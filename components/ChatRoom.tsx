@@ -1185,14 +1185,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         ? { source: 'p2p-stream', type: 'video', card_id: finalCardId || null, host_id: user.id }
         : { source: finalType === 'url' ? getEmbedUrl(finalSource) : finalSource, type: finalType, card_id: finalCardId || null };
 
-      const { error } = await supabase.from('rooms').upsert([{
-        id: roomId,
-        creator_id: user.id,
-        name: roomDetails?.name || 'Chat',
-        image_url: roomDetails?.image_url,
-        background_url: roomDetails?.background_url,
+      const { error } = await supabase.from('rooms').update({
         watch_party_data: watchPartyData
-      }], { onConflict: 'id' });
+      }).eq('id', roomId);
 
       if (error) {
         console.error('Watch party upsert error:', error);
