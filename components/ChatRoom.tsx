@@ -2055,54 +2055,216 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               ) : activeTab === 'showcase' ? (
                 <div className="max-w-6xl mx-auto w-full pb-24"><Gallery user={user} /></div>
               ) : activeTab === 'cinema' ? (
-                <div className="max-w-6xl mx-auto w-full pb-24 flex flex-col items-center justify-center min-h-[400px]">
-                  {watchPartySource ? (
-                    <div className="flex-1 flex flex-col items-center justify-center py-20 text-center space-y-6 max-w-md mx-auto">
-                      <div className="w-24 h-24 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 animate-pulse">
-                        <Tv size={44} />
-                      </div>
-                      <div className="space-y-2">
-                        <h3 className="text-xl font-black text-white uppercase tracking-tighter">Cinema ao Vivo</h3>
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-relaxed">O Host iniciou uma transmissão! Venha assistir com o grupo agora mesmo.</p>
-                      </div>
-                      <button 
-                        onClick={() => {
-                          setIsWatchPartyOpen(true);
-                          setActiveTab('chat');
-                        }}
-                        className="w-full py-4.5 bg-emerald-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-emerald-500 active:scale-95 transition-all shadow-xl shadow-emerald-600/10 flex items-center justify-center gap-2 px-6"
-                      >
-                        <Tv size={16} /> Entrar na Sala de Cinema
-                      </button>
+                watchPartySource ? (
+                  /* ACTIVE CINEMA VIEW */
+                  <div className="flex-1 w-full flex flex-col md:flex-row overflow-hidden rounded-3xl border border-slate-800 bg-black min-h-[450px] md:min-h-[550px] relative">
+                    <div className="flex-1 relative bg-black flex items-center justify-center min-h-[250px] md:min-h-0">
+                      {isHost && (
+                        <button
+                          onClick={stopWatchParty}
+                          className="absolute top-6 left-6 z-[510] px-4 py-2 bg-red-600/90 text-white rounded-xl hover:bg-red-600 transition-all shadow-md font-bold uppercase text-[10px] tracking-wider"
+                        >
+                          Encerrar
+                        </button>
+                      )}
+                      
+                      {watchPartyCardId && !myCards.some(c => c.id === watchPartyCardId) && !purchasedCardIds.has(watchPartyCardId) ? (
+                        <div className="absolute inset-0 z-[520] bg-slate-900/95 backdrop-blur-xl flex flex-col items-center justify-center p-8 text-center animate-in fade-in">
+                          <div className="p-8 rounded-[3rem] bg-slate-800 border border-slate-700 shadow-2xl mb-6">
+                            <Lock size={48} className="text-indigo-400 mx-auto mb-4" />
+                            <h4 className="text-xl font-black text-white uppercase tracking-tighter mb-2">Conteúdo Exclusivo</h4>
+                            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Este vídeo faz parte de um Card e requer liberação.</p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              const card = messages.find(m => m.card?.id === watchPartyCardId)?.card;
+                              if (card) handleInteractWithCard(card);
+                              else showToast("Desbloqueie o card original para assistir.", "info");
+                            }}
+                            className="px-8 py-4 bg-emerald-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-emerald-500 transition-all shadow-xl flex items-center gap-2"
+                          >
+                            <Zap size={16} /> Liberar Acesso
+                          </button>
+                        </div>
+                      ) : (
+                        watchPartyType === 'video' ? (
+                          watchPartySource === 'p2p-stream' ? (
+                            isHost ? (
+                              <video
+                                ref={hostVideoRef}
+                                src={localVideoUrl || undefined}
+                                controls
+                                autoPlay
+                                playsInline
+                                className="max-w-full max-h-full"
+                              />
+                            ) : (
+                              <video
+                                ref={viewerVideoRef}
+                                autoPlay
+                                playsInline
+                                controls
+                                className="max-w-full max-h-full"
+                              />
+                            )
+                          ) : (
+                            <video src={watchPartySource} controls autoPlay className="max-w-full max-h-full" />
+                          )
+                        ) : (
+                          <iframe src={getEmbedUrl(watchPartySource!)} className="w-full h-full border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
+                        )
+                      )}
                     </div>
-                  ) : isAdmin ? (
-                    <div className="flex-1 flex flex-col items-center justify-center py-20 text-center space-y-6 max-w-md mx-auto">
-                      <div className="w-24 h-24 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400">
-                        <Tv size={44} />
-                      </div>
-                      <div className="space-y-2">
-                        <h3 className="text-xl font-black text-white uppercase tracking-tighter">Cinema Off-line</h3>
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Você é Host/Admin. Escolha um vídeo para iniciar a transmissão conjunta com a sala.</p>
-                      </div>
-                      <button 
+
+                    {/* FLOATING CHAT SIDEBAR FOR WATCH PARTY */}
+                    <div className="w-full md:w-96 h-64 md:h-full bg-slate-900 border-l border-slate-800 flex flex-col shadow-2xl relative flex-shrink-0">
+                      {isAdmin ? (
+                        <div className="flex border-b border-slate-800 bg-slate-800/20">
+                          <button
+                            onClick={() => setSidebarTab('chat')}
+                            className={`flex-1 py-4 text-xs font-black uppercase tracking-widest transition-all ${sidebarTab === 'chat' ? 'text-white border-b-2 border-indigo-500 bg-slate-800/50' : 'text-slate-500 hover:text-slate-300'}`}
+                          >
+                            Chat
+                          </button>
+                          <button
+                            onClick={() => setSidebarTab('history')}
+                            className={`flex-1 py-4 text-xs font-black uppercase tracking-widest transition-all ${sidebarTab === 'history' ? 'text-white border-b-2 border-indigo-500 bg-slate-800/50' : 'text-slate-500 hover:text-slate-300'}`}
+                          >
+                            Histórico
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="p-4 border-b border-slate-800 bg-slate-800/50 flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                            <span className="text-xs font-black uppercase text-white tracking-widest">Assistindo Juntos</span>
+                          </div>
+                          <span className="text-[10px] font-bold text-slate-500 uppercase">{messages.length} Mensagens</span>
+                        </div>
+                      )}
+
+                      {(!isAdmin || sidebarTab === 'chat') ? (
+                        <>
+                          <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
+                            {messages.slice(-15).map((msg, i) => (
+                              <div key={msg.id} className={`flex flex-col ${msg.senderId === user.id ? 'items-end' : 'items-start'} animate-in slide-in-from-bottom-2 fade-in fill-mode-both`} style={{ animationDelay: `${i * 0.05}s` }}>
+                                <span
+                                  onClick={() => isHost && msg.senderId !== user.id && handleToggleAdmin(msg.senderId)}
+                                  className={`text-[10px] font-black uppercase mb-1 flex items-center gap-1 ${isHost && msg.senderId !== user.id ? 'cursor-pointer hover:text-indigo-400' : ''} ${msg.senderId === user.id ? 'text-blue-400' : 'text-slate-500'}`}
+                                >
+                                  {msg.senderName}
+                                  {roomAdmins.has(msg.senderId) && <span className="text-[7px] bg-indigo-600 text-white px-1 rounded-sm">ADM</span>}
+                                  {msg.senderId === roomId && <span className="text-[7px] bg-amber-500 text-white px-1 rounded-sm">HOST</span>}
+                                </span>
+                                <div className={`px-4 py-2 rounded-2xl text-xs font-medium max-w-[90%] break-all ${msg.senderId === user.id ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700/50'}`}>
+                                  {msg.text}
+                                </div>
+                              </div>
+                            ))}
+                            <div ref={messagesEndRef} />
+                          </div>
+
+                          <div className="p-4 bg-slate-800/30 border-t border-slate-800">
+                            <div className="flex items-center gap-2 bg-slate-900 rounded-xl px-4 py-1 border border-slate-700 focus-within:border-blue-500/50 transition-all">
+                              <input
+                                value={inputText}
+                                onChange={(e) => setInputText(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                                placeholder="Comentar..."
+                                className="flex-1 bg-transparent border-none text-[16px] py-3 text-white outline-none"
+                              />
+                              <button onClick={handleSendMessage} disabled={!inputText.trim()} className="text-blue-500 disabled:opacity-30"><Send size={18} /></button>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-hide animate-in fade-in">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Vídeos Recentes (Salvos Local)</span>
+                            <button 
+                              onClick={() => {
+                                if (confirm("Limpar todo o histórico local?")) {
+                                  recentVideos.forEach(v => deleteVideoFromLocalDB(v.id));
+                                  setRecentVideos([]);
+                                }
+                              }}
+                              className="text-[9px] font-bold text-red-500 hover:text-red-400 uppercase"
+                            >
+                              Limpar Tudo
+                            </button>
+                          </div>
+                          {recentVideos.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                              Nenhum vídeo recente encontrado.
+                            </div>
+                          ) : (
+                            recentVideos.map((video: any) => (
+                              <div key={video.id} className="flex items-center justify-between p-3 bg-slate-800/40 border border-slate-700/30 rounded-2xl group transition-all hover:bg-slate-800/80 hover:border-indigo-500/30 backdrop-blur-md relative overflow-hidden">
+                                <div className="w-16 aspect-video rounded-lg overflow-hidden bg-slate-900 border border-slate-700/50 flex-shrink-0 relative">
+                                  {video.thumbnail ? (
+                                    <img src={video.thumbnail} className="w-full h-full object-cover" alt="" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-slate-600 bg-slate-900">
+                                      <Video size={16} />
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0 px-3 flex flex-col justify-center">
+                                  <p className="text-xs font-black text-white truncate uppercase tracking-tighter" title={video.name}>{video.name}</p>
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{(video.size / (1024 * 1024)).toFixed(1)} MB</p>
+                                </div>
+                                <div className="flex items-center gap-1.5 z-10">
+                                  <button
+                                    onClick={() => playRecentVideo(video)}
+                                    className="p-2 bg-emerald-600/10 text-emerald-400 hover:bg-emerald-600 hover:text-white rounded-xl transition-all border border-emerald-500/10 shadow-lg active:scale-95"
+                                    title="Transmitir Vídeo"
+                                  >
+                                    <Tv size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => deleteRecentVideo(video.id)}
+                                    className="p-2 bg-red-600/10 text-red-400 hover:bg-red-600 hover:text-white rounded-xl transition-all border border-red-500/10 shadow-lg opacity-0 group-hover:opacity-100 focus:opacity-100 active:scale-95"
+                                    title="Excluir"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  /* OFFLINE CINEMA VIEW */
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 bg-slate-950/40 rounded-3xl border border-slate-800/50 text-center min-h-[450px] md:min-h-[550px] animate-in fade-in">
+                    {isAdmin ? (
+                      <div 
                         onClick={() => setIsWatchPartyOpen(true)}
-                        className="w-full py-4.5 bg-indigo-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-indigo-500 active:scale-95 transition-all shadow-xl shadow-indigo-600/10 flex items-center justify-center gap-2 px-6"
+                        className="p-8 md:p-12 rounded-[2.5rem] bg-indigo-600/5 hover:bg-indigo-600/10 border border-indigo-500/20 hover:border-indigo-500/40 transition-all cursor-pointer flex flex-col items-center max-w-sm group shadow-xl"
                       >
-                        <Plus size={16} /> Iniciar Transmissão
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center py-20 text-center space-y-6 max-w-md mx-auto">
-                      <div className="w-24 h-24 rounded-full bg-slate-800/50 border border-slate-700/30 flex items-center justify-center text-slate-600 animate-pulse">
-                        <Tv size={44} />
+                        <div className="w-16 h-16 rounded-full bg-indigo-500/10 flex items-center justify-center mb-6 text-indigo-400 group-hover:scale-110 transition-transform">
+                          <Tv size={32} />
+                        </div>
+                        <h4 className="text-lg font-black text-white uppercase tracking-tighter mb-3">Cinema Offline</h4>
+                        <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wide leading-relaxed">
+                          Clique aqui para fazer upload de um vídeo ou colar um link e iniciar a transmissão para todos os usuários da sala.
+                        </p>
                       </div>
-                      <div className="space-y-2">
-                        <h3 className="text-xl font-black text-slate-500 uppercase tracking-tighter">Cinema Fechado</h3>
-                        <p className="text-xs font-bold text-slate-600 uppercase tracking-widest leading-relaxed">Aguardando o Host ou Administrador iniciar a transmissão do vídeo.</p>
+                    ) : (
+                      <div className="p-8 md:p-12 rounded-[2.5rem] bg-slate-900/50 border border-slate-800 flex flex-col items-center max-w-sm shadow-xl">
+                        <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mb-6 text-slate-600 animate-pulse">
+                          <Tv size={32} />
+                        </div>
+                        <h4 className="text-lg font-black text-white uppercase tracking-tighter mb-3">Cinema Fechado</h4>
+                        <p className="text-[11px] text-slate-500 font-bold uppercase tracking-wide leading-relaxed">
+                          Aguardando o Host ou um Administrador iniciar a transmissão de um vídeo para começar a assistir juntos.
+                        </p>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )
               ) : (
                 // MY CARDS TAB
                 <div className="max-w-6xl mx-auto w-full pb-24">
