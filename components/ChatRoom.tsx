@@ -2189,7 +2189,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                           onChange={(e) => setInputText(e.target.value)}
                           onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                           placeholder="Fale algo..."
-                          className={`w-full bg-transparent border-none text-[15px] py-3.5 md:py-4.5 ${colors.textHighlight} outline-none placeholder:opacity-40 font-medium`}
+                          className={`w-full bg-transparent border-none text-[16px] py-3.5 md:py-4.5 ${colors.textHighlight} outline-none placeholder:opacity-40 font-medium`}
                         />
                       </div>
 
@@ -2334,7 +2334,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         onChange={(e) => setInputText(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                         placeholder="Comentar..."
-                        className="flex-1 bg-transparent border-none text-xs py-3 text-white outline-none"
+                        className="flex-1 bg-transparent border-none text-[16px] py-3 text-white outline-none"
                       />
                       <button onClick={handleSendMessage} disabled={!inputText.trim()} className="text-blue-500 disabled:opacity-30"><Send size={18} /></button>
                     </div>
