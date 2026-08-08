@@ -279,6 +279,23 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     }
   }, [isWatchPartyOpen]);
 
+  // Visual viewport height adjustment for mobile keyboard overlay issues
+  useEffect(() => {
+    const handleResize = () => {
+      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      document.documentElement.style.setProperty('--viewport-height', `${vh}px`);
+    };
+    
+    window.visualViewport?.addEventListener('resize', handleResize);
+    window.addEventListener('resize', handleResize);
+    handleResize();
+    
+    return () => {
+      window.visualViewport?.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
 
   const peerConnections = useRef<{ [peerId: string]: RTCPeerConnection }>({});
   const pendingViewers = useRef<Set<string>>(new Set());
@@ -1884,7 +1901,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   );
 
   return (
-    <div className={`flex h-[100dvh] h-screen overflow-hidden ${colors.text} ${colors.bg}`}>
+    <div 
+      className={`flex overflow-hidden ${colors.text} ${colors.bg}`}
+      style={{ height: 'var(--viewport-height, 100vh)' }}
+    >
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-[100] bg-black/80 md:hidden animate-in fade-in" onClick={() => setIsMobileMenuOpen(false)}>
           <div className="w-[280px] h-full shadow-2xl animate-in slide-in-from-left duration-300" onClick={e => e.stopPropagation()}>
@@ -2011,7 +2031,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                   )}
                   {messages.map((msg) => (
                     <div key={msg.id} className={`flex flex-col ${msg.senderId === user.id ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-3 duration-500`}>
-                      {msg.text && (<div className={`max-w-[85%] md:max-w-[80%] px-5 py-3.5 rounded-2xl text-sm shadow-sm font-medium ${msg.senderId === user.id ? `${colors.primary} text-white rounded-tr-none` : `${isDark ? 'bg-slate-800/80 text-slate-200 border-slate-700/30' : 'bg-white text-slate-800 border-gray-200'} border rounded-tl-none`}`}>{msg.text}</div>)}
+                      {msg.text && (<div className={`max-w-[85%] md:max-w-[80%] px-5 py-3.5 rounded-2xl text-sm shadow-sm font-medium break-all ${msg.senderId === user.id ? `${colors.primary} text-white rounded-tr-none` : `${isDark ? 'bg-slate-800/80 text-slate-200 border-slate-700/30' : 'bg-white text-slate-800 border-gray-200'} border rounded-tl-none`}`}>{msg.text}</div>)}
                       {msg.card && (
                         <MediaCardItem
                           card={msg.card}
@@ -2319,7 +2339,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                           {roomAdmins.has(msg.senderId) && <span className="text-[7px] bg-indigo-600 text-white px-1 rounded-sm">ADM</span>}
                           {msg.senderId === roomId && <span className="text-[7px] bg-amber-500 text-white px-1 rounded-sm">HOST</span>}
                         </span>
-                        <div className={`px-4 py-2 rounded-2xl text-xs font-medium max-w-[90%] ${msg.senderId === user.id ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700/50'}`}>
+                        <div className={`px-4 py-2 rounded-2xl text-xs font-medium max-w-[90%] break-all ${msg.senderId === user.id ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700/50'}`}>
                           {msg.text}
                         </div>
                       </div>
