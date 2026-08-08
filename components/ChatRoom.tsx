@@ -170,6 +170,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const [cardToInsert, setCardToInsert] = useState<MediaCard | null>(null);
 
   const [activeTab, setActiveTab] = useState<'chat' | 'showcase' | 'my_cards' | 'cinema'>('chat');
+  const [isCinemaSidebarCollapsed, setIsCinemaSidebarCollapsed] = useState(false);
+  const [floatingMessages, setFloatingMessages] = useState<Array<{ id: string | number, text: string, senderName: string }>>([]);
   const [showQrCode, setShowQrCode] = useState(false);
   const [showEarningsModal, setShowEarningsModal] = useState(false);
   const [withdrawalPending, setWithdrawalPending] = useState(false);
@@ -295,6 +297,26 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       window.removeEventListener('resize', handleResize);
     };
   }, []);
+
+  // Floating messages hook for collapsed sidebar mode in Cinema tab
+  useEffect(() => {
+    if (messages.length > 0) {
+      const latestMsg = messages[messages.length - 1];
+      if (latestMsg.text && activeTab === 'cinema' && isCinemaSidebarCollapsed) {
+        const newFloating = {
+          id: latestMsg.id,
+          text: latestMsg.text,
+          senderName: latestMsg.senderName
+        };
+        setFloatingMessages(prev => [...prev.slice(-2), newFloating]); // keep last 3 floating bubbles max
+        
+        // Auto-remove after 6 seconds
+        setTimeout(() => {
+          setFloatingMessages(prev => prev.filter(m => m.id !== newFloating.id));
+        }, 6000);
+      }
+    }
+  }, [messages, isCinemaSidebarCollapsed, activeTab]);
 
 
   const peerConnections = useRef<{ [peerId: string]: RTCPeerConnection }>({});
@@ -2068,6 +2090,33 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         </button>
                       )}
                       
+                      <button
+                        onClick={() => setIsCinemaSidebarCollapsed(!isCinemaSidebarCollapsed)}
+                        className="absolute top-6 right-6 z-[510] px-3 py-2 bg-slate-800/80 hover:bg-slate-700 text-white rounded-xl transition-all shadow-md font-bold uppercase text-[10px] tracking-wider flex items-center gap-1.5 backdrop-blur-sm"
+                      >
+                        {isCinemaSidebarCollapsed ? (
+                          <>
+                            <MessageSquare size={12} /> Mostrar Chat
+                          </>
+                        ) : (
+                          <>
+                            <ChevronRight size={12} /> Ocultar Chat
+                          </>
+                        )}
+                      </button>
+
+                      {/* Floating messages overlay when chat is collapsed */}
+                      {isCinemaSidebarCollapsed && floatingMessages.length > 0 && (
+                        <div className="absolute bottom-6 left-6 z-[520] max-w-[280px] md:max-w-sm flex flex-col gap-2 pointer-events-none animate-in fade-in">
+                          {floatingMessages.map((msg) => (
+                            <div key={msg.id} className="bg-slate-900/80 backdrop-blur-md border border-slate-700/30 px-4 py-2.5 rounded-2xl shadow-xl flex flex-col gap-0.5 animate-in slide-in-from-bottom-3 duration-300">
+                              <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400">{msg.senderName}</span>
+                              <span className="text-xs font-semibold text-slate-100 break-all">{msg.text}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
                       {watchPartyCardId && !myCards.some(c => c.id === watchPartyCardId) && !purchasedCardIds.has(watchPartyCardId) ? (
                         <div className="absolute inset-0 z-[520] bg-slate-900/95 backdrop-blur-xl flex flex-col items-center justify-center p-8 text-center animate-in fade-in">
                           <div className="p-8 rounded-[3rem] bg-slate-800 border border-slate-700 shadow-2xl mb-6">
@@ -2096,7 +2145,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                                 controls
                                 autoPlay
                                 playsInline
-                                className="max-w-full max-h-full"
+                                className="max-w-full max-h-full object-contain"
                               />
                             ) : (
                               <video
@@ -2104,11 +2153,11 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                                 autoPlay
                                 playsInline
                                 controls
-                                className="max-w-full max-h-full"
+                                className="max-w-full max-h-full object-contain"
                               />
                             )
                           ) : (
-                            <video src={watchPartySource} controls autoPlay className="max-w-full max-h-full" />
+                            <video src={watchPartySource} controls autoPlay className="max-w-full max-h-full object-contain" />
                           )
                         ) : (
                           <iframe src={getEmbedUrl(watchPartySource!)} className="w-full h-full border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
@@ -2117,7 +2166,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                     </div>
 
                     {/* FLOATING CHAT SIDEBAR FOR WATCH PARTY */}
-                    <div className="w-full md:w-96 h-64 md:h-full bg-slate-900 border-l border-slate-800 flex flex-col shadow-2xl relative flex-shrink-0">
+                    <div className={`${isCinemaSidebarCollapsed ? 'w-0 h-0 border-l-0 overflow-hidden' : 'w-full md:w-96 h-64 md:h-full border-l border-slate-800'} bg-slate-900 flex flex-col shadow-2xl relative flex-shrink-0 transition-all duration-300`}>
                       {isAdmin ? (
                         <div className="flex border-b border-slate-800 bg-slate-800/20">
                           <button
