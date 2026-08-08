@@ -393,7 +393,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   }, [localStream, isHost, user.id]);
 
   useEffect(() => {
-    if (watchPartySource === 'p2p-stream' && watchPartyHostId && !isHost && !remoteStream && roomId) {
+    if (watchPartySource === 'p2p-stream' && watchPartyHostId && !isHost && !remoteStream && isWatchPartyOpen && roomId) {
       // Send join-request to the host
       const channel = supabase.channel(`room:${roomId}`);
       channel.send({
@@ -406,7 +406,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         }
       });
     }
-  }, [watchPartySource, watchPartyHostId, isHost, remoteStream, roomId, user.id]);
+  }, [watchPartySource, watchPartyHostId, isHost, remoteStream, isWatchPartyOpen, roomId, user.id]);
 
   useEffect(() => {
     if (viewerVideoRef.current) {
@@ -756,6 +756,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           setWatchPartySource(data.watch_party_data.source);
           setWatchPartyCardId(data.watch_party_data.card_id);
           setWatchPartyType(data.watch_party_data.type as any);
+          setWatchPartyHostId(data.watch_party_data.host_id || null);
           setIsWatchPartyOpen(true);
         }
       }
@@ -1213,12 +1214,17 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       await supabase.from('rooms').update({
         watch_party_data: null
       }).eq('id', roomId);
+      setWatchPartySource(null);
+      setWatchPartyCardId(null);
+      setWatchPartyHostId(null);
+      cleanupP2P();
+    } else {
+      // For non-host viewers, close the local overlay & disconnect.
+      // Do not nullify source, so we can re-open Cinema.
+      cleanupP2P();
     }
 
     setIsWatchPartyOpen(false);
-    setWatchPartySource(null);
-    setWatchPartyCardId(null);
-    cleanupP2P();
   };
 
   const onCardCreated = async (card: MediaCard) => {
