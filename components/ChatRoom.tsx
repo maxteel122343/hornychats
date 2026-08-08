@@ -276,10 +276,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   };
 
   useEffect(() => {
-    if (isWatchPartyOpen) {
+    if (activeTab === 'cinema') {
       loadRecentVideos();
     }
-  }, [isWatchPartyOpen]);
+  }, [activeTab]);
 
   // Visual viewport height adjustment for mobile keyboard overlay issues
   useEffect(() => {
