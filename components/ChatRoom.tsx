@@ -2281,7 +2281,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
             {/* FLOATING CHAT SIDEBAR FOR WATCH PARTY */}
             <div className="w-full md:w-96 h-1/2 md:h-full bg-slate-900 border-l border-slate-800 flex flex-col shadow-2xl relative">
-              {isHost ? (
+              {isAdmin ? (
                 <div className="flex border-b border-slate-800 bg-slate-800/20">
                   <button
                     onClick={() => setSidebarTab('chat')}
@@ -2306,7 +2306,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                 </div>
               )}
 
-              {(!isHost || sidebarTab === 'chat') ? (
+              {(!isAdmin || sidebarTab === 'chat') ? (
                 <>
                   <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
                     {messages.slice(-15).map((msg, i) => (
