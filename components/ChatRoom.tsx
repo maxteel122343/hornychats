@@ -169,7 +169,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const [isRoomSelectorOpen, setIsRoomSelectorOpen] = useState(false);
   const [cardToInsert, setCardToInsert] = useState<MediaCard | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'chat' | 'showcase' | 'my_cards'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'showcase' | 'my_cards' | 'cinema'>('chat');
   const [showQrCode, setShowQrCode] = useState(false);
   const [showEarningsModal, setShowEarningsModal] = useState(false);
   const [withdrawalPending, setWithdrawalPending] = useState(false);
@@ -2000,6 +2000,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               <button onClick={() => setActiveTab('chat')} className={`px-4 md:px-8 py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'chat' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><MessageSquare size={14} /> Feed</button>
               <button onClick={() => setActiveTab('showcase')} className={`px-4 md:px-8 py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'showcase' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><LayoutGrid size={14} /> Vitrine</button>
               <button onClick={() => setActiveTab('my_cards')} className={`px-4 md:px-8 py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'my_cards' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><FolderOpen size={14} /> Meus Cards</button>
+              <button onClick={() => setActiveTab('cinema')} className={`px-4 md:px-8 py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'cinema' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><Tv size={14} /> Cinema</button>
             </nav>
 
             <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col scrollbar-hide">
@@ -2052,6 +2053,55 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                 </div>
               ) : activeTab === 'showcase' ? (
                 <div className="max-w-6xl mx-auto w-full pb-24"><Gallery user={user} /></div>
+              ) : activeTab === 'cinema' ? (
+                <div className="max-w-6xl mx-auto w-full pb-24 flex flex-col items-center justify-center min-h-[400px]">
+                  {watchPartySource ? (
+                    <div className="flex-1 flex flex-col items-center justify-center py-20 text-center space-y-6 max-w-md mx-auto">
+                      <div className="w-24 h-24 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 animate-pulse">
+                        <Tv size={44} />
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-xl font-black text-white uppercase tracking-tighter">Cinema ao Vivo</h3>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-relaxed">O Host iniciou uma transmissão! Venha assistir com o grupo agora mesmo.</p>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setIsWatchPartyOpen(true);
+                          setActiveTab('chat');
+                        }}
+                        className="w-full py-4.5 bg-emerald-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-emerald-500 active:scale-95 transition-all shadow-xl shadow-emerald-600/10 flex items-center justify-center gap-2 px-6"
+                      >
+                        <Tv size={16} /> Entrar na Sala de Cinema
+                      </button>
+                    </div>
+                  ) : isAdmin ? (
+                    <div className="flex-1 flex flex-col items-center justify-center py-20 text-center space-y-6 max-w-md mx-auto">
+                      <div className="w-24 h-24 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400">
+                        <Tv size={44} />
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-xl font-black text-white uppercase tracking-tighter">Cinema Off-line</h3>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Você é Host/Admin. Escolha um vídeo para iniciar a transmissão conjunta com a sala.</p>
+                      </div>
+                      <button 
+                        onClick={() => setIsWatchPartyOpen(true)}
+                        className="w-full py-4.5 bg-indigo-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-indigo-500 active:scale-95 transition-all shadow-xl shadow-indigo-600/10 flex items-center justify-center gap-2 px-6"
+                      >
+                        <Plus size={16} /> Iniciar Transmissão
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center py-20 text-center space-y-6 max-w-md mx-auto">
+                      <div className="w-24 h-24 rounded-full bg-slate-800/50 border border-slate-700/30 flex items-center justify-center text-slate-600 animate-pulse">
+                        <Tv size={44} />
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-xl font-black text-slate-500 uppercase tracking-tighter">Cinema Fechado</h3>
+                        <p className="text-xs font-bold text-slate-600 uppercase tracking-widest leading-relaxed">Aguardando o Host ou Administrador iniciar a transmissão do vídeo.</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               ) : (
                 // MY CARDS TAB
                 <div className="max-w-6xl mx-auto w-full pb-24">
