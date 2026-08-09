@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Plus, Home, Wallet, Share2, MessageSquare, LayoutGrid, QrCode, X, User as UserIcon, LogIn, Camera, Settings, Sun, Moon, Menu, ChevronLeft, ChevronRight, Copy, CheckCircle, Loader2, RefreshCw, DollarSign, ArrowUpRight, Mic, Video, Upload, StopCircle, Trash2, Aperture, Lock, Zap, History, CreditCard, Mail, ShoppingCart, LogOut, FolderOpen, Edit, Tv, Image as ImageIcon, Cloud } from 'lucide-react';
+import { Send, Plus, Home, Wallet, Share2, MessageSquare, LayoutGrid, QrCode, X, User as UserIcon, LogIn, Camera, Settings, Sun, Moon, Menu, ChevronLeft, ChevronRight, Copy, CheckCircle, Loader2, RefreshCw, DollarSign, ArrowUpRight, Mic, Video, Upload, StopCircle, Trash2, Aperture, Lock, Zap, History, CreditCard, Mail, ShoppingCart, LogOut, FolderOpen, Edit, Tv, Image as ImageIcon, Cloud, MoreVertical, Minimize2, Maximize2, Power } from 'lucide-react';
 import { User, Message, MediaCard, ChatSession, CardType, PaymentTransaction, CardDefaults } from '../types';
 import { supabase } from '../lib/supabase';
 import CardModal from './CardModal';
@@ -252,6 +252,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
   // Watch Party State
   const [isWatchPartyOpen, setIsWatchPartyOpen] = useState(false);
+  const [isCinemaMenuOpen, setIsCinemaMenuOpen] = useState(false);
   const [watchPartySource, setWatchPartySource] = useState<string | null>(null);
   const [watchPartyType, setWatchPartyType] = useState<'video' | 'url' | null>(null);
   const [watchPartyCardId, setWatchPartyCardId] = useState<string | null>(null);
@@ -275,7 +276,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       setRecentVideos(list);
 
       // AUTO RESTORE P2P STREAM AFTER RELOAD FOR HOST!
-      if (activeTab === 'cinema' && isWatchPartyHost && watchPartySource === 'p2p-stream' && list.length > 0 && !localVideoUrl) {
+      if ((activeTab === 'cinema' || isWatchPartyOpen) && isWatchPartyHost && watchPartySource === 'p2p-stream' && list.length > 0 && !localVideoUrl) {
         const latestVideo = list[0];
         const url = URL.createObjectURL(latestVideo.file);
         setLocalVideoUrl(url);
@@ -287,10 +288,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   };
 
   useEffect(() => {
-    if (activeTab === 'cinema') {
+    if (activeTab === 'cinema' || isWatchPartyOpen) {
       loadRecentVideos();
     }
-  }, [activeTab]);
+  }, [activeTab, isWatchPartyOpen]);
 
   // Visual viewport height adjustment for mobile keyboard overlay issues
   useEffect(() => {
@@ -439,7 +440,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       joinRequestIntervalRef.current = null;
     }
 
-    if (watchPartySource === 'p2p-stream' && watchPartyHostId && !isWatchPartyHost && !remoteStream && activeTab === 'cinema' && roomChannel) {
+    if (watchPartySource === 'p2p-stream' && watchPartyHostId && !isWatchPartyHost && !remoteStream && (activeTab === 'cinema' || isWatchPartyOpen) && roomChannel) {
       const sendJoinRequest = () => {
         roomChannel.send({
           type: 'broadcast',
@@ -459,7 +460,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         joinRequestIntervalRef.current = null;
       }
     };
-  }, [watchPartySource, watchPartyHostId, isWatchPartyHost, remoteStream, activeTab, roomChannel, user.id]);
+  }, [watchPartySource, watchPartyHostId, isWatchPartyHost, remoteStream, activeTab, isWatchPartyOpen, roomChannel, user.id]);
 
   useEffect(() => {
     if (viewerVideoRef.current) {
@@ -2361,25 +2362,35 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                   /* ACTIVE CINEMA VIEW */
                   <div className="flex-1 w-full flex flex-col md:flex-row overflow-hidden rounded-3xl border border-slate-800 bg-black min-h-[450px] md:min-h-[550px] relative">
                     <div className="flex-1 relative bg-black flex items-center justify-center min-h-[250px] md:min-h-0">
-                      {isAdmin && (
-                        <div className="absolute top-6 left-6 z-[510] flex gap-2">
-                          {isWatchPartyHost && (
-                            <button
-                              onClick={stopWatchParty}
-                              className="px-4 py-2 bg-red-600/90 text-white rounded-xl hover:bg-red-600 transition-all shadow-md font-bold uppercase text-[10px] tracking-wider"
-                            >
-                              Encerrar
-                            </button>
-                          )}
+                      <div className="absolute top-6 left-6 z-[510] flex gap-2">
+                        {isWatchPartyHost && (
                           <button
-                            onClick={() => setIsWatchPartyOpen(true)}
+                            onClick={stopWatchParty}
+                            className="px-4 py-2 bg-red-600/90 text-white rounded-xl hover:bg-red-600 transition-all shadow-md font-bold uppercase text-[10px] tracking-wider"
+                          >
+                            Encerrar
+                          </button>
+                        )}
+                        {isAdmin && (
+                          <button
+                            onClick={() => {
+                              setWatchPartySource(null);
+                              setIsWatchPartyOpen(true);
+                            }}
                             className="px-3 py-2 bg-indigo-600/90 hover:bg-indigo-500 text-white rounded-xl transition-all shadow-md flex items-center gap-1.5 font-bold uppercase text-[10px] tracking-wider"
                             title="Transmitir outro vídeo"
                           >
                             <Plus size={12} /> Novo Vídeo
                           </button>
-                        </div>
-                      )}
+                        )}
+                        <button
+                          onClick={() => setIsWatchPartyOpen(true)}
+                          className="px-3 py-2 bg-slate-800/90 hover:bg-slate-700 text-white rounded-xl transition-all shadow-md flex items-center gap-1.5 font-bold uppercase text-[10px] tracking-wider backdrop-blur-sm"
+                          title="Assistir em Tela Cheia"
+                        >
+                          <Maximize2 size={12} /> Tela Cheia
+                        </button>
+                      </div>
                       
                       <button
                         onClick={() => setIsCinemaSidebarCollapsed(!isCinemaSidebarCollapsed)}
@@ -2826,12 +2837,72 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         {isWatchPartyOpen && watchPartySource && (
           <div className="fixed inset-0 z-[500] bg-black animate-in fade-in flex flex-col md:flex-row overflow-hidden">
             <div className="flex-1 relative bg-black flex items-center justify-center">
-              <button
-                onClick={stopWatchParty}
-                className="absolute top-6 left-6 z-[510] p-3 bg-black/50 text-white rounded-full hover:bg-black/80 transition-all backdrop-blur-md border border-white/10"
-              >
-                <X size={24} />
-              </button>
+              {/* Floating Menu Controls */}
+              <div className="absolute top-6 left-6 z-[510] flex items-center gap-2">
+                <div className="relative">
+                  <button
+                    onClick={() => setIsCinemaMenuOpen(!isCinemaMenuOpen)}
+                    className="p-3 bg-black/50 text-white rounded-full hover:bg-black/80 transition-all backdrop-blur-md border border-white/10 flex items-center justify-center shadow-lg"
+                  >
+                    <MoreVertical size={20} />
+                  </button>
+                  
+                  {isCinemaMenuOpen && (
+                    <div className="absolute left-0 mt-2 w-56 rounded-2xl bg-slate-900/95 backdrop-blur-xl border border-slate-800 text-white shadow-2xl p-2 flex flex-col gap-1 z-[520] animate-in fade-in slide-in-from-top-2 duration-200">
+                      {isAdmin && (
+                        <button
+                          onClick={() => {
+                            setIsCinemaMenuOpen(false);
+                            setWatchPartySource(null);
+                            setIsWatchPartyOpen(true);
+                          }}
+                          className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800/80 transition-all text-left text-xs font-bold uppercase tracking-wider"
+                        >
+                          <Plus size={16} className="text-indigo-400" />
+                          Novo Vídeo
+                        </button>
+                      )}
+                      
+                      <button
+                        onClick={() => {
+                          setIsCinemaMenuOpen(false);
+                          setSidebarTab('history');
+                          setIsCinemaSidebarCollapsed(false);
+                        }}
+                        className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800/80 transition-all text-left text-xs font-bold uppercase tracking-wider"
+                      >
+                        <FolderOpen size={16} className="text-emerald-400" />
+                        Ver Histórico
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setIsCinemaMenuOpen(false);
+                          setIsWatchPartyOpen(false); // Minimize overlay, keeps playing in background/inline
+                          setActiveTab('cinema');
+                        }}
+                        className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800/80 transition-all text-left text-xs font-bold uppercase tracking-wider"
+                      >
+                        <Minimize2 size={16} className="text-sky-400" />
+                        Sair do Modo Cheio
+                      </button>
+
+                      {isWatchPartyHost && (
+                        <button
+                          onClick={() => {
+                            setIsCinemaMenuOpen(false);
+                            stopWatchParty();
+                          }}
+                          className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-950/40 hover:text-red-400 transition-all text-left text-xs font-bold uppercase tracking-wider text-red-500 border-t border-slate-800/50 mt-1"
+                        >
+                          <Power size={16} />
+                          Encerrar
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
               {/* LOCK OVERLAY IF NOT OWNER AND NOT PURCHASED */}
               {watchPartyCardId && !myCards.some(c => c.id === watchPartyCardId) && !purchasedCardIds.has(watchPartyCardId) ? (
                 <div className="absolute inset-0 z-[520] bg-slate-900/95 backdrop-blur-xl flex flex-col items-center justify-center p-8 text-center animate-in fade-in">
