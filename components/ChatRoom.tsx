@@ -336,6 +336,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const viewerVideoRef = useRef<HTMLVideoElement | null>(null);
   const roomChannelRef = useRef<any>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  // Retry interval for viewer join-request
+  const joinRequestIntervalRef = useRef<any>(null);
 
   useEffect(() => {
     localStreamRef.current = localStream;
@@ -379,65 +381,83 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const isDark = theme === 'dark';
 
   // WebRTC Effects
+  // FIX 1+3: When host gets a stream, connect all pending viewers AND broadcast 'stream-ready' to all
   useEffect(() => {
-    if (localStream && isHost && pendingViewers.current.size > 0) {
-      pendingViewers.current.forEach(async (viewerId) => {
-        if (peerConnections.current[viewerId]) return; // already connecting
+    if (localStream && isHost) {
+      const connectViewer = async (viewerId: string) => {
+        if (peerConnections.current[viewerId]) return;
         const pc = new RTCPeerConnection({
-          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
+          ]
         });
         peerConnections.current[viewerId] = pc;
-
         localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-
         pc.onicecandidate = (event) => {
           if (event.candidate && roomChannelRef.current) {
             roomChannelRef.current.send({
               type: 'broadcast',
               event: 'webrtc-signal',
-              payload: {
-                senderId: user.id,
-                targetId: viewerId,
-                type: 'candidate',
-                data: event.candidate
-              }
+              payload: { senderId: user.id, targetId: viewerId, type: 'candidate', data: event.candidate }
             });
           }
         };
-
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-
         if (roomChannelRef.current) {
           roomChannelRef.current.send({
             type: 'broadcast',
             event: 'webrtc-signal',
-            payload: {
-              senderId: user.id,
-              targetId: viewerId,
-              type: 'offer',
-              data: offer
-            }
+            payload: { senderId: user.id, targetId: viewerId, type: 'offer', data: offer }
           });
         }
-      });
-      pendingViewers.current.clear();
+      };
+
+      // Connect pending viewers queued before stream was ready
+      if (pendingViewers.current.size > 0) {
+        pendingViewers.current.forEach(connectViewer);
+        pendingViewers.current.clear();
+      }
+
+      // FIX 3: Broadcast 'stream-ready' to ALL viewers so they know to send join-request
+      if (roomChannelRef.current) {
+        roomChannelRef.current.send({
+          type: 'broadcast',
+          event: 'webrtc-signal',
+          payload: { senderId: user.id, targetId: 'all', type: 'stream-ready' }
+        });
+      }
     }
   }, [localStream, isHost, user.id]);
 
+  // FIX 2: Viewer retries join-request every 3 seconds until remoteStream received (max 10 attempts)
   useEffect(() => {
-    if (watchPartySource === 'p2p-stream' && watchPartyHostId && !isHost && !remoteStream && activeTab === 'cinema' && roomChannel) {
-      // Send join-request to the host
-      roomChannel.send({
-        type: 'broadcast',
-        event: 'webrtc-signal',
-        payload: {
-          senderId: user.id,
-          targetId: watchPartyHostId,
-          type: 'join-request'
-        }
-      });
+    if (joinRequestIntervalRef.current) {
+      clearInterval(joinRequestIntervalRef.current);
+      joinRequestIntervalRef.current = null;
     }
+
+    if (watchPartySource === 'p2p-stream' && watchPartyHostId && !isHost && !remoteStream && activeTab === 'cinema' && roomChannel) {
+      const sendJoinRequest = () => {
+        roomChannel.send({
+          type: 'broadcast',
+          event: 'webrtc-signal',
+          payload: { senderId: user.id, targetId: watchPartyHostId, type: 'join-request' }
+        });
+      };
+      // Send immediately
+      sendJoinRequest();
+      // Retry every 3 seconds (stops once remoteStream is received via effect cleanup)
+      joinRequestIntervalRef.current = setInterval(sendJoinRequest, 3000);
+    }
+
+    return () => {
+      if (joinRequestIntervalRef.current) {
+        clearInterval(joinRequestIntervalRef.current);
+        joinRequestIntervalRef.current = null;
+      }
+    };
   }, [watchPartySource, watchPartyHostId, isHost, remoteStream, activeTab, roomChannel, user.id]);
 
   useEffect(() => {
@@ -871,7 +891,20 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         })
       .on('broadcast', { event: 'webrtc-signal' }, async (payload) => {
         const { senderId, targetId, type, data } = payload.payload;
-        if (targetId !== user.id) return;
+        // Allow 'all' broadcasts (stream-ready) through for viewers; skip directed signals not for us
+        if (targetId !== user.id && targetId !== 'all') return;
+
+        // FIX 3: Host broadcasts 'stream-ready' → viewer responds immediately with join-request
+        if (type === 'stream-ready') {
+          if (!isHost && watchPartyHostId === senderId) {
+            channel.send({
+              type: 'broadcast',
+              event: 'webrtc-signal',
+              payload: { senderId: user.id, targetId: senderId, type: 'join-request' }
+            });
+          }
+          return;
+        }
 
         if (type === 'join-request') {
           if (!isHost) return;
@@ -884,7 +917,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           if (peerConnections.current[senderId]) return;
 
           const pc = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:stun1.l.google.com:19302' }
+            ]
           });
           peerConnections.current[senderId] = pc;
 
@@ -924,7 +960,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
             try { peerConnections.current[senderId].close(); } catch (e) {}
           }
           const pc = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:stun1.l.google.com:19302' }
+            ]
           });
           peerConnections.current[senderId] = pc;
 
@@ -1149,15 +1188,22 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     setLocalVideoUrl(null);
   };
 
-  const handleHostPlay = () => {
-    if (hostVideoRef.current && !localStream) {
+  // FIX 1: Capture stream as soon as video data is ready — no need to wait for Play
+  const captureHostStream = () => {
+    if (hostVideoRef.current && !localStreamRef.current) {
       const video = hostVideoRef.current;
-      const stream = (video as any).captureStream ? (video as any).captureStream() : (video as any).mozCaptureStream ? (video as any).mozCaptureStream() : null;
+      const stream = (video as any).captureStream
+        ? (video as any).captureStream()
+        : (video as any).mozCaptureStream
+          ? (video as any).mozCaptureStream()
+          : null;
       if (stream) {
         setLocalStream(stream);
       }
     }
   };
+
+  const handleHostPlay = () => captureHostStream();
 
   const handleWatchPartyUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2214,6 +2260,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                                 autoPlay
                                 playsInline
                                 className="max-w-full max-h-full object-contain"
+                                onCanPlay={captureHostStream}
                                 onPlay={handleHostPlay}
                               />
                             ) : (
@@ -2611,6 +2658,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         controls
                         autoPlay
                         className="max-w-full max-h-full"
+                        onCanPlay={captureHostStream}
                         onPlay={handleHostPlay}
                       />
                     ) : (
