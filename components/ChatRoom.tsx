@@ -355,8 +355,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   // Ensure video preview is attached when stream is available
   useEffect(() => {
     if (quickStream && quickVideoRef.current && (quickRecordingType === 'video' || quickRecordingType === 'photo')) {
-      quickVideoRef.current.srcObject = quickStream;
-      quickVideoRef.current.play().catch(e => console.log("Video play error:", e));
+      if (quickVideoRef.current.srcObject !== quickStream) {
+        quickVideoRef.current.srcObject = quickStream;
+        quickVideoRef.current.play().catch(e => console.log("Video play error:", e));
+      }
     }
   }, [quickStream, quickRecordingType]);
 
@@ -498,7 +500,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   }, [watchPartySource, watchPartyHostId, isWatchPartyHost, remoteStream, activeTab, isWatchPartyOpen, roomChannel, user.id]);
 
   useEffect(() => {
-    if (viewerVideoRef.current) {
+    if (viewerVideoRef.current && viewerVideoRef.current.srcObject !== remoteStream) {
       viewerVideoRef.current.srcObject = remoteStream;
     }
   }, [remoteStream]);
@@ -1061,7 +1063,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
             return;
           }
           
-          if (peerConnections.current[senderId]) return;
+          if (peerConnections.current[senderId]) {
+            try { peerConnections.current[senderId].close(); } catch (e) {}
+            delete peerConnections.current[senderId];
+          }
 
           const pc = new RTCPeerConnection({
             iceServers: [
