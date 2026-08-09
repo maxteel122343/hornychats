@@ -367,7 +367,6 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     user.isLoggedIn && (
       roomId === user.id ||
       roomId?.startsWith('priv-') ||
-      roomId?.startsWith('room-') ||
       (roomDetails && roomDetails.creator_id === user.id)
     )
   );
@@ -2872,19 +2871,30 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         onPlay={handleHostPlay}
                       />
                     ) : (
-                      <video
-                        ref={viewerVideoRef}
-                        autoPlay
-                        playsInline
-                        controls={canControlVideo}
-                        className="max-w-full max-h-full object-contain"
-                        onLoadedMetadata={(e) => {
-                          e.currentTarget.play().catch(err => console.log("Viewer play block error:", err));
-                        }}
-                        onPlay={canControlVideo ? handleHostControlPlay : undefined}
-                        onPause={canControlVideo ? handleHostControlPause : undefined}
-                        onSeeked={canControlVideo ? handleHostControlSeek : undefined}
-                      />
+                      <div className="relative w-full h-full flex items-center justify-center bg-black">
+                        {!remoteStream && (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-slate-950/80 backdrop-blur-sm z-[10] space-y-4">
+                            <Loader2 size={36} className="text-indigo-500 animate-spin" />
+                            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest animate-pulse">Conectando à transmissão P2P...</p>
+                            <div className="w-48 h-1 bg-slate-800 rounded-full overflow-hidden">
+                              <div className="bg-indigo-500 h-full w-2/3 animate-pulse" />
+                            </div>
+                          </div>
+                        )}
+                        <video
+                          ref={viewerVideoRef}
+                          autoPlay
+                          playsInline
+                          controls={canControlVideo}
+                          className="max-w-full max-h-full object-contain"
+                          onLoadedMetadata={(e) => {
+                            e.currentTarget.play().catch(err => console.log("Viewer play block error:", err));
+                          }}
+                          onPlay={canControlVideo ? handleHostControlPlay : undefined}
+                          onPause={canControlVideo ? handleHostControlPause : undefined}
+                          onSeeked={canControlVideo ? handleHostControlSeek : undefined}
+                        />
+                      </div>
                     )
                   ) : (
                     isWatchPartyHost ? (
