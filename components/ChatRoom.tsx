@@ -256,6 +256,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   // Watch Party State
   const [isRoomDetailsLoading, setIsRoomDetailsLoading] = useState(true);
   const [isChatMinimized, setIsChatMinimized] = useState(false);
+  const [p2pLoadingProgress, setP2pLoadingProgress] = useState(0);
   const [isWatchPartyOpen, setIsWatchPartyOpen] = useState(false);
   const [isCinemaMenuOpen, setIsCinemaMenuOpen] = useState(false);
   const [watchPartySource, setWatchPartySource] = useState<string | null>(null);
@@ -2523,8 +2524,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                 ) : (
                   /* OFFLINE CINEMA VIEW */
                   <div className="flex-1 flex flex-col items-center justify-center p-8 bg-slate-950/40 rounded-3xl border border-slate-800/50 text-center min-h-[450px] md:min-h-[550px] animate-in fade-in">
-                    {isAdmin ? (
-                      <div 
+                    {(isAdmin || isHost) ? (
+                      <div
                         onClick={() => setIsWatchPartyOpen(true)}
                         className="p-8 md:p-12 rounded-[2.5rem] bg-indigo-600/5 hover:bg-indigo-600/10 active:bg-indigo-600/20 border border-indigo-500/20 hover:border-indigo-500/40 transition-all cursor-pointer flex flex-col items-center max-w-sm group shadow-xl select-none"
                         style={{touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'}}
@@ -2550,6 +2551,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                     )}
                   </div>
                 )
+
               ) : (
                 // MY CARDS TAB
                 <div className="max-w-6xl mx-auto w-full pb-24">
@@ -2896,9 +2898,15 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                           <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-slate-950/80 backdrop-blur-sm z-[10] space-y-4">
                             <Loader2 size={36} className="text-indigo-500 animate-spin" />
                             <p className="text-xs text-slate-400 font-bold uppercase tracking-widest animate-pulse">Conectando à transmissão P2P...</p>
-                            <div className="w-48 h-1 bg-slate-800 rounded-full overflow-hidden">
-                              <div className="bg-indigo-500 h-full w-2/3 animate-pulse" />
+                            <div className="w-48 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                              <div
+                                className="bg-indigo-500 h-full rounded-full transition-all duration-500"
+                                style={{ width: `${Math.max(p2pLoadingProgress, 5)}%` }}
+                              />
                             </div>
+                            {p2pLoadingProgress > 0 && (
+                              <p className="text-[10px] font-black text-indigo-400 tracking-widest">{p2pLoadingProgress}%</p>
+                            )}
                           </div>
                         )}
                         <video
@@ -2909,6 +2917,13 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                           className="max-w-full max-h-full object-contain"
                           onLoadedMetadata={(e) => {
                             e.currentTarget.play().catch(err => console.log("Viewer play block error:", err));
+                          }}
+                          onProgress={(e) => {
+                            const video = e.currentTarget;
+                            if (video.buffered.length > 0 && video.duration > 0) {
+                              const pct = Math.round((video.buffered.end(video.buffered.length - 1) / video.duration) * 100);
+                              setP2pLoadingProgress(pct);
+                            }
                           }}
                           onPlay={canControlVideo ? handleHostControlPlay : undefined}
                           onPause={canControlVideo ? handleHostControlPause : undefined}
@@ -2951,8 +2966,20 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
             </div>
 
             {/* FLOATING CHAT SIDEBAR FOR WATCH PARTY */}
-            <div className={`${isCinemaSidebarCollapsed ? 'w-0 h-0 border-l-0 overflow-hidden' : 'w-full md:w-96 h-1/2 md:h-full border-l border-slate-800'} bg-slate-900 flex flex-col shadow-2xl relative flex-shrink-0 transition-all duration-300`}>
-              {isAdmin ? (
+            <div className={`${isCinemaSidebarCollapsed ? 'w-0 h-0 border-l-0 overflow-hidden' : isChatMinimized ? 'w-full md:w-96 md:h-full border-l border-slate-800' : 'w-full md:w-96 h-1/2 md:h-full border-l border-slate-800'} bg-slate-900 flex flex-col shadow-2xl relative flex-shrink-0 transition-all duration-300`}>
+              {/* When minimized: show ONLY the chevron row, hide tab labels and input */}
+              {isChatMinimized ? (
+                <div className="flex items-center justify-center border-b border-slate-800 bg-slate-800/20 py-2">
+                  <button
+                    onClick={() => setIsChatMinimized(false)}
+                    title="Expandir chat"
+                    className="px-6 py-2 text-slate-400 hover:text-slate-200 transition-all flex items-center gap-2"
+                  >
+                    <ChevronDown size={16} className="rotate-180" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Expandir Chat</span>
+                  </button>
+                </div>
+              ) : isAdmin ? (
                 <div className="flex border-b border-slate-800 bg-slate-800/20 items-center">
                   <button
                     onClick={() => setSidebarTab('chat')}
