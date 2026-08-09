@@ -9,9 +9,19 @@ import { Toast, ToastType } from './components/Toast';
 import { User } from './types';
 import { supabase } from './lib/supabase';
 
+const getVisitorId = () => {
+  if (typeof window === 'undefined') return 'guest_temp';
+  let id = localStorage.getItem('visitor_id');
+  if (!id) {
+    id = 'guest_' + Math.random().toString(36).substring(2, 7);
+    localStorage.setItem('visitor_id', id);
+  }
+  return id;
+};
+
 const App: React.FC = () => {
   const [user, setUser] = useState<User>({
-    id: 'guest_' + Math.random().toString(36).substr(2, 5),
+    id: getVisitorId(),
     name: 'Visitante',
     credits: 50,
     free_credits: 50,
@@ -51,7 +61,7 @@ const App: React.FC = () => {
         syncUser(session.user);
       } else {
         setUser({
-          id: 'guest_' + Math.random().toString(36).substr(2, 5),
+          id: getVisitorId(),
           name: 'Visitante',
           credits: 50,
           earnings: 0,
