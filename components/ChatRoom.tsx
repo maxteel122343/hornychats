@@ -273,6 +273,14 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     try {
       const list = await getRecentVideosFromLocalDB();
       setRecentVideos(list);
+
+      // AUTO RESTORE P2P STREAM AFTER RELOAD FOR HOST!
+      if (activeTab === 'cinema' && isHost && watchPartySource === 'p2p-stream' && list.length > 0 && !localVideoUrl) {
+        const latestVideo = list[0];
+        const url = URL.createObjectURL(latestVideo.file);
+        setLocalVideoUrl(url);
+        setWatchPartyFile(latestVideo.file);
+      }
     } catch (e) {
       console.error("Failed to load local videos:", e);
     }
@@ -852,6 +860,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
             setWatchPartyType(updated.watch_party_data.type);
             setWatchPartyHostId(updated.watch_party_data.host_id || null);
             setIsWatchPartyOpen(true);
+            setActiveTab('cinema');
           } else {
             setIsWatchPartyOpen(false);
             setWatchPartySource(null);
