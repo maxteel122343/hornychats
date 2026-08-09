@@ -415,7 +415,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   }, [localStream, isHost, user.id]);
 
   useEffect(() => {
-    if (watchPartySource === 'p2p-stream' && watchPartyHostId && !isHost && !remoteStream && isWatchPartyOpen && roomId) {
+    if (watchPartySource === 'p2p-stream' && watchPartyHostId && !isHost && !remoteStream && activeTab === 'cinema' && roomId) {
       // Send join-request to the host
       const channel = supabase.channel(`room:${roomId}`);
       channel.send({
@@ -428,7 +428,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         }
       });
     }
-  }, [watchPartySource, watchPartyHostId, isHost, remoteStream, isWatchPartyOpen, roomId, user.id]);
+  }, [watchPartySource, watchPartyHostId, isHost, remoteStream, activeTab, roomId, user.id]);
 
   useEffect(() => {
     if (viewerVideoRef.current) {
@@ -2081,13 +2081,24 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                   /* ACTIVE CINEMA VIEW */
                   <div className="flex-1 w-full flex flex-col md:flex-row overflow-hidden rounded-3xl border border-slate-800 bg-black min-h-[450px] md:min-h-[550px] relative">
                     <div className="flex-1 relative bg-black flex items-center justify-center min-h-[250px] md:min-h-0">
-                      {isHost && (
-                        <button
-                          onClick={stopWatchParty}
-                          className="absolute top-6 left-6 z-[510] px-4 py-2 bg-red-600/90 text-white rounded-xl hover:bg-red-600 transition-all shadow-md font-bold uppercase text-[10px] tracking-wider"
-                        >
-                          Encerrar
-                        </button>
+                      {isAdmin && (
+                        <div className="absolute top-6 left-6 z-[510] flex gap-2">
+                          {isHost && (
+                            <button
+                              onClick={stopWatchParty}
+                              className="px-4 py-2 bg-red-600/90 text-white rounded-xl hover:bg-red-600 transition-all shadow-md font-bold uppercase text-[10px] tracking-wider"
+                            >
+                              Encerrar
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setIsWatchPartyOpen(true)}
+                            className="px-3 py-2 bg-indigo-600/90 hover:bg-indigo-500 text-white rounded-xl transition-all shadow-md flex items-center gap-1.5 font-bold uppercase text-[10px] tracking-wider"
+                            title="Transmitir outro vídeo"
+                          >
+                            <Plus size={12} /> Novo Vídeo
+                          </button>
+                        </div>
                       )}
                       
                       <button
@@ -2146,6 +2157,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                                 autoPlay
                                 playsInline
                                 className="max-w-full max-h-full object-contain"
+                                onPlay={handleHostPlay}
                               />
                             ) : (
                               <video
