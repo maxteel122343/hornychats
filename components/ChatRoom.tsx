@@ -2458,7 +2458,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               <button onClick={() => setActiveTab('cinema')} className={`px-4 md:px-8 py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'cinema' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><Tv size={14} /> Cinema</button>
             </nav>
 
-            <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col scrollbar-hide">
+            <div className={`flex-1 overflow-y-auto flex flex-col scrollbar-hide relative ${activeTab === 'cinema' && watchPartySource ? 'p-0 overflow-hidden' : 'p-4 md:p-6'}`}>
               {activeTab === 'chat' ? (
                 <div className="flex-1 space-y-8 max-w-5xl mx-auto w-full py-4 pb-24">
                   {messages.length === 0 && (
@@ -2745,13 +2745,13 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               isWatchPartyOpen
                 ? "fixed inset-0 z-[500] bg-black flex flex-col md:flex-row overflow-hidden animate-in fade-in"
                 : activeTab === 'cinema'
-                  ? "absolute top-[120px] bottom-6 left-6 right-6 z-[490] bg-[#050a14] flex flex-col md:flex-row overflow-hidden rounded-3xl border border-slate-800"
+                  ? "absolute inset-0 z-[490] bg-[#050a14] flex flex-col md:flex-row overflow-hidden"
                   : "hidden"
             }
           >
             <div className="flex-1 relative bg-black flex items-center justify-center min-h-[250px] md:min-h-0">
               {/* Floating or Inline Controls */}
-              /* THREE-DOTS DROPDOWN MENU FOR BOTH INLINE AND FULLSCREEN */
+              {/* THREE-DOTS DROPDOWN MENU FOR BOTH INLINE AND FULLSCREEN */}
               <div className="absolute top-6 left-6 z-[510] flex items-center gap-2">
                 <div className="relative">
                   <button
