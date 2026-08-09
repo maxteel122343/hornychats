@@ -374,7 +374,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   );
   const isWatchPartyHost = watchPartyHostId ? watchPartyHostId === user.id : !!(localVideoUrl || isHost);
   const isAdmin = isHost || (user.isLoggedIn && roomAdmins.has(user.id)) || roomId?.startsWith('guest_');
-  const canControlVideo = isWatchPartyHost || isAdmin || allowedVideoControllers.has(user.id);
+  const canControlVideo = true; // Everyone can insert and control video
 
   const toggleVideoController = (userId: string) => {
     if (!isHost) return;
@@ -1538,90 +1538,81 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
     if (!finalSource) return;
 
-    // Host AND Admins can broadcast
-    if (isAdmin) {
-      let finalBroadCastSource = finalSource;
-      let finalBroadCastType = finalType;
-      
-      const file = fileToUpload || watchPartyFile;
-      const isLocalFile = finalSource.startsWith('blob:');
+    let finalBroadCastSource = finalSource;
+    let finalBroadCastType = finalType;
+    
+    const file = fileToUpload || watchPartyFile;
+    const isLocalFile = finalSource.startsWith('blob:');
 
-      // DATABASE UPLOAD FALLBACK: If it's a local video file, attempt to upload to Supabase Storage
-      if (isLocalFile && file && !skipUpload) {
-        setUploadingWatchParty(true);
-        try {
-          const fileExt = file.name.split('.').pop();
-          const fileName = `${Date.now()}.${fileExt}`;
-          const filePath = `${roomId}/watchparty/${fileName}`;
-          
-          showToast('Fazendo upload do vídeo para o servidor (Fallback)...', 'info');
-          const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
-          if (uploadError) throw uploadError;
-          
-          const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(filePath);
-          finalBroadCastSource = publicUrl;
-          finalBroadCastType = 'video'; // Treat direct file stream as a direct HTTP url
-          setLocalVideoUrl(publicUrl);
-          
-          // Clear file state since we're now streaming from URL
-          setWatchPartyFile(null);
-        } catch (e: any) {
-          console.error("Failed to upload watch party video fallback:", e);
-          showToast('Upload falhou. Transmitindo localmente via P2P...', 'info');
-          // If upload fails, finalBroadCastSource remains the blob URL and it defaults to P2P below
-        } finally {
-          setUploadingWatchParty(false);
-        }
-      }
-
-      // Check again if source is local or cloud
-      const finalIsLocalFile = finalBroadCastSource.startsWith('blob:');
-      const watchPartyData = finalIsLocalFile 
-        ? { source: 'p2p-stream', type: 'video', card_id: finalCardId || null, host_id: user.id, video_name: file?.name || watchPartySelection?.name || null }
-        : { source: finalBroadCastType === 'url' ? getEmbedUrl(finalBroadCastSource) : finalBroadCastSource, type: finalBroadCastType, card_id: finalCardId || null, video_name: null };
-
-      const activeChannel = roomChannel || roomChannelRef.current;
-      if (activeChannel) {
-        activeChannel.send({
-          type: 'broadcast',
-          event: 'webrtc-signal',
-          payload: { senderId: user.id, targetId: 'all', type: 'watch-party-update', data: watchPartyData }
-        });
-      }
-
+    // DATABASE UPLOAD FALLBACK: If it's a local video file, attempt to upload to Supabase Storage
+    if (isLocalFile && file && !skipUpload) {
+      setUploadingWatchParty(true);
       try {
-        await supabase.from('rooms').update({
-          watch_party_data: watchPartyData
-        }).eq('id', roomId);
-      } catch (e) {
-        console.warn("Skipping room database update for guest/unauthorized user:", e);
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `${roomId}/watchparty/${fileName}`;
+        
+        showToast('Fazendo upload do vídeo para o servidor (Fallback)...', 'info');
+        const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
+        if (uploadError) throw uploadError;
+        
+        const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(filePath);
+        finalBroadCastSource = publicUrl;
+        finalBroadCastType = 'video'; // Treat direct file stream as a direct HTTP url
+        setLocalVideoUrl(publicUrl);
+        
+        // Clear file state since we're now streaming from URL
+        setWatchPartyFile(null);
+      } catch (e: any) {
+        console.error("Failed to upload watch party video fallback:", e);
+        showToast('Upload falhou. Transmitindo localmente via P2P...', 'info');
+        // If upload fails, finalBroadCastSource remains the blob URL and it defaults to P2P below
+      } finally {
+        setUploadingWatchParty(false);
       }
-
-      if (roomId) {
-        localStorage.setItem(`watch_party_${roomId}`, JSON.stringify(watchPartyData));
-      }
-
-      setWatchPartySource(watchPartyData.source);
-      setWatchPartyType(watchPartyData.type as "video" | "url");
-      setWatchPartyCardId(watchPartyData.card_id);
-      setWatchPartyHostId(watchPartyData.host_id || null);
-      setWatchPartyVideoName(watchPartyData.video_name || null);
-      
-      setWatchPartySelection(null);
-      setIsWatchPartyOpen(false);
-      setActiveTab('cinema');
-      showToast('Vídeo enviado com sucesso!', 'success');
-    } else {
-      // If not host/admin, just open locally (fallback)
-      setWatchPartySource(finalSource);
-      setWatchPartyType(finalType);
-      setWatchPartyCardId(finalCardId || null);
-      setIsWatchPartyOpen(true);
     }
+
+    // Check again if source is local or cloud
+    const finalIsLocalFile = finalBroadCastSource.startsWith('blob:');
+    const watchPartyData = finalIsLocalFile 
+      ? { source: 'p2p-stream', type: 'video', card_id: finalCardId || null, host_id: user.id, video_name: file?.name || watchPartySelection?.name || null }
+      : { source: finalBroadCastType === 'url' ? getEmbedUrl(finalBroadCastSource) : finalBroadCastSource, type: finalBroadCastType, card_id: finalCardId || null, video_name: null };
+
+    const activeChannel = roomChannel || roomChannelRef.current;
+    if (activeChannel) {
+      activeChannel.send({
+        type: 'broadcast',
+        event: 'webrtc-signal',
+        payload: { senderId: user.id, targetId: 'all', type: 'watch-party-update', data: watchPartyData }
+      });
+    }
+
+    try {
+      await supabase.from('rooms').update({
+        watch_party_data: watchPartyData
+      }).eq('id', roomId);
+    } catch (e) {
+      console.warn("Skipping room database update for guest/unauthorized user:", e);
+    }
+
+    if (roomId) {
+      localStorage.setItem(`watch_party_${roomId}`, JSON.stringify(watchPartyData));
+    }
+
+    setWatchPartySource(watchPartyData.source);
+    setWatchPartyType(watchPartyData.type as "video" | "url");
+    setWatchPartyCardId(watchPartyData.card_id);
+    setWatchPartyHostId(watchPartyData.host_id || null);
+    setWatchPartyVideoName(watchPartyData.video_name || null);
+    
+    setWatchPartySelection(null);
+    setIsWatchPartyOpen(false);
+    setActiveTab('cinema');
+    showToast('Vídeo enviado com sucesso!', 'success');
   };
 
   const stopWatchParty = async () => {
-    if (isAdmin && roomId) {
+    if (roomId) {
       const activeChannel = roomChannel || roomChannelRef.current;
       if (activeChannel) {
         activeChannel.send({
@@ -1657,11 +1648,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   };
 
   const handleNewVideoSelection = () => {
-    if (isAdmin) {
-      stopWatchParty();
-    } else {
-      setWatchPartySource(null);
-    }
+    stopWatchParty();
     setIsWatchPartyOpen(true);
   };
 
@@ -3262,7 +3249,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                     </p>
                   </div>
 
-                  {isAdmin && myCards.some(c => c.type === CardType.VIDEO) && (
+                  {myCards.some(c => c.type === CardType.VIDEO) && (
                     <div className="space-y-4 pt-6 border-t border-slate-800">
                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block px-1">Minha Galeria de Vídeos</label>
                       <div className="grid grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-2 scrollbar-hide">
