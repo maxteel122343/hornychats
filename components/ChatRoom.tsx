@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Plus, Home, Wallet, Share2, MessageSquare, LayoutGrid, QrCode, X, User as UserIcon, LogIn, Camera, Settings, Sun, Moon, Menu, ChevronLeft, ChevronRight, Copy, CheckCircle, Loader2, RefreshCw, DollarSign, ArrowUpRight, Mic, Video, Upload, StopCircle, Trash2, Aperture, Lock, Zap, History, CreditCard, Mail, ShoppingCart, LogOut, FolderOpen, Edit, Tv, Image as ImageIcon } from 'lucide-react';
+import { Send, Plus, Home, Wallet, Share2, MessageSquare, LayoutGrid, QrCode, X, User as UserIcon, LogIn, Camera, Settings, Sun, Moon, Menu, ChevronLeft, ChevronRight, Copy, CheckCircle, Loader2, RefreshCw, DollarSign, ArrowUpRight, Mic, Video, Upload, StopCircle, Trash2, Aperture, Lock, Zap, History, CreditCard, Mail, ShoppingCart, LogOut, FolderOpen, Edit, Tv, Image as ImageIcon, Cloud } from 'lucide-react';
 import { User, Message, MediaCard, ChatSession, CardType, PaymentTransaction, CardDefaults } from '../types';
 import { supabase } from '../lib/supabase';
 import CardModal from './CardModal';
@@ -1197,7 +1197,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     setWatchPartyInput('');
   };
 
-  const broadcastWatchParty = async (source?: string, type?: 'video' | 'url', cardId?: string, fileToUpload?: File) => {
+  const broadcastWatchParty = async (source?: string, type?: 'video' | 'url', cardId?: string, fileToUpload?: File, skipUpload: boolean = false) => {
     if (!roomId) return;
 
     const finalSource = source || watchPartySelection?.source;
@@ -1215,7 +1215,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       const isLocalFile = finalSource.startsWith('blob:');
 
       // DATABASE UPLOAD FALLBACK: If it's a local video file, attempt to upload to Supabase Storage
-      if (isLocalFile && file) {
+      if (isLocalFile && file && !skipUpload) {
         setUploadingWatchParty(true);
         try {
           const fileExt = file.name.split('.').pop();
@@ -2774,21 +2774,31 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                     )}
                   </button>
                   {watchPartySelection?.type === 'video' && !uploadProgress && (
-                    <button 
-                      onClick={() => broadcastWatchParty()} 
-                      disabled={uploadingWatchParty}
-                      className="w-full py-4 bg-emerald-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-emerald-500 transition-all shadow-lg animate-in zoom-in-95 flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                      {uploadingWatchParty ? (
-                        <>
-                          <Loader2 size={16} className="animate-spin" /> Enviando ao Servidor...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle size={16} /> Entrar com Vídeo
-                        </>
-                      )}
-                    </button>
+                    <div className="flex flex-col gap-2 w-full">
+                      <button 
+                        onClick={() => broadcastWatchParty(undefined, undefined, undefined, undefined, true)} 
+                        disabled={uploadingWatchParty}
+                        className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-indigo-500 transition-all shadow-lg animate-in zoom-in-95 flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        <Zap size={16} /> Transmitir P2P (Instantâneo)
+                      </button>
+
+                      <button 
+                        onClick={() => broadcastWatchParty()} 
+                        disabled={uploadingWatchParty}
+                        className="w-full py-4 bg-emerald-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-emerald-500 transition-all shadow-lg animate-in zoom-in-95 flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {uploadingWatchParty ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" /> Enviando à Nuvem...
+                          </>
+                        ) : (
+                          <>
+                            <Cloud size={16} /> Salvar na Nuvem (Garantido)
+                          </>
+                        )}
+                      </button>
+                    </div>
                   )}
                 </div>
 
