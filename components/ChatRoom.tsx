@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Plus, Home, Wallet, Share2, MessageSquare, LayoutGrid, QrCode, X, User as UserIcon, LogIn, Camera, Settings, Sun, Moon, Menu, ChevronLeft, ChevronRight, Copy, CheckCircle, Loader2, RefreshCw, DollarSign, ArrowUpRight, Mic, Video, Upload, StopCircle, Trash2, Aperture, Lock, Zap, History, CreditCard, Mail, ShoppingCart, LogOut, FolderOpen, Edit, Tv, Image as ImageIcon, Cloud, Users, UserPlus, Search } from 'lucide-react';
+import { Send, Plus, Home, Wallet, Share2, MessageSquare, LayoutGrid, QrCode, X, User as UserIcon, LogIn, Camera, Settings, Sun, Moon, Menu, ChevronLeft, ChevronRight, Copy, CheckCircle, Loader2, RefreshCw, DollarSign, ArrowUpRight, Mic, Video, Upload, StopCircle, Trash2, Aperture, Lock, Zap, History, CreditCard, Mail, ShoppingCart, LogOut, FolderOpen, Edit, Tv, Image as ImageIcon, Cloud } from 'lucide-react';
 import { User, Message, MediaCard, ChatSession, CardType, PaymentTransaction, CardDefaults } from '../types';
 import { supabase } from '../lib/supabase';
 import CardModal from './CardModal';
@@ -169,7 +169,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const [isRoomSelectorOpen, setIsRoomSelectorOpen] = useState(false);
   const [cardToInsert, setCardToInsert] = useState<MediaCard | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'chat' | 'showcase' | 'my_cards' | 'cinema' | 'people'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'showcase' | 'my_cards' | 'cinema'>('chat');
   const [isCinemaSidebarCollapsed, setIsCinemaSidebarCollapsed] = useState(false);
   const [floatingMessages, setFloatingMessages] = useState<Array<{ id: string | number, text: string, senderName: string }>>([]);
   const [roomChannel, setRoomChannel] = useState<any>(null);
@@ -265,11 +265,6 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
-  // People tab / Presence states
-  const [onlineUsers, setOnlineUsers] = useState<Array<{ userId: string, userName: string, roomId: string | null }>>([]);
-  const [pendingInvite, setPendingInvite] = useState<{ fromName: string, fromRoom: string, fromUserId: string } | null>(null);
-  const [userSearch, setUserSearch] = useState('');
-
   // Local video history state
   const [recentVideos, setRecentVideos] = useState<Array<{ id: number, name: string, size: number, type: string, file: File, timestamp: number }>>([]);
   const [sidebarTab, setSidebarTab] = useState<'chat' | 'history'>('chat');
@@ -280,7 +275,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       setRecentVideos(list);
 
       // AUTO RESTORE P2P STREAM AFTER RELOAD FOR HOST!
-      if (activeTab === 'cinema' && isHost && watchPartySource === 'p2p-stream' && list.length > 0 && !localVideoUrl) {
+      if (activeTab === 'cinema' && isWatchPartyHost && watchPartySource === 'p2p-stream' && list.length > 0 && !localVideoUrl) {
         const latestVideo = list[0];
         const url = URL.createObjectURL(latestVideo.file);
         setLocalVideoUrl(url);
@@ -296,44 +291,6 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       loadRecentVideos();
     }
   }, [activeTab]);
-
-  // GLOBAL PRESENCE CHANNEL — tracks all online users across the platform
-  useEffect(() => {
-    const presenceChannel = supabase.channel('global-lobby', {
-      config: { presence: { key: user.id || 'anonymous' } }
-    });
-
-    presenceChannel
-      .on('presence', { event: 'sync' }, () => {
-        const state = presenceChannel.presenceState();
-        const users: Array<{ userId: string, userName: string, roomId: string | null }> = [];
-        Object.values(state).forEach((presences: any) => {
-          presences.forEach((p: any) => {
-            if (p.userId && p.userId !== user.id) {
-              users.push({ userId: p.userId, userName: p.userName || 'Visitante', roomId: p.roomId || null });
-            }
-          });
-        });
-        setOnlineUsers(users);
-      })
-      .on('broadcast', { event: 'room-invite' }, (payload) => {
-        const { targetId, fromName, fromRoom, fromUserId } = payload.payload;
-        if (targetId === user.id) {
-          setPendingInvite({ fromName, fromRoom, fromUserId });
-        }
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await presenceChannel.track({
-            userId: user.id,
-            userName: user.name || 'Visitante',
-            roomId: roomId || null
-          });
-        }
-      });
-
-    return () => { supabase.removeChannel(presenceChannel); };
-  }, [user.id, user.name, roomId]);
 
   // Visual viewport height adjustment for mobile keyboard overlay issues
   useEffect(() => {
@@ -420,13 +377,14 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   }, [quickStream, quickRecordingType]);
 
   const isHost = !!(user.isLoggedIn && (roomId === user.id || roomId?.startsWith('priv-') || roomId?.startsWith('room-')));
-  const isAdmin = isHost || (user.isLoggedIn && roomAdmins.has(user.id));
+  const isWatchPartyHost = watchPartyHostId ? watchPartyHostId === user.id : !!(localVideoUrl || isHost);
+  const isAdmin = isHost || (user.isLoggedIn && roomAdmins.has(user.id)) || roomId?.startsWith('guest_');
   const isDark = theme === 'dark';
 
   // WebRTC Effects
   // FIX 1+3: When host gets a stream, connect all pending viewers AND broadcast 'stream-ready' to all
   useEffect(() => {
-    if (localStream && isHost) {
+    if (localStream && isWatchPartyHost) {
       const connectViewer = async (viewerId: string) => {
         if (peerConnections.current[viewerId]) return;
         const pc = new RTCPeerConnection({
@@ -472,7 +430,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         });
       }
     }
-  }, [localStream, isHost, user.id]);
+  }, [localStream, isWatchPartyHost, user.id]);
 
   // FIX 2: Viewer retries join-request every 3 seconds until remoteStream received (max 10 attempts)
   useEffect(() => {
@@ -481,7 +439,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       joinRequestIntervalRef.current = null;
     }
 
-    if (watchPartySource === 'p2p-stream' && watchPartyHostId && !isHost && !remoteStream && activeTab === 'cinema' && roomChannel) {
+    if (watchPartySource === 'p2p-stream' && watchPartyHostId && !isWatchPartyHost && !remoteStream && activeTab === 'cinema' && roomChannel) {
       const sendJoinRequest = () => {
         roomChannel.send({
           type: 'broadcast',
@@ -501,17 +459,13 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         joinRequestIntervalRef.current = null;
       }
     };
-  }, [watchPartySource, watchPartyHostId, isHost, remoteStream, activeTab, roomChannel, user.id]);
+  }, [watchPartySource, watchPartyHostId, isWatchPartyHost, remoteStream, activeTab, roomChannel, user.id]);
 
   useEffect(() => {
     if (viewerVideoRef.current) {
       viewerVideoRef.current.srcObject = remoteStream;
-      // Explicitly call play() — browser autoplay policy blocks MediaStream autoplay without this
-      if (remoteStream) {
-        viewerVideoRef.current.play().catch(e => console.log('Viewer autoplay blocked:', e));
-      }
     }
-  }, [remoteStream, activeTab]);
+  }, [remoteStream]);
 
 
   const handleToggleAdmin = async (targetUserId: string) => {
@@ -943,7 +897,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
         // FIX 3: Host broadcasts 'stream-ready' → viewer responds immediately with join-request
         if (type === 'stream-ready') {
-          if (!isHost && watchPartyHostId === senderId) {
+          if (!isWatchPartyHost && watchPartyHostId === senderId) {
             channel.send({
               type: 'broadcast',
               event: 'webrtc-signal',
@@ -953,8 +907,49 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           return;
         }
 
+        // FIX: Watch Party Decentralized Synchronization
+        if (type === 'watch-party-update') {
+          const updatedData = data;
+          if (updatedData) {
+            setWatchPartySource(updatedData.source);
+            setWatchPartyCardId(updatedData.card_id);
+            setWatchPartyType(updatedData.type);
+            setWatchPartyHostId(updatedData.host_id || null);
+            setIsWatchPartyOpen(true);
+            setActiveTab('cinema');
+          } else {
+            setIsWatchPartyOpen(false);
+            setWatchPartySource(null);
+            setWatchPartyCardId(null);
+            setWatchPartyHostId(null);
+            cleanupP2P();
+          }
+          return;
+        }
+
+        if (type === 'get-watch-party-status') {
+          if (isWatchPartyHost && watchPartySource) {
+            channel.send({
+              type: 'broadcast',
+              event: 'webrtc-signal',
+              payload: {
+                senderId: user.id,
+                targetId: senderId,
+                type: 'watch-party-update',
+                data: {
+                  source: watchPartySource,
+                  type: watchPartyType,
+                  card_id: watchPartyCardId,
+                  host_id: watchPartyHostId
+                }
+              }
+            });
+          }
+          return;
+        }
+
         if (type === 'join-request') {
-          if (!isHost) return;
+          if (!isWatchPartyHost) return;
           const stream = localStreamRef.current;
           if (!stream) {
             pendingViewers.current.add(senderId);
@@ -1063,19 +1058,15 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           }
         }
       })
-      // FIX: Listen for P2P watch party announced via broadcast (no DB required, works for any user)
-      .on('broadcast', { event: 'watch-party-announce' }, (payload) => {
-        const { source, type: wpType, hostId, cardId } = payload.payload;
-        // Don't update your own state if you're the one who sent it
-        if (hostId === user.id) return;
-        setWatchPartySource(source);
-        setWatchPartyType(wpType as 'video' | 'url');
-        setWatchPartyHostId(hostId || null);
-        setWatchPartyCardId(cardId || null);
-        setIsWatchPartyOpen(true);
-        setActiveTab('cinema');
-      })
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          channel.send({
+            type: 'broadcast',
+            event: 'webrtc-signal',
+            payload: { senderId: user.id, targetId: 'all', type: 'get-watch-party-status' }
+          });
+        }
+      });
 
     roomChannelRef.current = channel;
     setRoomChannel(channel);
@@ -1085,7 +1076,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       setRoomChannel(null);
       supabase.removeChannel(channel);
     };
-  }, [roomId, isPrivateLocked, user.id, isHost]);
+  }, [roomId, isPrivateLocked, user.id, isWatchPartyHost]);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, activeTab]);
 
@@ -1258,50 +1249,11 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           : null;
       if (stream) {
         setLocalStream(stream);
-        // Ensure host video is actually playing so frames flow to viewers
-        video.play().catch(e => console.log('Host autoplay blocked:', e));
       }
     }
   };
 
   const handleHostPlay = () => captureHostStream();
-
-  // VIDEO SYNC: Host broadcasts play/pause/seek to all viewers
-  const sendVideoSync = (action: 'play' | 'pause' | 'seek', time: number) => {
-    const ch = roomChannelRef.current;
-    if (ch) {
-      ch.send({ type: 'broadcast', event: 'video-sync', payload: { action, time } });
-    }
-  };
-
-  const handleHostVideoPlay = (e: React.SyntheticEvent<HTMLVideoElement>) => {
-    captureHostStream();
-    sendVideoSync('play', (e.target as HTMLVideoElement).currentTime);
-  };
-
-  const handleHostVideoPause = (e: React.SyntheticEvent<HTMLVideoElement>) => {
-    sendVideoSync('pause', (e.target as HTMLVideoElement).currentTime);
-  };
-
-  const handleHostVideoSeeked = (e: React.SyntheticEvent<HTMLVideoElement>) => {
-    sendVideoSync('seek', (e.target as HTMLVideoElement).currentTime);
-  };
-
-  // INVITE: Send room invite to a specific user via global-lobby broadcast
-  const sendRoomInvite = (targetUserId: string) => {
-    const lobbyChannel = supabase.channel('global-lobby');
-    lobbyChannel.send({
-      type: 'broadcast',
-      event: 'room-invite',
-      payload: {
-        targetId: targetUserId,
-        fromName: user.name || 'Visitante',
-        fromRoom: roomId,
-        fromUserId: user.id
-      }
-    });
-    showToast('Convite enviado!', 'success');
-  };
 
   const handleWatchPartyUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1311,7 +1263,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     const localUrl = URL.createObjectURL(file);
     setLocalVideoUrl(localUrl);
 
-    // Save selection
+    // Save selection as type: 'video' and source: localUrl
     setWatchPartySelection({ source: localUrl, type: 'video' });
     setWatchPartyFile(file);
 
@@ -1322,9 +1274,6 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     } catch (err) {
       console.error("Failed to save video to local database:", err);
     }
-
-    // START P2P WATCH PARTY INSTANTLY — Loads video immediately!
-    broadcastWatchParty(localUrl, 'video', undefined, file, true);
   };
 
   const playRecentVideo = async (video: { file: File }) => {
@@ -1362,55 +1311,13 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
     if (!finalSource) return;
 
-    const file = fileToUpload || watchPartyFile;
-    const isLocalFile = finalSource.startsWith('blob:');
-
-    // ───────────────────────────────────────────────────────────────────────
-    // P2P PATH: Any user in the room can start a P2P stream.
-    // We do NOT need isAdmin — we use the Supabase Broadcast channel directly.
-    // ───────────────────────────────────────────────────────────────────────
-    if (isLocalFile && (skipUpload || !isAdmin)) {
-      // Set local host state
-      setWatchPartySource('p2p-stream');
-      setWatchPartyType('video');
-      setWatchPartyHostId(user.id);
-      setWatchPartyCardId(finalCardId || null);
-      setIsWatchPartyOpen(true);
-      setActiveTab('cinema');
-      setWatchPartySelection(null);
-
-      // Announce P2P session via broadcast channel to all room members
-      const ch = roomChannelRef.current;
-      if (ch) {
-        ch.send({
-          type: 'broadcast',
-          event: 'watch-party-announce',
-          payload: {
-            source: 'p2p-stream',
-            type: 'video',
-            hostId: user.id,
-            cardId: finalCardId || null
-          }
-        });
-      }
-
-      // Also write to DB if user is admin (so page reloads work too)
-      if (isAdmin) {
-        await supabase.from('rooms').update({
-          watch_party_data: { source: 'p2p-stream', type: 'video', card_id: finalCardId || null, host_id: user.id }
-        }).eq('id', roomId);
-      }
-
-      showToast('Transmissão P2P iniciada!', 'success');
-      return;
-    }
-
-    // ───────────────────────────────────────────────────────────────────────
-    // CLOUD / URL PATH: Requires isAdmin. Writes to database.
-    // ───────────────────────────────────────────────────────────────────────
+    // Host AND Admins can broadcast
     if (isAdmin) {
       let finalBroadCastSource = finalSource;
       let finalBroadCastType = finalType;
+      
+      const file = fileToUpload || watchPartyFile;
+      const isLocalFile = finalSource.startsWith('blob:');
 
       // DATABASE UPLOAD FALLBACK: If it's a local video file, attempt to upload to Supabase Storage
       if (isLocalFile && file && !skipUpload) {
@@ -1420,48 +1327,59 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           const fileName = `${Date.now()}.${fileExt}`;
           const filePath = `${roomId}/watchparty/${fileName}`;
           
-          showToast('Fazendo upload do vídeo para o servidor...', 'info');
+          showToast('Fazendo upload do vídeo para o servidor (Fallback)...', 'info');
           const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
           if (uploadError) throw uploadError;
           
           const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(filePath);
           finalBroadCastSource = publicUrl;
-          finalBroadCastType = 'video';
+          finalBroadCastType = 'video'; // Treat direct file stream as a direct HTTP url
           setLocalVideoUrl(publicUrl);
+          
+          // Clear file state since we're now streaming from URL
           setWatchPartyFile(null);
         } catch (e: any) {
           console.error("Failed to upload watch party video fallback:", e);
-          showToast('Upload falhou. Tente via P2P.', 'error');
-          setUploadingWatchParty(false);
-          return;
+          showToast('Upload falhou. Transmitindo localmente via P2P...', 'info');
+          // If upload fails, finalBroadCastSource remains the blob URL and it defaults to P2P below
         } finally {
           setUploadingWatchParty(false);
         }
       }
 
+      // Check again if source is local or cloud
       const finalIsLocalFile = finalBroadCastSource.startsWith('blob:');
       const watchPartyData = finalIsLocalFile 
         ? { source: 'p2p-stream', type: 'video', card_id: finalCardId || null, host_id: user.id }
         : { source: finalBroadCastType === 'url' ? getEmbedUrl(finalBroadCastSource) : finalBroadCastSource, type: finalBroadCastType, card_id: finalCardId || null };
 
-      const { error } = await supabase.from('rooms').update({
-        watch_party_data: watchPartyData
-      }).eq('id', roomId);
-
-      if (error) {
-        console.error('Watch party upsert error:', error);
-        showToast('Erro ao iniciar transmissão: ' + error.message, 'error');
-      } else {
-        setWatchPartySource(watchPartyData.source);
-        setWatchPartyType(watchPartyData.type as "video" | "url");
-        setWatchPartyCardId(watchPartyData.card_id);
-        setWatchPartyHostId(watchPartyData.host_id || null);
-        setWatchPartySelection(null);
-        setIsWatchPartyOpen(false);
-        showToast('Vídeo enviado com sucesso!', 'success');
+      const activeChannel = roomChannel || roomChannelRef.current;
+      if (activeChannel) {
+        activeChannel.send({
+          type: 'broadcast',
+          event: 'webrtc-signal',
+          payload: { senderId: user.id, targetId: 'all', type: 'watch-party-update', data: watchPartyData }
+        });
       }
+
+      try {
+        await supabase.from('rooms').update({
+          watch_party_data: watchPartyData
+        }).eq('id', roomId);
+      } catch (e) {
+        console.warn("Skipping room database update for guest/unauthorized user:", e);
+      }
+
+      setWatchPartySource(watchPartyData.source);
+      setWatchPartyType(watchPartyData.type as "video" | "url");
+      setWatchPartyCardId(watchPartyData.card_id);
+      setWatchPartyHostId(watchPartyData.host_id || null);
+      
+      setWatchPartySelection(null);
+      setIsWatchPartyOpen(false);
+      showToast('Vídeo enviado com sucesso!', 'success');
     } else {
-      // Non-admin, non-local: just open locally (fallback for URL sharing)
+      // If not host/admin, just open locally (fallback)
       setWatchPartySource(finalSource);
       setWatchPartyType(finalType);
       setWatchPartyCardId(finalCardId || null);
@@ -1470,10 +1388,24 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   };
 
   const stopWatchParty = async () => {
-    if (isHost && roomId) {
-      await supabase.from('rooms').update({
-        watch_party_data: null
-      }).eq('id', roomId);
+    if (isWatchPartyHost && roomId) {
+      const activeChannel = roomChannel || roomChannelRef.current;
+      if (activeChannel) {
+        activeChannel.send({
+          type: 'broadcast',
+          event: 'webrtc-signal',
+          payload: { senderId: user.id, targetId: 'all', type: 'watch-party-update', data: null }
+        });
+      }
+
+      try {
+        await supabase.from('rooms').update({
+          watch_party_data: null
+        }).eq('id', roomId);
+      } catch (e) {
+        console.warn("Skipping room database update for guest/unauthorized user:", e);
+      }
+
       setWatchPartySource(null);
       setWatchPartyCardId(null);
       setWatchPartyHostId(null);
@@ -2267,7 +2199,6 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               <button onClick={() => setActiveTab('showcase')} className={`px-4 md:px-8 py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'showcase' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><LayoutGrid size={14} /> Vitrine</button>
               <button onClick={() => setActiveTab('my_cards')} className={`px-4 md:px-8 py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'my_cards' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><FolderOpen size={14} /> Meus Cards</button>
               <button onClick={() => setActiveTab('cinema')} className={`px-4 md:px-8 py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'cinema' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><Tv size={14} /> Cinema</button>
-              <button onClick={() => setActiveTab('people')} className={`px-4 md:px-8 py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'people' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><Users size={14} /> Pessoas</button>
             </nav>
 
             <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col scrollbar-hide">
@@ -2327,7 +2258,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                     <div className="flex-1 relative bg-black flex items-center justify-center min-h-[250px] md:min-h-0">
                       {isAdmin && (
                         <div className="absolute top-6 left-6 z-[510] flex gap-2">
-                          {isHost && (
+                          {isWatchPartyHost && (
                             <button
                               onClick={stopWatchParty}
                               className="px-4 py-2 bg-red-600/90 text-white rounded-xl hover:bg-red-600 transition-all shadow-md font-bold uppercase text-[10px] tracking-wider"
@@ -2393,7 +2324,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                       ) : (
                         watchPartyType === 'video' ? (
                           watchPartySource === 'p2p-stream' ? (
-                            isHost ? (
+                            isWatchPartyHost ? (
                               <video
                                 ref={hostVideoRef}
                                 src={localVideoUrl || undefined}
@@ -2401,7 +2332,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                                 autoPlay
                                 playsInline
                                 className="max-w-full max-h-full object-contain"
-                                onCanPlay={captureHostStream}
+                                onCanPlay={() => {
+                                  captureHostStream();
+                                  hostVideoRef.current?.play().catch(e => console.log("Host play block error:", e));
+                                }}
                                 onPlay={handleHostPlay}
                               />
                             ) : (
@@ -2411,6 +2345,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                                 playsInline
                                 controls
                                 className="max-w-full max-h-full object-contain"
+                                onLoadedMetadata={(e) => {
+                                  e.currentTarget.play().catch(err => console.log("Viewer play block error:", err));
+                                }}
                               />
                             )
                           ) : (
@@ -2792,14 +2729,17 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               ) : (
                 watchPartyType === 'video' ? (
                   watchPartySource === 'p2p-stream' ? (
-                    isHost ? (
+                    isWatchPartyHost ? (
                       <video
                         ref={hostVideoRef}
                         src={localVideoUrl || undefined}
                         controls
                         autoPlay
                         className="max-w-full max-h-full"
-                        onCanPlay={captureHostStream}
+                        onCanPlay={() => {
+                          captureHostStream();
+                          hostVideoRef.current?.play().catch(e => console.log("Host play block error 2:", e));
+                        }}
                         onPlay={handleHostPlay}
                       />
                     ) : (
@@ -2808,6 +2748,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         controls
                         autoPlay
                         className="max-w-full max-h-full"
+                        onLoadedMetadata={(e) => {
+                          e.currentTarget.play().catch(err => console.log("Viewer play block error 2:", err));
+                        }}
                       />
                     )
                   ) : (
@@ -2939,60 +2882,6 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         </div>
                       </div>
                     ))
-                  )}
-                </div>
-              )}
-
-              {activeTab === 'people' && (
-                /* NEW PEOPLE TAB VIEW */
-                <div className="max-w-4xl mx-auto w-full pb-24 space-y-6 animate-in fade-in duration-300">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-black uppercase tracking-tighter flex items-center gap-2">
-                      <Users className="text-blue-500" /> Pessoas Online
-                    </h3>
-                    <div className="flex items-center gap-2 bg-slate-800/40 rounded-xl px-4 py-2 border border-slate-700/50 max-w-xs w-full">
-                      <Search size={14} className="text-slate-400" />
-                      <input
-                        value={userSearch}
-                        onChange={(e) => setUserSearch(e.target.value)}
-                        placeholder="Buscar usuário..."
-                        className="bg-transparent border-none outline-none text-xs text-white placeholder-slate-500 w-full"
-                      />
-                    </div>
-                  </div>
-
-                  {onlineUsers.filter(u => u.userName.toLowerCase().includes(userSearch.toLowerCase())).length === 0 ? (
-                    <div className="py-20 text-center text-slate-500 uppercase tracking-widest text-xs font-bold bg-slate-800/10 rounded-[2rem] border border-dashed border-slate-800">
-                      Nenhum outro usuário online no momento.
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {onlineUsers
-                        .filter(u => u.userName.toLowerCase().includes(userSearch.toLowerCase()))
-                        .map((u) => (
-                          <div key={u.userId} className="flex items-center justify-between p-4 bg-slate-800/30 border border-slate-700/30 rounded-2xl hover:border-blue-500/30 transition-all">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-blue-600/10 flex items-center justify-center text-blue-500 font-bold border border-blue-500/20">
-                                {u.userName.substring(0, 2).toUpperCase()}
-                              </div>
-                              <div>
-                                <p className="text-sm font-black text-white">{u.userName}</p>
-                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                                  {u.roomId === roomId ? '✨ Nesta Sala' : u.roomId ? `Sala: ${u.roomId.substring(0, 8)}` : 'No Lobby'}
-                                </span>
-                              </div>
-                            </div>
-                            {u.roomId !== roomId && (
-                              <button
-                                onClick={() => sendRoomInvite(u.userId)}
-                                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold uppercase text-[10px] tracking-wider transition-all"
-                              >
-                                <UserPlus size={12} /> Convidar
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                    </div>
                   )}
                 </div>
               )}
