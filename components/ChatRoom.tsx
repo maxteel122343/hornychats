@@ -1256,6 +1256,11 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         console.error('Watch party upsert error:', error);
         showToast('Erro ao iniciar transmissão: ' + error.message, 'error');
       } else {
+        setWatchPartySource(watchPartyData.source);
+        setWatchPartyType(watchPartyData.type as "video" | "url");
+        setWatchPartyCardId(watchPartyData.card_id);
+        setWatchPartyHostId(watchPartyData.host_id || null);
+        
         setWatchPartySelection(null);
         setIsWatchPartyOpen(false);
         showToast('Vídeo enviado com sucesso!', 'success');
