@@ -38,7 +38,7 @@ const deleteVideoFromLocalDB = async (id: number): Promise<void> => {
   });
 };
 
-const getRecentVideosFromLocalDB = async (): Promise<Array<{ id: number, name: string, size: number, type: string, file: File, timestamp: number }>> => {
+const getRecentVideosFromLocalDB = async (roomId: string): Promise<Array<{ id: number, name: string, size: number, type: string, file: File, room_id?: string, timestamp: number }>> => {
   const db = await initLocalDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readonly');
@@ -46,8 +46,9 @@ const getRecentVideosFromLocalDB = async (): Promise<Array<{ id: number, name: s
     const request = store.getAll();
     request.onsuccess = () => {
       const result = request.result || [];
-      result.sort((a, b) => b.timestamp - a.timestamp); // Sort by newest first
-      resolve(result);
+      const filtered = result.filter((v: any) => v.room_id === roomId);
+      filtered.sort((a, b) => b.timestamp - a.timestamp); // Sort by newest first
+      resolve(filtered);
     };
     request.onerror = () => reject(request.error);
   });
@@ -95,13 +96,13 @@ const generateVideoThumbnail = (file: File): Promise<string | null> => {
   });
 };
 
-const saveVideoToLocalDB = async (file: File): Promise<void> => {
+const saveVideoToLocalDB = async (file: File, roomId: string): Promise<void> => {
   const db = await initLocalDB();
   const thumbnail = await generateVideoThumbnail(file).catch(() => null);
 
   return new Promise(async (resolve, reject) => {
     try {
-      const videos = await getRecentVideosFromLocalDB();
+      const videos = await getRecentVideosFromLocalDB(roomId);
       // Keep max 5 videos
       if (videos.length >= 5) {
         // Delete the oldest video (last item in descending array)
@@ -117,6 +118,7 @@ const saveVideoToLocalDB = async (file: File): Promise<void> => {
         type: file.type,
         file: file,
         thumbnail: thumbnail,
+        room_id: roomId,
         timestamp: Date.now()
       });
       request.onsuccess = () => resolve();
@@ -387,8 +389,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   };
 
   const loadRecentVideos = async () => {
+    if (!roomId) return;
     try {
-      const list = await getRecentVideosFromLocalDB();
+      const list = await getRecentVideosFromLocalDB(roomId);
       setRecentVideos(list);
 
       // AUTO RESTORE P2P STREAM AFTER RELOAD FOR HOST!
@@ -829,6 +832,19 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   useEffect(() => {
     if (!roomId) return;
     if (isPrivateLocked) return;
+
+    // Reset watch party states for the new room
+    setWatchPartySource(null);
+    setWatchPartyType(null);
+    setWatchPartyCardId(null);
+    setWatchPartyVideoName(null);
+    setWatchPartyHostId(null);
+    setLocalVideoUrl(null);
+    setLocalStream(null);
+    setRemoteStream(null);
+    setAllowedVideoControllers(new Set());
+    setIsWatchPartyOpen(false);
+    cleanupP2P();
 
     const fetchRoomDetails = async () => {
       if (!roomId) return;
@@ -1436,7 +1452,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
     // Persist file locally in IndexedDB
     try {
-      await saveVideoToLocalDB(file);
+      if (roomId) {
+        await saveVideoToLocalDB(file, roomId);
+      }
       loadRecentVideos();
     } catch (err) {
       console.error("Failed to save video to local database:", err);
@@ -2683,7 +2701,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                     
                     {isCinemaMenuOpen && (
                       <div className="absolute left-0 mt-2 w-56 rounded-2xl bg-slate-900/95 backdrop-blur-xl border border-slate-800 text-white shadow-2xl p-2 flex flex-col gap-1 z-[520] animate-in fade-in slide-in-from-top-2 duration-200">
-                        {isAdmin && (
+                        {canControlVideo && (
                           <button
                             onClick={() => {
                               setIsCinemaMenuOpen(false);
@@ -2747,7 +2765,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                       Encerrar
                     </button>
                   )}
-                  {isAdmin && (
+                  {canControlVideo && (
                     <button
                       onClick={handleNewVideoSelection}
                       className="px-3 py-2 bg-indigo-600/90 hover:bg-indigo-500 text-white rounded-xl transition-all shadow-md flex items-center gap-1.5 font-bold uppercase text-[10px] tracking-wider"
@@ -3021,141 +3039,152 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         {/* WATCH PARTY SOURCE SELECTION MODAL */}
         {isWatchPartyOpen && !watchPartySource && (
           <div className="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md animate-in fade-in">
-            <div className="bg-slate-900 border border-slate-800 p-8 rounded-[3rem] w-full max-w-md shadow-2xl relative">
-              <button onClick={() => setIsWatchPartyOpen(false)} className="absolute top-6 right-6 p-2 bg-slate-800 rounded-full text-white hover:bg-slate-700 transition-all"><X size={20} /></button>
-              <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-8 text-center flex items-center justify-center gap-3">
-                <Tv className="text-indigo-500" /> Assistir Juntos
-              </h3>
+            {canControlVideo ? (
+              <div className="bg-slate-900 border border-slate-800 p-8 rounded-[3rem] w-full max-w-md shadow-2xl relative animate-in zoom-in-95 duration-200">
+                <button onClick={() => setIsWatchPartyOpen(false)} className="absolute top-6 right-6 p-2 bg-slate-800 rounded-full text-white hover:bg-slate-700 transition-all"><X size={20} /></button>
+                <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-8 text-center flex items-center justify-center gap-3">
+                  <Tv className="text-indigo-500" /> Assistir Juntos
+                </h3>
 
-              <div className="space-y-6">
-                <div className="space-y-3">
-                  <button
-                    onClick={() => watchVideoUploadRef.current?.click()}
-                    disabled={uploadProgress !== null}
-                    className="w-full py-6 rounded-2xl bg-indigo-600/10 border-2 border-dashed border-indigo-500/30 flex flex-col items-center gap-2 text-indigo-400 hover:bg-indigo-600/20 transition-all group disabled:opacity-50"
-                  >
-                    {uploadProgress !== null ? (
-                      <div className="flex flex-col items-center gap-3 w-full px-8">
-                        <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                          <div className="bg-indigo-500 h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                <div className="space-y-6">
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => watchVideoUploadRef.current?.click()}
+                      disabled={uploadProgress !== null}
+                      className="w-full py-6 rounded-2xl bg-indigo-600/10 border-2 border-dashed border-indigo-500/30 flex flex-col items-center gap-2 text-indigo-400 hover:bg-indigo-600/20 transition-all group disabled:opacity-50"
+                    >
+                      {uploadProgress !== null ? (
+                        <div className="flex flex-col items-center gap-3 w-full px-8">
+                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div className="bg-indigo-500 h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                          </div>
+                          <span className="text-[10px] font-black uppercase tracking-widest">{uploadProgress}% Carregando...</span>
                         </div>
-                        <span className="text-[10px] font-black uppercase tracking-widest">{uploadProgress}% Carregando...</span>
-                      </div>
-                    ) : (
-                      <>
-                        <Upload size={32} className="group-hover:scale-110 transition-transform" />
-                        <span className="text-xs font-black uppercase tracking-widest">Subir Vídeo Local</span>
-                      </>
-                    )}
-                  </button>
-                  {watchPartySelection?.type === 'video' && !uploadProgress && (
-                    <div className="flex flex-col gap-2 w-full">
-                      <button 
-                        onClick={() => broadcastWatchParty(undefined, undefined, undefined, undefined, true)} 
-                        disabled={uploadingWatchParty}
-                        className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-indigo-500 transition-all shadow-lg animate-in zoom-in-95 flex items-center justify-center gap-2 disabled:opacity-50"
-                      >
-                        <Zap size={16} /> Transmitir P2P (Instantâneo)
-                      </button>
+                      ) : (
+                        <>
+                          <Upload size={32} className="group-hover:scale-110 transition-transform" />
+                          <span className="text-xs font-black uppercase tracking-widest">Subir Vídeo Local</span>
+                        </>
+                      )}
+                    </button>
+                    {watchPartySelection?.type === 'video' && !uploadProgress && (
+                      <div className="flex flex-col gap-2 w-full">
+                        <button 
+                          onClick={() => broadcastWatchParty(undefined, undefined, undefined, undefined, true)} 
+                          disabled={uploadingWatchParty}
+                          className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-indigo-500 transition-all shadow-lg animate-in zoom-in-95 flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          <Zap size={16} /> Transmitir P2P (Instantâneo)
+                        </button>
 
-                      <button 
-                        onClick={() => broadcastWatchParty()} 
-                        disabled={uploadingWatchParty}
-                        className="w-full py-4 bg-emerald-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-emerald-500 transition-all shadow-lg animate-in zoom-in-95 flex items-center justify-center gap-2 disabled:opacity-50"
+                        <button 
+                          onClick={() => broadcastWatchParty()} 
+                          disabled={uploadingWatchParty}
+                          className="w-full py-4 bg-emerald-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-emerald-500 transition-all shadow-lg animate-in zoom-in-95 flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          {uploadingWatchParty ? (
+                            <>
+                              <Loader2 size={16} className="animate-spin" /> Enviando à Nuvem...
+                            </>
+                          ) : (
+                            <>
+                              <Cloud size={16} /> Salvar na Nuvem (Garantido)
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="relative py-2 flex items-center">
+                    <div className="flex-1 border-t border-slate-800"></div>
+                    <span className="px-4 text-[10px] font-black text-slate-600 uppercase">OU</span>
+                    <div className="flex-1 border-t border-slate-800"></div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2 px-1">Inserir Link (YouTube, Vimeo, etc.)</label>
+                    <div className="flex gap-2">
+                      <input
+                        value={watchPartyInput}
+                        onChange={(e) => setWatchPartyInput(e.target.value)}
+                        placeholder="https://www.youtube.com/watch?v=..."
+                        className="flex-1 bg-slate-800 border border-slate-700 rounded-2xl p-4 text-white text-xs outline-none focus:border-indigo-500 transition-all font-medium"
+                      />
+                      <button
+                        onClick={startWatchPartyWithUrl}
+                        className="p-4 bg-slate-800 text-white rounded-2xl hover:bg-slate-700 transition-all border border-slate-700"
                       >
-                        {uploadingWatchParty ? (
-                          <>
-                            <Loader2 size={16} className="animate-spin" /> Enviando à Nuvem...
-                          </>
-                        ) : (
-                          <>
-                            <Cloud size={16} /> Salvar na Nuvem (Garantido)
-                          </>
-                        )}
+                        Selecionar
                       </button>
                     </div>
-                  )}
-                </div>
-
-                <div className="relative py-2 flex items-center">
-                  <div className="flex-1 border-t border-slate-800"></div>
-                  <span className="px-4 text-[10px] font-black text-slate-600 uppercase">OU</span>
-                  <div className="flex-1 border-t border-slate-800"></div>
-                </div>
-
-                <div className="space-y-4">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2 px-1">Inserir Link (YouTube, Vimeo, etc.)</label>
-                  <div className="flex gap-2">
-                    <input
-                      value={watchPartyInput}
-                      onChange={(e) => setWatchPartyInput(e.target.value)}
-                      placeholder="https://www.youtube.com/watch?v=..."
-                      className="flex-1 bg-slate-800 border border-slate-700 rounded-2xl p-4 text-white text-xs outline-none focus:border-indigo-500 transition-all font-medium"
-                    />
-                    <button
-                      onClick={startWatchPartyWithUrl}
-                      className="p-4 bg-slate-800 text-white rounded-2xl hover:bg-slate-700 transition-all border border-slate-700"
-                    >
-                      Selecionar
-                    </button>
+                    {watchPartySelection?.type === 'url' && (
+                      <button onClick={() => broadcastWatchParty()} className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-indigo-500 transition-all shadow-lg animate-in zoom-in-95 flex items-center justify-center gap-2">
+                        <ArrowUpRight size={16} /> Entrar com Link
+                      </button>
+                    )}
+                    <p className="text-[9px] text-slate-500 font-bold uppercase tracking-tight px-1 italic">
+                      * Nota: Alguns sites bloqueiam o acesso via navegador compartilhado por segurança (X-Frame). Use links diretos de vídeo sempre que possível.
+                    </p>
                   </div>
-                  {watchPartySelection?.type === 'url' && (
-                    <button onClick={() => broadcastWatchParty()} className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-indigo-500 transition-all shadow-lg animate-in zoom-in-95 flex items-center justify-center gap-2">
-                      <ArrowUpRight size={16} /> Entrar com Link
-                    </button>
-                  )}
-                  <p className="text-[9px] text-slate-500 font-bold uppercase tracking-tight px-1 italic">
-                    * Nota: Alguns sites bloqueiam o acesso via navegador compartilhado por segurança (X-Frame). Use links diretos de vídeo sempre que possível.
-                  </p>
-                </div>
 
-                {isAdmin && myCards.some(c => c.type === CardType.VIDEO) && (
-                  <div className="space-y-4 pt-6 border-t border-slate-800">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block px-1">Minha Galeria de Vídeos</label>
-                    <div className="grid grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-2 scrollbar-hide">
-                      {myCards.filter(c => c.type === CardType.VIDEO).map(card => (
-                        <div key={card.id} className={`relative aspect-video rounded-xl overflow-hidden group border transition-all ${watchPartySelection?.cardId === card.id ? 'border-indigo-500 ring-2 ring-indigo-500/50' : 'border-slate-800 hover:border-slate-600'}`}>
-                          <button
-                            onClick={() => setWatchPartySelection({ source: card.mediaUrl!, type: 'video', cardId: card.id })}
-                            className="w-full h-full text-left"
-                          >
-                            <img src={card.thumbnail || card.mediaUrl} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
-                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white">
-                              {watchPartySelection?.cardId === card.id ? <CheckCircle size={24} /> : <Video size={20} className="drop-shadow-lg" />}
-                            </div>
-                          </button>
-                          <button 
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              if (confirm("Deseja realmente excluir este card de vídeo da sua vitrine?")) {
-                                const { error } = await supabase.from('cards').delete().eq('id', card.id);
-                                if (error) showToast("Erro ao excluir: " + error.message, "error");
-                                else {
-                                  showToast("Card excluído com sucesso!", "success");
-                                  setMyCards(prev => prev.filter(c => c.id !== card.id));
-                                  if (watchPartySelection?.cardId === card.id) {
-                                    setWatchPartySelection(null);
+                  {isAdmin && myCards.some(c => c.type === CardType.VIDEO) && (
+                    <div className="space-y-4 pt-6 border-t border-slate-800">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block px-1">Minha Galeria de Vídeos</label>
+                      <div className="grid grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-2 scrollbar-hide">
+                        {myCards.filter(c => c.type === CardType.VIDEO).map(card => (
+                          <div key={card.id} className={`relative aspect-video rounded-xl overflow-hidden group border transition-all ${watchPartySelection?.cardId === card.id ? 'border-indigo-500 ring-2 ring-indigo-500/50' : 'border-slate-800 hover:border-slate-600'}`}>
+                            <button
+                              onClick={() => setWatchPartySelection({ source: card.mediaUrl!, type: 'video', cardId: card.id })}
+                              className="w-full h-full text-left"
+                            >
+                              <img src={card.thumbnail || card.mediaUrl} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
+                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white">
+                                {watchPartySelection?.cardId === card.id ? <CheckCircle size={24} /> : <Video size={20} className="drop-shadow-lg" />}
+                              </div>
+                            </button>
+                            <button 
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (confirm("Deseja realmente excluir este card de vídeo da sua vitrine?")) {
+                                  const { error } = await supabase.from('cards').delete().eq('id', card.id);
+                                  if (error) showToast("Erro ao excluir: " + error.message, "error");
+                                  else {
+                                    showToast("Card excluído com sucesso!", "success");
+                                    setMyCards(prev => prev.filter(c => c.id !== card.id));
+                                    if (watchPartySelection?.cardId === card.id) {
+                                      setWatchPartySelection(null);
+                                    }
                                   }
                                 }
-                              }
-                            }}
-                            className="absolute top-2 right-2 p-1.5 bg-red-600/80 hover:bg-red-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-[10] shadow-md"
-                            title="Remover da Vitrine"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                      ))}
+                              }}
+                              className="absolute top-2 right-2 p-1.5 bg-red-600/80 hover:bg-red-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-[10] shadow-md"
+                              title="Remover da Vitrine"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      {watchPartySelection?.cardId && (
+                        <button onClick={() => broadcastWatchParty()} className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-indigo-500 transition-all shadow-lg flex items-center justify-center gap-2">
+                          <Tv size={16} /> Transmitir Card Selecionado
+                        </button>
+                      )}
                     </div>
-                    {watchPartySelection?.cardId && (
-                      <button onClick={() => broadcastWatchParty()} className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-indigo-500 transition-all shadow-lg flex items-center justify-center gap-2">
-                        <Tv size={16} /> Transmitir Card Selecionado
-                      </button>
-                    )}
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="bg-slate-900 border border-slate-800 p-8 rounded-[3rem] w-full max-w-md shadow-2xl relative flex flex-col items-center justify-center text-center animate-in zoom-in-95 duration-200">
+                <button onClick={() => setIsWatchPartyOpen(false)} className="absolute top-6 right-6 p-2 bg-slate-800 rounded-full text-white hover:bg-slate-700 transition-all"><X size={20} /></button>
+                <div className="w-16 h-16 bg-indigo-500/10 rounded-full flex items-center justify-center mb-6 text-indigo-400">
+                  <Tv size={36} className="animate-pulse" />
+                </div>
+                <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-2">Cinema Offline</h3>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Aguardando o anfitrião iniciar um vídeo...</p>
+              </div>
+            )}
           </div>
         )}
 
