@@ -1511,7 +1511,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   };
 
   const stopWatchParty = async () => {
-    if (isWatchPartyHost && roomId) {
+    if (isAdmin && roomId) {
       const activeChannel = roomChannel || roomChannelRef.current;
       if (activeChannel) {
         activeChannel.send({
@@ -1544,6 +1544,15 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     }
 
     setIsWatchPartyOpen(false);
+  };
+
+  const handleNewVideoSelection = () => {
+    if (isAdmin) {
+      stopWatchParty();
+    } else {
+      setWatchPartySource(null);
+    }
+    setIsWatchPartyOpen(true);
   };
 
   const onCardCreated = async (card: MediaCard) => {
@@ -2629,8 +2638,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                           <button
                             onClick={() => {
                               setIsCinemaMenuOpen(false);
-                              setWatchPartySource(null);
-                              setIsWatchPartyOpen(true);
+                              handleNewVideoSelection();
                             }}
                             className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800/80 transition-all text-left text-xs font-bold uppercase tracking-wider"
                           >
@@ -2692,10 +2700,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                   )}
                   {isAdmin && (
                     <button
-                      onClick={() => {
-                        setWatchPartySource(null);
-                        setIsWatchPartyOpen(true);
-                      }}
+                      onClick={handleNewVideoSelection}
                       className="px-3 py-2 bg-indigo-600/90 hover:bg-indigo-500 text-white rounded-xl transition-all shadow-md flex items-center gap-1.5 font-bold uppercase text-[10px] tracking-wider"
                       title="Transmitir outro vídeo"
                     >
