@@ -2264,6 +2264,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           const isActive = roomId === session.id;
           const currentRoomDetails = isActive ? roomDetails : null; // We only have details for current room easily
           const displayImage = currentRoomDetails?.image_url || null;
+          const isOtherUserRoom = session.id !== user.id && !session.id.startsWith('priv-') && !session.id.startsWith('room-');
 
           return (
             <div key={session.id} onClick={() => { navigate(`/chat/${session.id}`); setIsMobileMenuOpen(false); }} className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center gap-3 group ${isActive ? `${colors.primarySoft} ${colors.primaryBorder}` : `hover:bg-gray-100 dark:hover:bg-slate-800/60 ${colors.border}`} ${isSidebarCollapsed ? 'justify-center' : ''}`}>
@@ -2277,7 +2278,16 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               {!isSidebarCollapsed && (
                 <div className="flex-1 min-w-0 animate-in fade-in">
                   <div className="flex justify-between items-start">
-                    <h3 className={`text-sm font-semibold truncate ${colors.textHighlight}`}>{isActive && roomDetails?.name ? roomDetails.name : session.name}</h3>
+                    <div className="flex flex-col min-w-0">
+                      <h3 className={`text-sm font-semibold truncate ${isOtherUserRoom ? 'text-blue-400 dark:text-blue-400' : colors.textHighlight}`}>
+                        {isActive && roomDetails?.name ? roomDetails.name : session.name}
+                      </h3>
+                      {isOtherUserRoom && (
+                        <span className="text-[8px] text-blue-400 font-black uppercase tracking-wider mt-0.5">
+                          Sala de outro usuário ({session.id.slice(0, 6)})
+                        </span>
+                      )}
+                    </div>
                     <div className="flex flex-col items-end gap-1">
                       <button
                         onClick={(e) => handleCloseSession(e, session.id)}
