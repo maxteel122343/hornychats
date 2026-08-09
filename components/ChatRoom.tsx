@@ -252,6 +252,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
   // Watch Party State
   const [isWatchPartyOpen, setIsWatchPartyOpen] = useState(false);
+  const [isWatchPartyUploaderOpen, setIsWatchPartyUploaderOpen] = useState(false);
   const [watchPartySource, setWatchPartySource] = useState<string | null>(null);
   const [watchPartyType, setWatchPartyType] = useState<'video' | 'url' | null>(null);
   const [watchPartyCardId, setWatchPartyCardId] = useState<string | null>(null);
@@ -1388,6 +1389,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     setWatchPartyType('video');
     setWatchPartyHostId(user.id);
     setIsWatchPartyOpen(true);
+    setIsWatchPartyUploaderOpen(false);
     setWatchPartyFile(video.file);
     broadcastWatchParty(url, 'video', undefined, video.file);
   };
@@ -1482,6 +1484,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       
       setWatchPartySelection(null);
       setIsWatchPartyOpen(false);
+      setIsWatchPartyUploaderOpen(false);
       showToast('Vídeo enviado com sucesso!', 'success');
     } else {
       // If not host/admin, just open locally (fallback)
@@ -1522,6 +1525,18 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     }
 
     setIsWatchPartyOpen(false);
+  };
+
+  const handleTvShortcutClick = () => {
+    if (watchPartySource) {
+      setIsWatchPartyOpen(true);
+    } else {
+      if (isAdmin) {
+        setIsWatchPartyUploaderOpen(true);
+      } else {
+        setActiveTab('cinema');
+      }
+    }
   };
 
   const onCardCreated = async (card: MediaCard) => {
@@ -2372,7 +2387,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                             </button>
                           )}
                           <button
-                            onClick={() => setIsWatchPartyOpen(true)}
+                            onClick={() => setIsWatchPartyUploaderOpen(true)}
                             className="px-3 py-2 bg-indigo-600/90 hover:bg-indigo-500 text-white rounded-xl transition-all shadow-md flex items-center gap-1.5 font-bold uppercase text-[10px] tracking-wider"
                             title="Transmitir outro vídeo"
                           >
@@ -2610,7 +2625,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                   <div className="flex-1 flex flex-col items-center justify-center p-8 bg-slate-950/40 rounded-3xl border border-slate-800/50 text-center min-h-[450px] md:min-h-[550px] animate-in fade-in">
                     {isAdmin ? (
                       <div 
-                        onClick={() => setIsWatchPartyOpen(true)}
+                        onClick={() => setIsWatchPartyUploaderOpen(true)}
                         className="p-8 md:p-12 rounded-[2.5rem] bg-indigo-600/5 hover:bg-indigo-600/10 border border-indigo-500/20 hover:border-indigo-500/40 transition-all cursor-pointer flex flex-col items-center max-w-sm group shadow-xl"
                       >
                         <div className="w-16 h-16 rounded-full bg-indigo-500/10 flex items-center justify-center mb-6 text-indigo-400 group-hover:scale-110 transition-transform">
@@ -2768,7 +2783,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                     <div className="flex md:hidden items-center gap-2 overflow-x-auto pb-1 scrollbar-hide no-scrollbar -mx-2 px-2">
                       <button disabled={isUploading} onClick={() => quickUploadRef.current?.click()} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Upload"><Upload size={16} /></button>
                       <button disabled={isUploading} onClick={() => startQuickRecording('photo')} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Foto"><Camera size={16} /></button>
-                      <button disabled={isUploading} onClick={() => setIsWatchPartyOpen(true)} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20" title="TV"><Tv size={16} /></button>
+                      <button disabled={isUploading} onClick={handleTvShortcutClick} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20" title="TV"><Tv size={16} /></button>
                       <button disabled={isUploading} onClick={() => setIsCardModalOpen(true)} className={`flex-shrink-0 w-9 h-9 flex items-center justify-center ${colors.primary} text-white rounded-xl shadow-lg`} title="Novo Card"><Plus size={18} /></button>
                       <button disabled={isUploading} onClick={() => setIsQuickSettingsOpen(true)} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Ajustes"><Settings size={14} /></button>
                       <button disabled={isUploading} onClick={() => startQuickRecording('audio')} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Áudio"><Mic size={16} /></button>
@@ -2780,7 +2795,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                       <div className="hidden md:flex items-center gap-2">
                         <button disabled={isUploading} onClick={() => quickUploadRef.current?.click()} className={`w-12 h-12 flex items-center justify-center ${isDark ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-gray-200 text-slate-500 hover:bg-gray-300'} rounded-2xl transition-all`} title="Upload Rápido"><Upload size={20} /></button>
                         <button disabled={isUploading} onClick={() => startQuickRecording('photo')} className={`w-12 h-12 flex items-center justify-center ${isDark ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-gray-200 text-slate-500 hover:bg-gray-300'} rounded-2xl transition-all`} title="Foto Rápida"><Camera size={20} /></button>
-                        <button disabled={isUploading} onClick={() => setIsWatchPartyOpen(true)} className={`w-12 h-12 flex items-center justify-center ${isDark ? 'bg-slate-800 text-slate-400 hover:bg-indigo-400' : 'bg-indigo-100 text-indigo-500 hover:bg-indigo-200'} rounded-2xl transition-all`} title="Assistir Juntos"><Tv size={20} /></button>
+                        <button disabled={isUploading} onClick={handleTvShortcutClick} className={`w-12 h-12 flex items-center justify-center ${isDark ? 'bg-slate-800 text-slate-400 hover:bg-indigo-400' : 'bg-indigo-100 text-indigo-500 hover:bg-indigo-200'} rounded-2xl transition-all`} title="Assistir Juntos"><Tv size={20} /></button>
                         <button disabled={isUploading} onClick={() => setIsCardModalOpen(true)} className={`w-12 h-12 flex items-center justify-center ${colors.primary} text-white rounded-2xl shadow-xl hover:opacity-90 transform hover:-translate-y-0.5 transition-all`} title="Criar Card Avançado"><Plus size={24} /></button>
                       </div>
 
@@ -2827,7 +2842,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           <div className="fixed inset-0 z-[500] bg-black animate-in fade-in flex flex-col md:flex-row overflow-hidden">
             <div className="flex-1 relative bg-black flex items-center justify-center">
               <button
-                onClick={stopWatchParty}
+                onClick={() => setIsWatchPartyOpen(false)}
                 className="absolute top-6 left-6 z-[510] p-3 bg-black/50 text-white rounded-full hover:bg-black/80 transition-all backdrop-blur-md border border-white/10"
               >
                 <X size={24} />
@@ -3037,10 +3052,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         )}
 
         {/* WATCH PARTY SOURCE SELECTION MODAL */}
-        {isWatchPartyOpen && !watchPartySource && (
+        {isWatchPartyUploaderOpen && (
           <div className="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md animate-in fade-in">
             <div className="bg-slate-900 border border-slate-800 p-8 rounded-[3rem] w-full max-w-md shadow-2xl relative">
-              <button onClick={() => setIsWatchPartyOpen(false)} className="absolute top-6 right-6 p-2 bg-slate-800 rounded-full text-white hover:bg-slate-700 transition-all"><X size={20} /></button>
+              <button onClick={() => setIsWatchPartyUploaderOpen(false)} className="absolute top-6 right-6 p-2 bg-slate-800 rounded-full text-white hover:bg-slate-700 transition-all"><X size={20} /></button>
               <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-8 text-center flex items-center justify-center gap-3">
                 <Tv className="text-indigo-500" /> Assistir Juntos
               </h3>
