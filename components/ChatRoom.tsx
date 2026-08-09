@@ -1016,6 +1016,18 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           }
         }
       })
+      // FIX: Listen for P2P watch party announced via broadcast (no DB required, works for any user)
+      .on('broadcast', { event: 'watch-party-announce' }, (payload) => {
+        const { source, type: wpType, hostId, cardId } = payload.payload;
+        // Don't update your own state if you're the one who sent it
+        if (hostId === user.id) return;
+        setWatchPartySource(source);
+        setWatchPartyType(wpType as 'video' | 'url');
+        setWatchPartyHostId(hostId || null);
+        setWatchPartyCardId(cardId || null);
+        setIsWatchPartyOpen(true);
+        setActiveTab('cinema');
+      })
       .subscribe();
 
     roomChannelRef.current = channel;
@@ -1261,13 +1273,55 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
     if (!finalSource) return;
 
-    // Host AND Admins can broadcast
+    const file = fileToUpload || watchPartyFile;
+    const isLocalFile = finalSource.startsWith('blob:');
+
+    // ───────────────────────────────────────────────────────────────────────
+    // P2P PATH: Any user in the room can start a P2P stream.
+    // We do NOT need isAdmin — we use the Supabase Broadcast channel directly.
+    // ───────────────────────────────────────────────────────────────────────
+    if (isLocalFile && (skipUpload || !isAdmin)) {
+      // Set local host state
+      setWatchPartySource('p2p-stream');
+      setWatchPartyType('video');
+      setWatchPartyHostId(user.id);
+      setWatchPartyCardId(finalCardId || null);
+      setIsWatchPartyOpen(true);
+      setActiveTab('cinema');
+      setWatchPartySelection(null);
+
+      // Announce P2P session via broadcast channel to all room members
+      const ch = roomChannelRef.current;
+      if (ch) {
+        ch.send({
+          type: 'broadcast',
+          event: 'watch-party-announce',
+          payload: {
+            source: 'p2p-stream',
+            type: 'video',
+            hostId: user.id,
+            cardId: finalCardId || null
+          }
+        });
+      }
+
+      // Also write to DB if user is admin (so page reloads work too)
+      if (isAdmin) {
+        await supabase.from('rooms').update({
+          watch_party_data: { source: 'p2p-stream', type: 'video', card_id: finalCardId || null, host_id: user.id }
+        }).eq('id', roomId);
+      }
+
+      showToast('Transmissão P2P iniciada!', 'success');
+      return;
+    }
+
+    // ───────────────────────────────────────────────────────────────────────
+    // CLOUD / URL PATH: Requires isAdmin. Writes to database.
+    // ───────────────────────────────────────────────────────────────────────
     if (isAdmin) {
       let finalBroadCastSource = finalSource;
       let finalBroadCastType = finalType;
-      
-      const file = fileToUpload || watchPartyFile;
-      const isLocalFile = finalSource.startsWith('blob:');
 
       // DATABASE UPLOAD FALLBACK: If it's a local video file, attempt to upload to Supabase Storage
       if (isLocalFile && file && !skipUpload) {
@@ -1277,27 +1331,25 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           const fileName = `${Date.now()}.${fileExt}`;
           const filePath = `${roomId}/watchparty/${fileName}`;
           
-          showToast('Fazendo upload do vídeo para o servidor (Fallback)...', 'info');
+          showToast('Fazendo upload do vídeo para o servidor...', 'info');
           const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
           if (uploadError) throw uploadError;
           
           const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(filePath);
           finalBroadCastSource = publicUrl;
-          finalBroadCastType = 'video'; // Treat direct file stream as a direct HTTP url
+          finalBroadCastType = 'video';
           setLocalVideoUrl(publicUrl);
-          
-          // Clear file state since we're now streaming from URL
           setWatchPartyFile(null);
         } catch (e: any) {
           console.error("Failed to upload watch party video fallback:", e);
-          showToast('Upload falhou. Transmitindo localmente via P2P...', 'info');
-          // If upload fails, finalBroadCastSource remains the blob URL and it defaults to P2P below
+          showToast('Upload falhou. Tente via P2P.', 'error');
+          setUploadingWatchParty(false);
+          return;
         } finally {
           setUploadingWatchParty(false);
         }
       }
 
-      // Check again if source is local or cloud
       const finalIsLocalFile = finalBroadCastSource.startsWith('blob:');
       const watchPartyData = finalIsLocalFile 
         ? { source: 'p2p-stream', type: 'video', card_id: finalCardId || null, host_id: user.id }
@@ -1315,13 +1367,12 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         setWatchPartyType(watchPartyData.type as "video" | "url");
         setWatchPartyCardId(watchPartyData.card_id);
         setWatchPartyHostId(watchPartyData.host_id || null);
-        
         setWatchPartySelection(null);
         setIsWatchPartyOpen(false);
         showToast('Vídeo enviado com sucesso!', 'success');
       }
     } else {
-      // If not host/admin, just open locally (fallback)
+      // Non-admin, non-local: just open locally (fallback for URL sharing)
       setWatchPartySource(finalSource);
       setWatchPartyType(finalType);
       setWatchPartyCardId(finalCardId || null);
