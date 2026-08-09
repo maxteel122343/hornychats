@@ -463,6 +463,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   useEffect(() => {
     if (viewerVideoRef.current) {
       viewerVideoRef.current.srcObject = remoteStream;
+      // Explicitly call play() — browser autoplay policy blocks MediaStream autoplay without this
+      if (remoteStream) {
+        viewerVideoRef.current.play().catch(e => console.log('Viewer autoplay blocked:', e));
+      }
     }
   }, [remoteStream]);
 
@@ -1211,6 +1215,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           : null;
       if (stream) {
         setLocalStream(stream);
+        // Ensure host video is actually playing so frames flow to viewers
+        video.play().catch(e => console.log('Host autoplay blocked:', e));
       }
     }
   };
