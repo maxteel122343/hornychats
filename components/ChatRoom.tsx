@@ -948,6 +948,33 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           return;
         }
 
+        if (type === 'watch-party-sync') {
+          if (!isWatchPartyHost && data) {
+            const video = viewerVideoRef.current;
+            if (video) {
+              const { action, time } = data;
+              if (action === 'play') {
+                if (Math.abs(video.currentTime - time) > 1.2) {
+                  video.currentTime = time;
+                }
+                video.play().catch(e => console.log("Play sync blocked:", e));
+              } else if (action === 'pause') {
+                if (Math.abs(video.currentTime - time) > 1.2) {
+                  video.currentTime = time;
+                }
+                video.pause();
+              } else if (action === 'seek') {
+                video.currentTime = time;
+              } else if (action === 'heartbeat') {
+                if (Math.abs(video.currentTime - time) > 2.5) {
+                  video.currentTime = time;
+                }
+              }
+            }
+          }
+          return;
+        }
+
         if (type === 'join-request') {
           if (!isWatchPartyHost) return;
           const stream = localStreamRef.current;
@@ -1253,7 +1280,85 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     }
   };
 
-  const handleHostPlay = () => captureHostStream();
+  const handleHostControlPlay = () => {
+    captureHostStream();
+    const video = hostVideoRef.current;
+    if (!video) return;
+    const activeChannel = roomChannel || roomChannelRef.current;
+    if (activeChannel) {
+      activeChannel.send({
+        type: 'broadcast',
+        event: 'webrtc-signal',
+        payload: {
+          senderId: user.id,
+          targetId: 'all',
+          type: 'watch-party-sync',
+          data: { action: 'play', time: video.currentTime }
+        }
+      });
+    }
+  };
+
+  const handleHostControlPause = () => {
+    const video = hostVideoRef.current;
+    if (!video) return;
+    const activeChannel = roomChannel || roomChannelRef.current;
+    if (activeChannel) {
+      activeChannel.send({
+        type: 'broadcast',
+        event: 'webrtc-signal',
+        payload: {
+          senderId: user.id,
+          targetId: 'all',
+          type: 'watch-party-sync',
+          data: { action: 'pause', time: video.currentTime }
+        }
+      });
+    }
+  };
+
+  const handleHostControlSeek = () => {
+    const video = hostVideoRef.current;
+    if (!video) return;
+    const activeChannel = roomChannel || roomChannelRef.current;
+    if (activeChannel) {
+      activeChannel.send({
+        type: 'broadcast',
+        event: 'webrtc-signal',
+        payload: {
+          senderId: user.id,
+          targetId: 'all',
+          type: 'watch-party-sync',
+          data: { action: 'seek', time: video.currentTime }
+        }
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!isWatchPartyHost) return;
+    const interval = setInterval(() => {
+      const video = hostVideoRef.current;
+      if (video && !video.paused) {
+        const activeChannel = roomChannel || roomChannelRef.current;
+        if (activeChannel) {
+          activeChannel.send({
+            type: 'broadcast',
+            event: 'webrtc-signal',
+            payload: {
+              senderId: user.id,
+              targetId: 'all',
+              type: 'watch-party-sync',
+              data: { action: 'heartbeat', time: video.currentTime }
+            }
+          });
+        }
+      }
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [isWatchPartyHost, roomChannel, watchPartySource]);
+
+  const handleHostPlay = () => handleHostControlPlay();
 
   const handleWatchPartyUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2351,7 +2456,28 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                               />
                             )
                           ) : (
-                            <video src={watchPartySource} controls autoPlay className="max-w-full max-h-full object-contain" />
+                            isWatchPartyHost ? (
+                              <video
+                                ref={hostVideoRef}
+                                src={watchPartySource}
+                                controls
+                                autoPlay
+                                className="max-w-full max-h-full object-contain"
+                                onPlay={handleHostControlPlay}
+                                onPause={handleHostControlPause}
+                                onSeeked={handleHostControlSeek}
+                              />
+                            ) : (
+                              <video
+                                ref={viewerVideoRef}
+                                src={watchPartySource}
+                                autoPlay
+                                className="max-w-full max-h-full object-contain"
+                                onLoadedMetadata={(e) => {
+                                  e.currentTarget.play().catch(err => console.log("Viewer URL play error:", err));
+                                }}
+                              />
+                            )
                           )
                         ) : (
                           <iframe src={getEmbedUrl(watchPartySource!)} className="w-full h-full border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
@@ -2754,7 +2880,28 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                       />
                     )
                   ) : (
-                    <video src={watchPartySource} controls autoPlay className="max-w-full max-h-full" />
+                    isWatchPartyHost ? (
+                      <video
+                        ref={hostVideoRef}
+                        src={watchPartySource}
+                        controls
+                        autoPlay
+                        className="max-w-full max-h-full"
+                        onPlay={handleHostControlPlay}
+                        onPause={handleHostControlPause}
+                        onSeeked={handleHostControlSeek}
+                      />
+                    ) : (
+                      <video
+                        ref={viewerVideoRef}
+                        src={watchPartySource}
+                        autoPlay
+                        className="max-w-full max-h-full"
+                        onLoadedMetadata={(e) => {
+                          e.currentTarget.play().catch(err => console.log("Viewer URL play error 2:", err));
+                        }}
+                      />
+                    )
                   )
                 ) : (
                   <iframe src={getEmbedUrl(watchPartySource!)} className="w-full h-full border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
