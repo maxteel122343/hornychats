@@ -316,6 +316,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
 
   const peerConnections = useRef<{ [peerId: string]: RTCPeerConnection }>({});
+  const pendingCandidates = useRef<{ [userId: string]: RTCIceCandidateInit[] }>({});
   const pendingViewers = useRef<Set<string>>(new Set());
   const hostVideoRef = useRef<HTMLVideoElement | null>(null);
   const viewerVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -883,7 +884,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         setWatchPartyType(watchPartyData.type as any);
         setWatchPartyHostId(watchPartyData.host_id || null);
         setWatchPartyVideoName(watchPartyData.video_name || null);
-        setIsWatchPartyOpen(true);
+        setIsWatchPartyOpen(false);
       }
     };
 
@@ -991,7 +992,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
             if (updatedData.allowed_controllers) {
               setAllowedVideoControllers(new Set(updatedData.allowed_controllers));
             }
-            setIsWatchPartyOpen(true);
+            setIsWatchPartyOpen(false);
             setActiveTab('cinema');
           } else {
             setIsWatchPartyOpen(false);
@@ -1148,6 +1149,16 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           };
 
           await pc.setRemoteDescription(new RTCSessionDescription(data));
+          
+          // Process pending candidates queued before remoteDescription was set
+          const pending = pendingCandidates.current[senderId];
+          if (pending && pending.length > 0) {
+            for (const cand of pending) {
+              await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(e => console.log("Pending candidate err:", e));
+            }
+            pendingCandidates.current[senderId] = [];
+          }
+
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
 
@@ -1166,12 +1177,28 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           const pc = peerConnections.current[senderId];
           if (pc) {
             await pc.setRemoteDescription(new RTCSessionDescription(data));
+            
+            // Process pending candidates queued before remoteDescription was set
+            const pending = pendingCandidates.current[senderId];
+            if (pending && pending.length > 0) {
+              for (const cand of pending) {
+                await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(e => console.log("Pending candidate err:", e));
+              }
+              pendingCandidates.current[senderId] = [];
+            }
           }
         } 
         else if (type === 'candidate') {
           const pc = peerConnections.current[senderId];
           if (pc && data) {
-            await pc.addIceCandidate(new RTCIceCandidate(data)).catch(e => console.error(e));
+            if (pc.remoteDescription && pc.remoteDescription.type) {
+              await pc.addIceCandidate(new RTCIceCandidate(data)).catch(e => console.error(e));
+            } else {
+              if (!pendingCandidates.current[senderId]) {
+                pendingCandidates.current[senderId] = [];
+              }
+              pendingCandidates.current[senderId].push(data);
+            }
           }
         }
       })
@@ -2710,101 +2737,80 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           >
             <div className="flex-1 relative bg-black flex items-center justify-center min-h-[250px] md:min-h-0">
               {/* Floating or Inline Controls */}
-              {isWatchPartyOpen ? (
-                /* THREE-DOTS DROPDOWN MENU FOR FULLSCREEN */
-                <div className="absolute top-6 left-6 z-[510] flex items-center gap-2">
-                  <div className="relative">
-                    <button
-                      onClick={() => setIsCinemaMenuOpen(!isCinemaMenuOpen)}
-                      className="p-3 bg-black/50 text-white rounded-full hover:bg-black/80 transition-all backdrop-blur-md border border-white/10 flex items-center justify-center shadow-lg"
-                    >
-                      <MoreVertical size={20} />
-                    </button>
-                    
-                    {isCinemaMenuOpen && (
-                      <div className="absolute left-0 mt-2 w-56 rounded-2xl bg-slate-900/95 backdrop-blur-xl border border-slate-800 text-white shadow-2xl p-2 flex flex-col gap-1 z-[520] animate-in fade-in slide-in-from-top-2 duration-200">
-                        {canControlVideo && (
-                          <button
-                            onClick={() => {
-                              setIsCinemaMenuOpen(false);
-                              handleNewVideoSelection();
-                            }}
-                            className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800/80 transition-all text-left text-xs font-bold uppercase tracking-wider"
-                          >
-                            <Plus size={16} className="text-indigo-400" />
-                            Novo Vídeo
-                          </button>
-                        )}
-                        
-                        <button
-                          onClick={() => {
-                            setIsCinemaMenuOpen(false);
-                            setSidebarTab('history');
-                            setIsCinemaSidebarCollapsed(false);
-                          }}
-                          className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800/80 transition-all text-left text-xs font-bold uppercase tracking-wider"
-                        >
-                          <FolderOpen size={16} className="text-emerald-400" />
-                          Ver Histórico
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setIsCinemaMenuOpen(false);
-                            setIsWatchPartyOpen(false); // Minimize overlay, keeps playing inline
-                            setActiveTab('cinema');
-                          }}
-                          className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800/80 transition-all text-left text-xs font-bold uppercase tracking-wider"
-                        >
-                          <Minimize2 size={16} className="text-sky-400" />
-                          Sair do Modo Cheio
-                        </button>
-
-                        {isWatchPartyHost && (
-                          <button
-                            onClick={() => {
-                              setIsCinemaMenuOpen(false);
-                              stopWatchParty();
-                            }}
-                            className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-950/40 hover:text-red-400 transition-all text-left text-xs font-bold uppercase tracking-wider text-red-500 border-t border-slate-800/50 mt-1"
-                          >
-                            <Power size={16} />
-                            Encerrar
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                /* INLINE PLAYER BUTTONS */
-                <div className="absolute top-6 left-6 z-[510] flex gap-2">
-                  {isWatchPartyHost && (
-                    <button
-                      onClick={stopWatchParty}
-                      className="px-4 py-2 bg-red-600/90 text-white rounded-xl hover:bg-red-600 transition-all shadow-md font-bold uppercase text-[10px] tracking-wider"
-                    >
-                      Encerrar
-                    </button>
-                  )}
-                  {canControlVideo && (
-                    <button
-                      onClick={handleNewVideoSelection}
-                      className="px-3 py-2 bg-indigo-600/90 hover:bg-indigo-500 text-white rounded-xl transition-all shadow-md flex items-center gap-1.5 font-bold uppercase text-[10px] tracking-wider"
-                      title="Transmitir outro vídeo"
-                    >
-                      <Plus size={12} /> Novo Vídeo
-                    </button>
-                  )}
+              /* THREE-DOTS DROPDOWN MENU FOR BOTH INLINE AND FULLSCREEN */
+              <div className="absolute top-6 left-6 z-[510] flex items-center gap-2">
+                <div className="relative">
                   <button
-                    onClick={() => setIsWatchPartyOpen(true)}
-                    className="px-3 py-2 bg-slate-800/90 hover:bg-slate-700 text-white rounded-xl transition-all shadow-md flex items-center gap-1.5 font-bold uppercase text-[10px] tracking-wider backdrop-blur-sm"
-                    title="Assistir em Tela Cheia"
+                    onClick={() => setIsCinemaMenuOpen(!isCinemaMenuOpen)}
+                    className="p-3 bg-black/50 text-white rounded-full hover:bg-black/80 transition-all backdrop-blur-md border border-white/10 flex items-center justify-center shadow-lg"
                   >
-                    <Maximize2 size={12} /> Tela Cheia
+                    <MoreVertical size={20} />
                   </button>
+                  
+                  {isCinemaMenuOpen && (
+                    <div className="absolute left-0 mt-2 w-56 rounded-2xl bg-slate-900/95 backdrop-blur-xl border border-slate-800 text-white shadow-2xl p-2 flex flex-col gap-1 z-[520] animate-in fade-in slide-in-from-top-2 duration-200">
+                      {canControlVideo && (
+                        <button
+                          onClick={() => {
+                            setIsCinemaMenuOpen(false);
+                            handleNewVideoSelection();
+                          }}
+                          className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800/80 transition-all text-left text-xs font-bold uppercase tracking-wider"
+                        >
+                          <Plus size={16} className="text-indigo-400" />
+                          Novo Vídeo
+                        </button>
+                      )}
+                      
+                      <button
+                        onClick={() => {
+                          setIsCinemaMenuOpen(false);
+                          setSidebarTab('history');
+                          setIsCinemaSidebarCollapsed(false);
+                        }}
+                        className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800/80 transition-all text-left text-xs font-bold uppercase tracking-wider"
+                      >
+                        <FolderOpen size={16} className="text-emerald-400" />
+                        Ver Histórico
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setIsCinemaMenuOpen(false);
+                          setIsWatchPartyOpen(!isWatchPartyOpen);
+                          setActiveTab('cinema');
+                        }}
+                        className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800/80 transition-all text-left text-xs font-bold uppercase tracking-wider"
+                      >
+                        {isWatchPartyOpen ? (
+                          <>
+                            <Minimize2 size={16} className="text-sky-400" />
+                            Sair do Modo Cheio
+                          </>
+                        ) : (
+                          <>
+                            <Maximize2 size={16} className="text-sky-400" />
+                            Tela Cheia
+                          </>
+                        )}
+                      </button>
+
+                      {isWatchPartyHost && (
+                        <button
+                          onClick={() => {
+                            setIsCinemaMenuOpen(false);
+                            stopWatchParty();
+                          }}
+                          className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-950/40 hover:text-red-400 transition-all text-left text-xs font-bold uppercase tracking-wider text-red-500 border-t border-slate-800/50 mt-1"
+                        >
+                          <Power size={16} />
+                          Encerrar
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
 
               {/* Chat Sidebar Toggle Button */}
               <button
