@@ -172,6 +172,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const [activeTab, setActiveTab] = useState<'chat' | 'showcase' | 'my_cards' | 'cinema'>('chat');
   const [isCinemaSidebarCollapsed, setIsCinemaSidebarCollapsed] = useState(false);
   const [floatingMessages, setFloatingMessages] = useState<Array<{ id: string | number, text: string, senderName: string }>>([]);
+  const [roomChannel, setRoomChannel] = useState<any>(null);
   const [showQrCode, setShowQrCode] = useState(false);
   const [showEarningsModal, setShowEarningsModal] = useState(false);
   const [withdrawalPending, setWithdrawalPending] = useState(false);
@@ -415,10 +416,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   }, [localStream, isHost, user.id]);
 
   useEffect(() => {
-    if (watchPartySource === 'p2p-stream' && watchPartyHostId && !isHost && !remoteStream && activeTab === 'cinema' && roomId) {
+    if (watchPartySource === 'p2p-stream' && watchPartyHostId && !isHost && !remoteStream && activeTab === 'cinema' && roomChannel) {
       // Send join-request to the host
-      const channel = supabase.channel(`room:${roomId}`);
-      channel.send({
+      roomChannel.send({
         type: 'broadcast',
         event: 'webrtc-signal',
         payload: {
@@ -428,7 +428,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         }
       });
     }
-  }, [watchPartySource, watchPartyHostId, isHost, remoteStream, activeTab, roomId, user.id]);
+  }, [watchPartySource, watchPartyHostId, isHost, remoteStream, activeTab, roomChannel, user.id]);
 
   useEffect(() => {
     if (viewerVideoRef.current) {
@@ -969,9 +969,11 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       .subscribe();
 
     roomChannelRef.current = channel;
+    setRoomChannel(channel);
 
     return () => {
       roomChannelRef.current = null;
+      setRoomChannel(null);
       supabase.removeChannel(channel);
     };
   }, [roomId, isPrivateLocked, user.id, isHost]);
