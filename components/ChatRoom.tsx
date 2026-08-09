@@ -1257,6 +1257,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         showToast('Erro ao iniciar transmissão: ' + error.message, 'error');
       } else {
         setWatchPartySelection(null);
+        setIsWatchPartyOpen(false);
+        showToast('Vídeo enviado com sucesso!', 'success');
       }
     } else {
       // If not host/admin, just open locally (fallback)
