@@ -1610,6 +1610,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       
       setWatchPartySelection(null);
       setIsWatchPartyOpen(false);
+      setActiveTab('cinema');
       showToast('Vídeo enviado com sucesso!', 'success');
     } else {
       // If not host/admin, just open locally (fallback)
@@ -2525,7 +2526,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                     {isAdmin ? (
                       <div 
                         onClick={() => setIsWatchPartyOpen(true)}
-                        className="p-8 md:p-12 rounded-[2.5rem] bg-indigo-600/5 hover:bg-indigo-600/10 border border-indigo-500/20 hover:border-indigo-500/40 transition-all cursor-pointer flex flex-col items-center max-w-sm group shadow-xl"
+                        className="p-8 md:p-12 rounded-[2.5rem] bg-indigo-600/5 hover:bg-indigo-600/10 active:bg-indigo-600/20 border border-indigo-500/20 hover:border-indigo-500/40 transition-all cursor-pointer flex flex-col items-center max-w-sm group shadow-xl select-none"
+                        style={{touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'}}
                       >
                         <div className="w-16 h-16 rounded-full bg-indigo-500/10 flex items-center justify-center mb-6 text-indigo-400 group-hover:scale-110 transition-transform">
                           <Tv size={32} />
@@ -2682,7 +2684,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                     <div className="flex md:hidden items-center gap-2 overflow-x-auto pb-1 scrollbar-hide no-scrollbar -mx-2 px-2">
                       <button disabled={isUploading} onClick={() => quickUploadRef.current?.click()} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Upload"><Upload size={16} /></button>
                       <button disabled={isUploading} onClick={() => startQuickRecording('photo')} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Foto"><Camera size={16} /></button>
-                      <button disabled={isUploading} onClick={() => setIsWatchPartyOpen(true)} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20" title="TV"><Tv size={16} /></button>
+                      <button disabled={isUploading} onClick={() => { setActiveTab('cinema'); setIsWatchPartyOpen(true); }} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20" title="TV" style={{touchAction:'manipulation'}}><Tv size={16} /></button>
                       <button disabled={isUploading} onClick={() => setIsCardModalOpen(true)} className={`flex-shrink-0 w-9 h-9 flex items-center justify-center ${colors.primary} text-white rounded-xl shadow-lg`} title="Novo Card"><Plus size={18} /></button>
                       <button disabled={isUploading} onClick={() => setIsQuickSettingsOpen(true)} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Ajustes"><Settings size={14} /></button>
                       <button disabled={isUploading} onClick={() => startQuickRecording('audio')} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Áudio"><Mic size={16} /></button>
@@ -2694,7 +2696,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                       <div className="hidden md:flex items-center gap-2">
                         <button disabled={isUploading} onClick={() => quickUploadRef.current?.click()} className={`w-12 h-12 flex items-center justify-center ${isDark ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-gray-200 text-slate-500 hover:bg-gray-300'} rounded-2xl transition-all`} title="Upload Rápido"><Upload size={20} /></button>
                         <button disabled={isUploading} onClick={() => startQuickRecording('photo')} className={`w-12 h-12 flex items-center justify-center ${isDark ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-gray-200 text-slate-500 hover:bg-gray-300'} rounded-2xl transition-all`} title="Foto Rápida"><Camera size={20} /></button>
-                        <button disabled={isUploading} onClick={() => setIsWatchPartyOpen(true)} className={`w-12 h-12 flex items-center justify-center ${isDark ? 'bg-slate-800 text-slate-400 hover:bg-indigo-400' : 'bg-indigo-100 text-indigo-500 hover:bg-indigo-200'} rounded-2xl transition-all`} title="Assistir Juntos"><Tv size={20} /></button>
+                        <button disabled={isUploading} onClick={() => { setActiveTab('cinema'); setIsWatchPartyOpen(true); }} className={`w-12 h-12 flex items-center justify-center ${isDark ? 'bg-slate-800 text-slate-400 hover:bg-indigo-400' : 'bg-indigo-100 text-indigo-500 hover:bg-indigo-200'} rounded-2xl transition-all`} title="Assistir Juntos" style={{touchAction:'manipulation'}}><Tv size={20} /></button>
                         <button disabled={isUploading} onClick={() => setIsCardModalOpen(true)} className={`w-12 h-12 flex items-center justify-center ${colors.primary} text-white rounded-2xl shadow-xl hover:opacity-90 transform hover:-translate-y-0.5 transition-all`} title="Criar Card Avançado"><Plus size={24} /></button>
                       </div>
 
