@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Plus, Home, Wallet, Share2, MessageSquare, LayoutGrid, QrCode, X, User as UserIcon, LogIn, Camera, Settings, Sun, Moon, Menu, ChevronLeft, ChevronRight, Copy, CheckCircle, Loader2, RefreshCw, DollarSign, ArrowUpRight, Mic, Video, Upload, StopCircle, Trash2, Aperture, Lock, Zap, History, CreditCard, Mail, ShoppingCart, LogOut, FolderOpen, Edit, Tv, Image as ImageIcon, Cloud, MoreVertical, Minimize2, Maximize2, Power, Sliders } from 'lucide-react';
+import { Send, Plus, Home, Wallet, Share2, MessageSquare, LayoutGrid, QrCode, X, User as UserIcon, LogIn, Camera, Settings, Sun, Moon, Menu, ChevronLeft, ChevronRight, ChevronDown, Copy, CheckCircle, Loader2, RefreshCw, DollarSign, ArrowUpRight, Mic, Video, Upload, StopCircle, Trash2, Aperture, Lock, Zap, History, CreditCard, Mail, ShoppingCart, LogOut, FolderOpen, Edit, Tv, Image as ImageIcon, Cloud, MoreVertical, Minimize2, Maximize2, Power, Sliders } from 'lucide-react';
 import { User, Message, MediaCard, ChatSession, CardType, PaymentTransaction, CardDefaults } from '../types';
 import { supabase } from '../lib/supabase';
 import CardModal from './CardModal';
@@ -254,6 +254,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const [roomAdmins, setRoomAdmins] = useState<Set<string>>(new Set());
 
   // Watch Party State
+  const [isRoomDetailsLoading, setIsRoomDetailsLoading] = useState(true);
+  const [isChatMinimized, setIsChatMinimized] = useState(false);
   const [isWatchPartyOpen, setIsWatchPartyOpen] = useState(false);
   const [isCinemaMenuOpen, setIsCinemaMenuOpen] = useState(false);
   const [watchPartySource, setWatchPartySource] = useState<string | null>(null);
@@ -858,6 +860,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
     const fetchRoomDetails = async () => {
       if (!roomId) return;
+      setIsRoomDetailsLoading(true);
       const { data } = await supabase.from('rooms').select('name, image_url, background_url, watch_party_data, admins, creator_id').eq('id', roomId).single();
       
       let watchPartyData = data?.watch_party_data || null;
@@ -886,6 +889,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         setWatchPartyVideoName(watchPartyData.video_name || null);
         setIsWatchPartyOpen(false);
       }
+      setIsRoomDetailsLoading(false);
     };
 
     const fetchMessages = async () => {
@@ -2504,7 +2508,15 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               ) : activeTab === 'showcase' ? (
                 <div className="max-w-6xl mx-auto w-full pb-24"><Gallery user={user} /></div>
               ) : activeTab === 'cinema' ? (
-                watchPartySource ? (
+                isRoomDetailsLoading ? (
+                  /* LOADING STATE - prevents flicker between offline/online states */
+                  <div className="flex-1 flex items-center justify-center min-h-[450px] md:min-h-[550px]">
+                    <div className="flex flex-col items-center gap-4">
+                      <Loader2 size={32} className="text-indigo-500 animate-spin" />
+                      <p className="text-xs text-slate-500 font-bold uppercase tracking-widest animate-pulse">Carregando...</p>
+                    </div>
+                  </div>
+                ) : watchPartySource ? (
                   /* ACTIVE CINEMA VIEW PLACEHOLDER (The actual player container is rendered globally at the bottom to prevent WebRTC unmount/disconnects) */
                   <div className="flex-1 w-full flex flex-col md:flex-row overflow-hidden rounded-3xl border border-transparent bg-transparent min-h-[450px] md:min-h-[550px] relative pointer-events-none" />
                 ) : (
@@ -2939,12 +2951,20 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
             {/* FLOATING CHAT SIDEBAR FOR WATCH PARTY */}
             <div className={`${isCinemaSidebarCollapsed ? 'w-0 h-0 border-l-0 overflow-hidden' : 'w-full md:w-96 h-1/2 md:h-full border-l border-slate-800'} bg-slate-900 flex flex-col shadow-2xl relative flex-shrink-0 transition-all duration-300`}>
               {isAdmin ? (
-                <div className="flex border-b border-slate-800 bg-slate-800/20">
+                <div className="flex border-b border-slate-800 bg-slate-800/20 items-center">
                   <button
                     onClick={() => setSidebarTab('chat')}
                     className={`flex-1 py-4 text-xs font-black uppercase tracking-widest transition-all ${sidebarTab === 'chat' ? 'text-white border-b-2 border-indigo-500 bg-slate-800/50' : 'text-slate-500 hover:text-slate-300'}`}
                   >
                     Chat
+                  </button>
+                  {/* Minimize chat toggle */}
+                  <button
+                    onClick={() => setIsChatMinimized(!isChatMinimized)}
+                    title={isChatMinimized ? 'Expandir chat' : 'Minimizar chat'}
+                    className="px-2 py-4 text-slate-500 hover:text-slate-300 transition-all flex items-center justify-center"
+                  >
+                    <ChevronDown size={14} className={`transition-transform duration-300 ${isChatMinimized ? 'rotate-180' : ''}`} />
                   </button>
                   <button
                     onClick={() => setSidebarTab('history')}
@@ -2959,12 +2979,22 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                     <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
                     <span className="text-xs font-black uppercase text-white tracking-widest">Assistindo Juntos</span>
                   </div>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase">{messages.length} Mensagens</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">{messages.length} Mensagens</span>
+                    <button
+                      onClick={() => setIsChatMinimized(!isChatMinimized)}
+                      title={isChatMinimized ? 'Expandir chat' : 'Minimizar chat'}
+                      className="text-slate-500 hover:text-slate-300 transition-all"
+                    >
+                      <ChevronDown size={14} className={`transition-transform duration-300 ${isChatMinimized ? 'rotate-180' : ''}`} />
+                    </button>
+                  </div>
                 </div>
               )}
 
               {(!isAdmin || sidebarTab === 'chat') ? (
                 <>
+                  {!isChatMinimized && (
                   <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
                     {messages.slice(-15).map((msg, i) => (
                       <div key={msg.id} className={`flex flex-col ${msg.senderId === user.id ? 'items-end' : 'items-start'} animate-in slide-in-from-bottom-2 fade-in fill-mode-both`} style={{ animationDelay: `${i * 0.05}s` }}>
@@ -3000,6 +3030,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                     ))}
                     <div ref={messagesEndRef} />
                   </div>
+                  )}
 
                   <div className="p-4 bg-slate-800/30 border-t border-slate-800">
                     <div className="flex items-center gap-2 bg-slate-900 rounded-xl px-4 py-1 border border-slate-700 focus-within:border-blue-500/50 transition-all">
