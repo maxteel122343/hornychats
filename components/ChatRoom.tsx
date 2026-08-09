@@ -1311,7 +1311,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     const localUrl = URL.createObjectURL(file);
     setLocalVideoUrl(localUrl);
 
-    // Save selection as type: 'video' and source: localUrl
+    // Save selection
     setWatchPartySelection({ source: localUrl, type: 'video' });
     setWatchPartyFile(file);
 
@@ -1322,6 +1322,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     } catch (err) {
       console.error("Failed to save video to local database:", err);
     }
+
+    // START P2P WATCH PARTY INSTANTLY — Loads video immediately!
+    broadcastWatchParty(localUrl, 'video', undefined, file, true);
   };
 
   const playRecentVideo = async (video: { file: File }) => {
