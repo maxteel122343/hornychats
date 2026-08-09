@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Plus, Home, Wallet, Share2, MessageSquare, LayoutGrid, QrCode, X, User as UserIcon, LogIn, Camera, Settings, Sun, Moon, Menu, ChevronLeft, ChevronRight, Copy, CheckCircle, Loader2, RefreshCw, DollarSign, ArrowUpRight, Mic, Video, Upload, StopCircle, Trash2, Aperture, Lock, Zap, History, CreditCard, Mail, ShoppingCart, LogOut, FolderOpen, Edit, Tv, Image as ImageIcon, Cloud } from 'lucide-react';
+import { Send, Plus, Home, Wallet, Share2, MessageSquare, LayoutGrid, QrCode, X, User as UserIcon, LogIn, Camera, Settings, Sun, Moon, Menu, ChevronLeft, ChevronRight, Copy, CheckCircle, Loader2, RefreshCw, DollarSign, ArrowUpRight, Mic, Video, Upload, StopCircle, Trash2, Aperture, Lock, Zap, History, CreditCard, Mail, ShoppingCart, LogOut, FolderOpen, Edit, Tv, Image as ImageIcon, Cloud, Users, UserPlus, Search } from 'lucide-react';
 import { User, Message, MediaCard, ChatSession, CardType, PaymentTransaction, CardDefaults } from '../types';
 import { supabase } from '../lib/supabase';
 import CardModal from './CardModal';
@@ -169,7 +169,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const [isRoomSelectorOpen, setIsRoomSelectorOpen] = useState(false);
   const [cardToInsert, setCardToInsert] = useState<MediaCard | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'chat' | 'showcase' | 'my_cards' | 'cinema'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'showcase' | 'my_cards' | 'cinema' | 'people'>('chat');
   const [isCinemaSidebarCollapsed, setIsCinemaSidebarCollapsed] = useState(false);
   const [floatingMessages, setFloatingMessages] = useState<Array<{ id: string | number, text: string, senderName: string }>>([]);
   const [roomChannel, setRoomChannel] = useState<any>(null);
@@ -265,6 +265,11 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
+  // People tab / Presence states
+  const [onlineUsers, setOnlineUsers] = useState<Array<{ userId: string, userName: string, roomId: string | null }>>([]);
+  const [pendingInvite, setPendingInvite] = useState<{ fromName: string, fromRoom: string, fromUserId: string } | null>(null);
+  const [userSearch, setUserSearch] = useState('');
+
   // Local video history state
   const [recentVideos, setRecentVideos] = useState<Array<{ id: number, name: string, size: number, type: string, file: File, timestamp: number }>>([]);
   const [sidebarTab, setSidebarTab] = useState<'chat' | 'history'>('chat');
@@ -291,6 +296,44 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       loadRecentVideos();
     }
   }, [activeTab]);
+
+  // GLOBAL PRESENCE CHANNEL — tracks all online users across the platform
+  useEffect(() => {
+    const presenceChannel = supabase.channel('global-lobby', {
+      config: { presence: { key: user.id || 'anonymous' } }
+    });
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        const users: Array<{ userId: string, userName: string, roomId: string | null }> = [];
+        Object.values(state).forEach((presences: any) => {
+          presences.forEach((p: any) => {
+            if (p.userId && p.userId !== user.id) {
+              users.push({ userId: p.userId, userName: p.userName || 'Visitante', roomId: p.roomId || null });
+            }
+          });
+        });
+        setOnlineUsers(users);
+      })
+      .on('broadcast', { event: 'room-invite' }, (payload) => {
+        const { targetId, fromName, fromRoom, fromUserId } = payload.payload;
+        if (targetId === user.id) {
+          setPendingInvite({ fromName, fromRoom, fromUserId });
+        }
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({
+            userId: user.id,
+            userName: user.name || 'Visitante',
+            roomId: roomId || null
+          });
+        }
+      });
+
+    return () => { supabase.removeChannel(presenceChannel); };
+  }, [user.id, user.name, roomId]);
 
   // Visual viewport height adjustment for mobile keyboard overlay issues
   useEffect(() => {
@@ -1222,6 +1265,43 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   };
 
   const handleHostPlay = () => captureHostStream();
+
+  // VIDEO SYNC: Host broadcasts play/pause/seek to all viewers
+  const sendVideoSync = (action: 'play' | 'pause' | 'seek', time: number) => {
+    const ch = roomChannelRef.current;
+    if (ch) {
+      ch.send({ type: 'broadcast', event: 'video-sync', payload: { action, time } });
+    }
+  };
+
+  const handleHostVideoPlay = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    captureHostStream();
+    sendVideoSync('play', (e.target as HTMLVideoElement).currentTime);
+  };
+
+  const handleHostVideoPause = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    sendVideoSync('pause', (e.target as HTMLVideoElement).currentTime);
+  };
+
+  const handleHostVideoSeeked = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    sendVideoSync('seek', (e.target as HTMLVideoElement).currentTime);
+  };
+
+  // INVITE: Send room invite to a specific user via global-lobby broadcast
+  const sendRoomInvite = (targetUserId: string) => {
+    const lobbyChannel = supabase.channel('global-lobby');
+    lobbyChannel.send({
+      type: 'broadcast',
+      event: 'room-invite',
+      payload: {
+        targetId: targetUserId,
+        fromName: user.name || 'Visitante',
+        fromRoom: roomId,
+        fromUserId: user.id
+      }
+    });
+    showToast('Convite enviado!', 'success');
+  };
 
   const handleWatchPartyUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2855,6 +2935,60 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         </div>
                       </div>
                     ))
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'people' && (
+                /* NEW PEOPLE TAB VIEW */
+                <div className="max-w-4xl mx-auto w-full pb-24 space-y-6 animate-in fade-in duration-300">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-black uppercase tracking-tighter flex items-center gap-2">
+                      <Users className="text-blue-500" /> Pessoas Online
+                    </h3>
+                    <div className="flex items-center gap-2 bg-slate-800/40 rounded-xl px-4 py-2 border border-slate-700/50 max-w-xs w-full">
+                      <Search size={14} className="text-slate-400" />
+                      <input
+                        value={userSearch}
+                        onChange={(e) => setUserSearch(e.target.value)}
+                        placeholder="Buscar usuário..."
+                        className="bg-transparent border-none outline-none text-xs text-white placeholder-slate-500 w-full"
+                      />
+                    </div>
+                  </div>
+
+                  {onlineUsers.filter(u => u.userName.toLowerCase().includes(userSearch.toLowerCase())).length === 0 ? (
+                    <div className="py-20 text-center text-slate-500 uppercase tracking-widest text-xs font-bold bg-slate-800/10 rounded-[2rem] border border-dashed border-slate-800">
+                      Nenhum outro usuário online no momento.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {onlineUsers
+                        .filter(u => u.userName.toLowerCase().includes(userSearch.toLowerCase()))
+                        .map((u) => (
+                          <div key={u.userId} className="flex items-center justify-between p-4 bg-slate-800/30 border border-slate-700/30 rounded-2xl hover:border-blue-500/30 transition-all">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-blue-600/10 flex items-center justify-center text-blue-500 font-bold border border-blue-500/20">
+                                {u.userName.substring(0, 2).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="text-sm font-black text-white">{u.userName}</p>
+                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+                                  {u.roomId === roomId ? '✨ Nesta Sala' : u.roomId ? `Sala: ${u.roomId.substring(0, 8)}` : 'No Lobby'}
+                                </span>
+                              </div>
+                            </div>
+                            {u.roomId !== roomId && (
+                              <button
+                                onClick={() => sendRoomInvite(u.userId)}
+                                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold uppercase text-[10px] tracking-wider transition-all"
+                              >
+                                <UserPlus size={12} /> Convidar
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                    </div>
                   )}
                 </div>
               )}
