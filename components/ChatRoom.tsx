@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Plus, Home, Wallet, Share2, MessageSquare, LayoutGrid, QrCode, X, User as UserIcon, LogIn, Camera, Settings, Sun, Moon, Menu, ChevronLeft, ChevronRight, Copy, CheckCircle, Loader2, RefreshCw, DollarSign, ArrowUpRight, Mic, Video, Upload, StopCircle, Trash2, Aperture, Lock, Zap, History, CreditCard, Mail, ShoppingCart, LogOut, FolderOpen, Edit, Tv, Image as ImageIcon, Cloud, MoreVertical, Minimize2, Maximize2, Power } from 'lucide-react';
+import { Send, Plus, Home, Wallet, Share2, MessageSquare, LayoutGrid, QrCode, X, User as UserIcon, LogIn, Camera, Settings, Sun, Moon, Menu, ChevronLeft, ChevronRight, Copy, CheckCircle, Loader2, RefreshCw, DollarSign, ArrowUpRight, Mic, Video, Upload, StopCircle, Trash2, Aperture, Lock, Zap, History, CreditCard, Mail, ShoppingCart, LogOut, FolderOpen, Edit, Tv, Image as ImageIcon, Cloud, MoreVertical, Minimize2, Maximize2, Power, Sliders } from 'lucide-react';
 import { User, Message, MediaCard, ChatSession, CardType, PaymentTransaction, CardDefaults } from '../types';
 import { supabase } from '../lib/supabase';
 import CardModal from './CardModal';
@@ -256,9 +256,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const [watchPartySource, setWatchPartySource] = useState<string | null>(null);
   const [watchPartyType, setWatchPartyType] = useState<'video' | 'url' | null>(null);
   const [watchPartyCardId, setWatchPartyCardId] = useState<string | null>(null);
+  const [watchPartyVideoName, setWatchPartyVideoName] = useState<string | null>(null);
   const [watchPartyInput, setWatchPartyInput] = useState('');
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-  const [watchPartySelection, setWatchPartySelection] = useState<{ source: string, type: 'video' | 'url', cardId?: string } | null>(null);
+  const [watchPartySelection, setWatchPartySelection] = useState<{ source: string, type: 'video' | 'url', cardId?: string, name?: string } | null>(null);
 
   // WebRTC P2P States
   const [watchPartyHostId, setWatchPartyHostId] = useState<string | null>(null);
@@ -269,29 +270,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   // Local video history state
   const [recentVideos, setRecentVideos] = useState<Array<{ id: number, name: string, size: number, type: string, file: File, timestamp: number }>>([]);
   const [sidebarTab, setSidebarTab] = useState<'chat' | 'history'>('chat');
+  const [allowedVideoControllers, setAllowedVideoControllers] = useState<Set<string>>(new Set());
 
-  const loadRecentVideos = async () => {
-    try {
-      const list = await getRecentVideosFromLocalDB();
-      setRecentVideos(list);
 
-      // AUTO RESTORE P2P STREAM AFTER RELOAD FOR HOST!
-      if ((activeTab === 'cinema' || isWatchPartyOpen) && isWatchPartyHost && watchPartySource === 'p2p-stream' && list.length > 0 && !localVideoUrl) {
-        const latestVideo = list[0];
-        const url = URL.createObjectURL(latestVideo.file);
-        setLocalVideoUrl(url);
-        setWatchPartyFile(latestVideo.file);
-      }
-    } catch (e) {
-      console.error("Failed to load local videos:", e);
-    }
-  };
-
-  useEffect(() => {
-    if (activeTab === 'cinema' || isWatchPartyOpen) {
-      loadRecentVideos();
-    }
-  }, [activeTab, isWatchPartyOpen]);
 
   // Visual viewport height adjustment for mobile keyboard overlay issues
   useEffect(() => {
@@ -380,6 +361,57 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const isHost = !!(user.isLoggedIn && (roomId === user.id || roomId?.startsWith('priv-') || roomId?.startsWith('room-')));
   const isWatchPartyHost = watchPartyHostId ? watchPartyHostId === user.id : !!(localVideoUrl || isHost);
   const isAdmin = isHost || (user.isLoggedIn && roomAdmins.has(user.id)) || roomId?.startsWith('guest_');
+  const canControlVideo = isWatchPartyHost || isAdmin || allowedVideoControllers.has(user.id);
+
+  const toggleVideoController = (userId: string) => {
+    if (!isHost) return;
+    const newControllers = new Set(allowedVideoControllers);
+    if (newControllers.has(userId)) {
+      newControllers.delete(userId);
+      showToast("Permissão de controle removida.", "info");
+    } else {
+      newControllers.add(userId);
+      showToast("Controle do player permitido para este usuário!", "success");
+    }
+    setAllowedVideoControllers(newControllers);
+    
+    // Broadcast update to all
+    const activeChannel = roomChannel || roomChannelRef.current;
+    if (activeChannel) {
+      activeChannel.send({
+        type: 'broadcast',
+        event: 'webrtc-signal',
+        payload: { senderId: user.id, targetId: 'all', type: 'allowed-controllers-update', data: Array.from(newControllers) }
+      });
+    }
+  };
+
+  const loadRecentVideos = async () => {
+    try {
+      const list = await getRecentVideosFromLocalDB();
+      setRecentVideos(list);
+
+      // AUTO RESTORE P2P STREAM AFTER RELOAD FOR HOST!
+      if ((activeTab === 'cinema' || isWatchPartyOpen) && isWatchPartyHost && watchPartySource === 'p2p-stream' && list.length > 0 && !localVideoUrl) {
+        const match = list.find(v => 
+          (watchPartyVideoName && v.name === watchPartyVideoName) ||
+          (!watchPartyVideoName && !watchPartyCardId && v.name)
+        ) || list[0];
+        
+        const url = URL.createObjectURL(match.file);
+        setLocalVideoUrl(url);
+        setWatchPartyFile(match.file);
+      }
+    } catch (e) {
+      console.error("Failed to load local videos:", e);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'cinema' || isWatchPartyOpen) {
+      loadRecentVideos();
+    }
+  }, [activeTab, isWatchPartyOpen, isWatchPartyHost, watchPartySource, watchPartyVideoName, watchPartyCardId]);
   const isDark = theme === 'dark';
 
   // WebRTC Effects
@@ -825,6 +857,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         setWatchPartyCardId(watchPartyData.card_id);
         setWatchPartyType(watchPartyData.type as any);
         setWatchPartyHostId(watchPartyData.host_id || null);
+        setWatchPartyVideoName(watchPartyData.video_name || null);
         setIsWatchPartyOpen(true);
       }
     };
@@ -929,6 +962,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
             setWatchPartyCardId(updatedData.card_id);
             setWatchPartyType(updatedData.type);
             setWatchPartyHostId(updatedData.host_id || null);
+            setWatchPartyVideoName(updatedData.video_name || null);
+            if (updatedData.allowed_controllers) {
+              setAllowedVideoControllers(new Set(updatedData.allowed_controllers));
+            }
             setIsWatchPartyOpen(true);
             setActiveTab('cinema');
           } else {
@@ -936,7 +973,16 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
             setWatchPartySource(null);
             setWatchPartyCardId(null);
             setWatchPartyHostId(null);
+            setWatchPartyVideoName(null);
+            setAllowedVideoControllers(new Set());
             cleanupP2P();
+          }
+          return;
+        }
+
+        if (type === 'allowed-controllers-update') {
+          if (data && Array.isArray(data)) {
+            setAllowedVideoControllers(new Set(data));
           }
           return;
         }
@@ -954,7 +1000,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                   source: watchPartySource,
                   type: watchPartyType,
                   card_id: watchPartyCardId,
-                  host_id: watchPartyHostId
+                  host_id: watchPartyHostId,
+                  video_name: watchPartyVideoName,
+                  allowed_controllers: Array.from(allowedVideoControllers)
                 }
               }
             });
@@ -1469,8 +1517,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       // Check again if source is local or cloud
       const finalIsLocalFile = finalBroadCastSource.startsWith('blob:');
       const watchPartyData = finalIsLocalFile 
-        ? { source: 'p2p-stream', type: 'video', card_id: finalCardId || null, host_id: user.id }
-        : { source: finalBroadCastType === 'url' ? getEmbedUrl(finalBroadCastSource) : finalBroadCastSource, type: finalBroadCastType, card_id: finalCardId || null };
+        ? { source: 'p2p-stream', type: 'video', card_id: finalCardId || null, host_id: user.id, video_name: file?.name || watchPartySelection?.name || null }
+        : { source: finalBroadCastType === 'url' ? getEmbedUrl(finalBroadCastSource) : finalBroadCastSource, type: finalBroadCastType, card_id: finalCardId || null, video_name: null };
 
       const activeChannel = roomChannel || roomChannelRef.current;
       if (activeChannel) {
@@ -1497,6 +1545,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       setWatchPartyType(watchPartyData.type as "video" | "url");
       setWatchPartyCardId(watchPartyData.card_id);
       setWatchPartyHostId(watchPartyData.host_id || null);
+      setWatchPartyVideoName(watchPartyData.video_name || null);
       
       setWatchPartySelection(null);
       setIsWatchPartyOpen(false);
@@ -2786,11 +2835,14 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         ref={viewerVideoRef}
                         autoPlay
                         playsInline
-                        controls
+                        controls={canControlVideo}
                         className="max-w-full max-h-full object-contain"
                         onLoadedMetadata={(e) => {
                           e.currentTarget.play().catch(err => console.log("Viewer play block error:", err));
                         }}
+                        onPlay={canControlVideo ? handleHostControlPlay : undefined}
+                        onPause={canControlVideo ? handleHostControlPause : undefined}
+                        onSeeked={canControlVideo ? handleHostControlSeek : undefined}
                       />
                     )
                   ) : (
@@ -2810,10 +2862,14 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         ref={viewerVideoRef}
                         src={watchPartySource}
                         autoPlay
+                        controls={canControlVideo}
                         className="max-w-full max-h-full object-contain"
                         onLoadedMetadata={(e) => {
                           e.currentTarget.play().catch(err => console.log("Viewer URL play error:", err));
                         }}
+                        onPlay={canControlVideo ? handleHostControlPlay : undefined}
+                        onPause={canControlVideo ? handleHostControlPause : undefined}
+                        onSeeked={canControlVideo ? handleHostControlSeek : undefined}
                       />
                     )
                   )
@@ -2862,6 +2918,23 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                           {msg.senderName}
                           {roomAdmins.has(msg.senderId) && <span className="text-[7px] bg-indigo-600 text-white px-1 rounded-sm">ADM</span>}
                           {msg.senderId === roomId && <span className="text-[7px] bg-amber-500 text-white px-1 rounded-sm">HOST</span>}
+                          {isHost && msg.senderId !== user.id && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleVideoController(msg.senderId);
+                              }}
+                              className={`ml-1.5 p-0.5 rounded hover:bg-slate-700/50 transition-all ${allowedVideoControllers.has(msg.senderId) ? 'text-emerald-400' : 'text-slate-600'}`}
+                              title={allowedVideoControllers.has(msg.senderId) ? "Remover controle do player" : "Permitir controle do player"}
+                            >
+                              <Sliders size={10} />
+                            </button>
+                          )}
+                          {!isHost && allowedVideoControllers.has(msg.senderId) && (
+                            <span className="text-[8px] text-emerald-400 font-bold uppercase ml-1 flex items-center gap-0.5">
+                              <Sliders size={8} /> CTRL
+                            </span>
+                          )}
                         </span>
                         <div className={`px-4 py-2 rounded-2xl text-xs font-medium max-w-[90%] break-all ${msg.senderId === user.id ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700/50'}`}>
                           {msg.text}
