@@ -368,11 +368,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   }, [quickStream, quickRecordingType]);
 
   const isHost = !!(
-    user.isLoggedIn && (
-      roomId === user.id ||
-      roomId?.startsWith('priv-') ||
-      (roomDetails && roomDetails.creator_id === user.id)
-    )
+    roomId === user.id ||
+    roomId?.startsWith('priv-') ||
+    (roomDetails && roomDetails.creator_id === user.id)
   );
   const isWatchPartyHost = watchPartyHostId ? watchPartyHostId === user.id : !!(localVideoUrl || isHost);
   const isAdmin = isHost || (user.isLoggedIn && roomAdmins.has(user.id)) || roomId?.startsWith('guest_');
@@ -1933,12 +1931,23 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     setTimeout(() => { setShowQrCode(false); setActivePayment(null); setPaymentAmount(null); alert(`Pagamento confirmado! +${transaction.credits_amount} créditos.`); }, 2500);
   };
 
-  const handleCreateNewSession = () => {
+  const handleCreateNewSession = async () => {
     const newId = 'room-' + Math.random().toString(36).substr(2, 6);
     const newSession = { id: newId, name: `Nova Sala: ${newId.split('-')[1]}`, lastMessage: 'Chat iniciado', time: 'Agora', isActive: false };
     setSessions(prev => [newSession, ...prev]);
     navigate(`/chat/${newId}`);
     setIsMobileMenuOpen(false);
+    // Persist the room immediately so creator_id is stored and isHost works on first load
+    try {
+      await supabase.from('rooms').upsert([{
+        id: newId,
+        creator_id: user.id,
+        name: `Nova Sala: ${newId.split('-')[1]}`,
+        admins: [user.id]
+      }], { onConflict: 'id' });
+    } catch (e) {
+      console.warn('Could not persist new room to DB:', e);
+    }
   };
 
   const handleSendMessage = async () => {
@@ -2778,6 +2787,32 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         </button>
                       )}
                       
+                      <button
+                        onClick={() => {
+                          setIsCinemaMenuOpen(false);
+                          const roomUrl = `${window.location.origin}/#/chat/${roomId}`;
+                          if (navigator.share) {
+                            navigator.share({
+                              title: 'LinkCard Chat',
+                              text: 'Assista comigo nesta sala!',
+                              url: roomUrl
+                            }).catch(() => {
+                              navigator.clipboard.writeText(roomUrl)
+                                .then(() => showToast('Link da sala copiado!', 'success'))
+                                .catch(() => prompt('Copie o link da sala:', roomUrl));
+                            });
+                          } else {
+                            navigator.clipboard.writeText(roomUrl)
+                              .then(() => showToast('Link da sala copiado!', 'success'))
+                              .catch(() => prompt('Copie o link da sala:', roomUrl));
+                          }
+                        }}
+                        className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800/80 transition-all text-left text-xs font-bold uppercase tracking-wider"
+                      >
+                        <Copy size={16} className="text-sky-400" />
+                        Copiar Link da Sala
+                      </button>
+
                       <button
                         onClick={() => {
                           setIsCinemaMenuOpen(false);
