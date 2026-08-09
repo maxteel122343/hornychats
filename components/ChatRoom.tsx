@@ -1228,7 +1228,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           
           const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(filePath);
           finalBroadCastSource = publicUrl;
-          finalBroadCastType = 'url'; // Treat direct file stream as a direct HTTP url
+          finalBroadCastType = 'video'; // Treat direct file stream as a direct HTTP url
           setLocalVideoUrl(publicUrl);
           
           // Clear file state since we're now streaming from URL
