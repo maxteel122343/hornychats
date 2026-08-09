@@ -173,6 +173,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const [isCinemaSidebarCollapsed, setIsCinemaSidebarCollapsed] = useState(false);
   const [floatingMessages, setFloatingMessages] = useState<Array<{ id: string | number, text: string, senderName: string }>>([]);
   const [roomChannel, setRoomChannel] = useState<any>(null);
+  const [watchPartyFile, setWatchPartyFile] = useState<File | null>(null);
+  const [uploadingWatchParty, setUploadingWatchParty] = useState(false);
   const [showQrCode, setShowQrCode] = useState(false);
   const [showEarningsModal, setShowEarningsModal] = useState(false);
   const [withdrawalPending, setWithdrawalPending] = useState(false);
@@ -1158,6 +1160,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
     // Save selection as type: 'video' and source: localUrl
     setWatchPartySelection({ source: localUrl, type: 'video' });
+    setWatchPartyFile(file);
 
     // Persist file locally in IndexedDB
     try {
@@ -1175,7 +1178,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     setWatchPartyType('video');
     setWatchPartyHostId(user.id);
     setIsWatchPartyOpen(true);
-    broadcastWatchParty(url, 'video');
+    setWatchPartyFile(video.file);
+    broadcastWatchParty(url, 'video', undefined, video.file);
   };
 
   const deleteRecentVideo = async (id: number) => {
@@ -1193,7 +1197,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     setWatchPartyInput('');
   };
 
-  const broadcastWatchParty = async (source?: string, type?: 'video' | 'url', cardId?: string) => {
+  const broadcastWatchParty = async (source?: string, type?: 'video' | 'url', cardId?: string, fileToUpload?: File) => {
     if (!roomId) return;
 
     const finalSource = source || watchPartySelection?.source;
@@ -1204,10 +1208,45 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
     // Host AND Admins can broadcast
     if (isAdmin) {
+      let finalBroadCastSource = finalSource;
+      let finalBroadCastType = finalType;
+      
+      const file = fileToUpload || watchPartyFile;
       const isLocalFile = finalSource.startsWith('blob:');
-      const watchPartyData = isLocalFile 
+
+      // DATABASE UPLOAD FALLBACK: If it's a local video file, attempt to upload to Supabase Storage
+      if (isLocalFile && file) {
+        setUploadingWatchParty(true);
+        try {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Date.now()}.${fileExt}`;
+          const filePath = `${roomId}/watchparty/${fileName}`;
+          
+          showToast('Fazendo upload do vídeo para o servidor (Fallback)...', 'info');
+          const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
+          if (uploadError) throw uploadError;
+          
+          const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(filePath);
+          finalBroadCastSource = publicUrl;
+          finalBroadCastType = 'url'; // Treat direct file stream as a direct HTTP url
+          setLocalVideoUrl(publicUrl);
+          
+          // Clear file state since we're now streaming from URL
+          setWatchPartyFile(null);
+        } catch (e: any) {
+          console.error("Failed to upload watch party video fallback:", e);
+          showToast('Upload falhou. Transmitindo localmente via P2P...', 'info');
+          // If upload fails, finalBroadCastSource remains the blob URL and it defaults to P2P below
+        } finally {
+          setUploadingWatchParty(false);
+        }
+      }
+
+      // Check again if source is local or cloud
+      const finalIsLocalFile = finalBroadCastSource.startsWith('blob:');
+      const watchPartyData = finalIsLocalFile 
         ? { source: 'p2p-stream', type: 'video', card_id: finalCardId || null, host_id: user.id }
-        : { source: finalType === 'url' ? getEmbedUrl(finalSource) : finalSource, type: finalType, card_id: finalCardId || null };
+        : { source: finalBroadCastType === 'url' ? getEmbedUrl(finalBroadCastSource) : finalBroadCastSource, type: finalBroadCastType, card_id: finalCardId || null };
 
       const { error } = await supabase.from('rooms').update({
         watch_party_data: watchPartyData
@@ -2733,8 +2772,20 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                     )}
                   </button>
                   {watchPartySelection?.type === 'video' && !uploadProgress && (
-                    <button onClick={() => broadcastWatchParty()} className="w-full py-4 bg-emerald-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-emerald-500 transition-all shadow-lg animate-in zoom-in-95 flex items-center justify-center gap-2">
-                      <CheckCircle size={16} /> Entrar com Vídeo
+                    <button 
+                      onClick={() => broadcastWatchParty()} 
+                      disabled={uploadingWatchParty}
+                      className="w-full py-4 bg-emerald-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-emerald-500 transition-all shadow-lg animate-in zoom-in-95 flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {uploadingWatchParty ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" /> Enviando ao Servidor...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle size={16} /> Entrar com Vídeo
+                        </>
+                      )}
                     </button>
                   )}
                 </div>
