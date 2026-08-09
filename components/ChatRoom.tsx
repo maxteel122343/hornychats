@@ -248,7 +248,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     image_url?: string,
     background_url?: string,
     watch_party_data?: { source: string, card_id?: string, type: string },
-    admins?: string[]
+    admins?: string[],
+    creator_id?: string
   } | null>(null);
   const [roomAdmins, setRoomAdmins] = useState<Set<string>>(new Set());
 
@@ -362,7 +363,14 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     }
   }, [quickStream, quickRecordingType]);
 
-  const isHost = !!(user.isLoggedIn && (roomId === user.id || roomId?.startsWith('priv-') || roomId?.startsWith('room-')));
+  const isHost = !!(
+    user.isLoggedIn && (
+      roomId === user.id ||
+      roomId?.startsWith('priv-') ||
+      roomId?.startsWith('room-') ||
+      (roomDetails && roomDetails.creator_id === user.id)
+    )
+  );
   const isWatchPartyHost = watchPartyHostId ? watchPartyHostId === user.id : !!(localVideoUrl || isHost);
   const isAdmin = isHost || (user.isLoggedIn && roomAdmins.has(user.id)) || roomId?.startsWith('guest_');
   const canControlVideo = isWatchPartyHost || isAdmin || allowedVideoControllers.has(user.id);
@@ -850,7 +858,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
     const fetchRoomDetails = async () => {
       if (!roomId) return;
-      const { data } = await supabase.from('rooms').select('name, image_url, background_url, watch_party_data, admins').eq('id', roomId).single();
+      const { data } = await supabase.from('rooms').select('name, image_url, background_url, watch_party_data, admins, creator_id').eq('id', roomId).single();
       
       let watchPartyData = data?.watch_party_data || null;
 
