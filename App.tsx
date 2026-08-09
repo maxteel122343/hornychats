@@ -10,14 +10,28 @@ import { User } from './types';
 import { supabase } from './lib/supabase';
 
 const App: React.FC = () => {
-  const [user, setUser] = useState<User>({
-    id: 'guest_' + Math.random().toString(36).substr(2, 5),
-    name: 'Visitante',
-    credits: 50,
-    free_credits: 50,
-    earnings: 0,
-    isHost: false,
-    isLoggedIn: false
+  const [user, setUser] = useState<User>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('guest_user');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {}
+      }
+    }
+    const newGuest = {
+      id: 'guest_' + Math.random().toString(36).substr(2, 5),
+      name: 'Visitante',
+      credits: 50,
+      free_credits: 50,
+      earnings: 0,
+      isHost: false,
+      isLoggedIn: false
+    };
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('guest_user', JSON.stringify(newGuest));
+    }
+    return newGuest;
   });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   // Alterado para 'light' como padrão
@@ -50,14 +64,34 @@ const App: React.FC = () => {
       if (session) {
         syncUser(session.user);
       } else {
-        setUser({
-          id: 'guest_' + Math.random().toString(36).substr(2, 5),
-          name: 'Visitante',
-          credits: 50,
-          earnings: 0,
-          isHost: false,
-          isLoggedIn: false
-        });
+        let guestUser: User;
+        const saved = localStorage.getItem('guest_user');
+        if (saved) {
+          try {
+            guestUser = JSON.parse(saved);
+          } catch (e) {
+            guestUser = {
+              id: 'guest_' + Math.random().toString(36).substr(2, 5),
+              name: 'Visitante',
+              credits: 50,
+              earnings: 0,
+              isHost: false,
+              isLoggedIn: false
+            };
+            localStorage.setItem('guest_user', JSON.stringify(guestUser));
+          }
+        } else {
+          guestUser = {
+            id: 'guest_' + Math.random().toString(36).substr(2, 5),
+            name: 'Visitante',
+            credits: 50,
+            earnings: 0,
+            isHost: false,
+            isLoggedIn: false
+          };
+          localStorage.setItem('guest_user', JSON.stringify(guestUser));
+        }
+        setUser(guestUser);
       }
     });
 
