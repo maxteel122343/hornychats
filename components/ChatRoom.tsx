@@ -511,7 +511,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         viewerVideoRef.current.play().catch(e => console.log('Viewer autoplay blocked:', e));
       }
     }
-  }, [remoteStream]);
+  }, [remoteStream, activeTab]);
 
 
   const handleToggleAdmin = async (targetUserId: string) => {
@@ -2264,6 +2264,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               <button onClick={() => setActiveTab('showcase')} className={`px-4 md:px-8 py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'showcase' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><LayoutGrid size={14} /> Vitrine</button>
               <button onClick={() => setActiveTab('my_cards')} className={`px-4 md:px-8 py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'my_cards' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><FolderOpen size={14} /> Meus Cards</button>
               <button onClick={() => setActiveTab('cinema')} className={`px-4 md:px-8 py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'cinema' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><Tv size={14} /> Cinema</button>
+              <button onClick={() => setActiveTab('people')} className={`px-4 md:px-8 py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'people' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><Users size={14} /> Pessoas</button>
             </nav>
 
             <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col scrollbar-hide">
