@@ -2364,7 +2364,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                     <div className="flex flex-col items-end gap-1">
                       <button
                         onClick={(e) => handleCloseSession(e, session.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded text-red-500 transition-all"
+                        className="p-1 hover:bg-red-500/20 rounded text-red-400 hover:text-red-500 transition-all"
                       >
                         <X size={12} />
                       </button>
