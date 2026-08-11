@@ -1648,11 +1648,31 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     setIsWatchPartyOpen(false);
   };
 
-  const handleNewVideoSelection = async () => {
-    // Must await stopWatchParty so its internal setIsWatchPartyOpen(false)
-    // doesn't close the modal after we set it to true below.
-    await stopWatchParty();
-    setIsWatchPartyOpen(true);
+  const handleNewVideoSelection = () => {
+    // Clear all watch-party state SYNCHRONOUSLY so React batches everything
+    // in ONE render: watchPartySource=null + isWatchPartyOpen=true → modal appears
+    setWatchPartySource(null);
+    setWatchPartyCardId(null);
+    setWatchPartyHostId(null);
+    setWatchPartySelection(null);
+    setWatchPartyInput('');
+    setIsWatchPartyOpen(true);   // open the selection modal immediately
+    cleanupP2P();
+
+    // Fire-and-forget async cleanup (broadcast + DB) — does NOT block the modal
+    const activeChannel = roomChannel || roomChannelRef.current;
+    if (activeChannel) {
+      activeChannel.send({
+        type: 'broadcast',
+        event: 'webrtc-signal',
+        payload: { senderId: user.id, targetId: 'all', type: 'watch-party-update', data: null }
+      });
+    }
+    if (roomId) {
+      localStorage.removeItem(`watch_party_${roomId}`);
+      supabase.from('rooms').update({ watch_party_data: null }).eq('id', roomId)
+        .catch((e: any) => console.warn('Background room clear failed:', e));
+    }
   };
 
   const onCardCreated = async (card: MediaCard) => {
