@@ -2361,18 +2361,18 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         </span>
                       )}
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <button
-                        onClick={(e) => handleCloseSession(e, session.id)}
-                        title="Fechar sala"
-                        className="flex-shrink-0 w-5 h-5 flex items-center justify-center bg-red-500/20 hover:bg-red-500 rounded-full text-red-500 hover:text-white transition-all border border-red-500/30"
-                      >
-                        <X size={10} strokeWidth={3} />
-                      </button>
-                      <span className={`text-[10px] ${colors.text}`}>{session.time}</span>
-                    </div>
+                    <button
+                      onClick={(e) => handleCloseSession(e, session.id)}
+                      title="Fechar sala"
+                      className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-red-600 hover:bg-red-500 rounded-full text-white shadow-md transition-all z-10"
+                    >
+                      <X size={12} strokeWidth={3} />
+                    </button>
                   </div>
-                  <p className={`text-[11px] ${colors.text} truncate opacity-70`}>{session.lastMessage}</p>
+                  <div className="flex justify-between items-center mt-1">
+                    <p className={`text-[11px] ${colors.text} truncate opacity-70`}>{session.lastMessage}</p>
+                    <span className={`text-[10px] ${colors.text} flex-shrink-0 ml-2`}>{session.time}</span>
+                  </div>
                 </div>
               )}
             </div>
