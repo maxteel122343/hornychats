@@ -2364,9 +2364,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                     <div className="flex flex-col items-end gap-1">
                       <button
                         onClick={(e) => handleCloseSession(e, session.id)}
-                        className="p-1 hover:bg-red-500/20 rounded text-red-400 hover:text-red-500 transition-all"
+                        title="Fechar sala"
+                        className="flex-shrink-0 w-5 h-5 flex items-center justify-center bg-red-500/20 hover:bg-red-500 rounded-full text-red-500 hover:text-white transition-all border border-red-500/30"
                       >
-                        <X size={12} />
+                        <X size={10} strokeWidth={3} />
                       </button>
                       <span className={`text-[10px] ${colors.text}`}>{session.time}</span>
                     </div>
