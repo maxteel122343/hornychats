@@ -2886,6 +2886,17 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                     </div>
                   )}
                 </div>
+
+                {/* QUICK TV BUTTON — always visible, opens upload/link modal directly */}
+                {canControlVideo && (
+                  <button
+                    onClick={() => { setIsCinemaMenuOpen(false); handleNewVideoSelection(); }}
+                    title="Subir Vídeo / Link"
+                    className="p-3 bg-indigo-600/80 text-white rounded-full hover:bg-indigo-500 active:scale-95 transition-all backdrop-blur-md border border-indigo-400/30 flex items-center justify-center shadow-lg"
+                  >
+                    <Tv size={18} />
+                  </button>
+                )}
               </div>
 
               {/* Chat Sidebar Toggle Button */}
