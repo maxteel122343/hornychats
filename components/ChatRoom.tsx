@@ -328,6 +328,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const localStreamRef = useRef<MediaStream | null>(null);
   // Retry interval for viewer join-request
   const joinRequestIntervalRef = useRef<any>(null);
+  // Guard: prevents self-triggered stop events from closing the new-video selection modal
+  const selectingNewVideoRef = useRef(false);
 
   useEffect(() => {
     localStreamRef.current = localStream;
@@ -960,11 +962,22 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
             setIsWatchPartyOpen(true);
             setActiveTab('cinema');
           } else {
-            setIsWatchPartyOpen(false);
-            setWatchPartySource(null);
-            setWatchPartyCardId(null);
-            setWatchPartyHostId(null);
-            cleanupP2P();
+            // Guard: don't close the modal if we're the one who triggered this stop
+            // (i.e. user clicked "Novo Vídeo" and is choosing a new source)
+            if (selectingNewVideoRef.current) {
+              selectingNewVideoRef.current = false;
+              setWatchPartySource(null);
+              setWatchPartyCardId(null);
+              setWatchPartyHostId(null);
+              cleanupP2P();
+              // Keep isWatchPartyOpen=true so the selection modal stays open
+            } else {
+              setIsWatchPartyOpen(false);
+              setWatchPartySource(null);
+              setWatchPartyCardId(null);
+              setWatchPartyHostId(null);
+              cleanupP2P();
+            }
           }
         })
       .on('broadcast', { event: 'webrtc-signal' }, async (payload) => {
@@ -999,6 +1012,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
             setIsWatchPartyOpen(false);
             setActiveTab('cinema');
           } else {
+            // Guard: if we are the sender and we're choosing a new video, skip the close
+            if (senderId === user.id && selectingNewVideoRef.current) {
+              return; // already handled synchronously in handleNewVideoSelection
+            }
             setIsWatchPartyOpen(false);
             setWatchPartySource(null);
             setWatchPartyCardId(null);
@@ -1649,6 +1666,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   };
 
   const handleNewVideoSelection = () => {
+    // Set guard BEFORE any async events fire, so self-triggered stop events
+    // (broadcast echo + postgres_changes) don't close the selection modal.
+    selectingNewVideoRef.current = true;
+
     // Clear all watch-party state SYNCHRONOUSLY so React batches everything
     // in ONE render: watchPartySource=null + isWatchPartyOpen=true → modal appears
     setWatchPartySource(null);
@@ -1659,7 +1680,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     setIsWatchPartyOpen(true);   // open the selection modal immediately
     cleanupP2P();
 
-    // Fire-and-forget async cleanup (broadcast + DB) — does NOT block the modal
+    // Notify others via broadcast (they don't have selectingNewVideoRef=true so they DO close)
     const activeChannel = roomChannel || roomChannelRef.current;
     if (activeChannel) {
       activeChannel.send({
@@ -1668,6 +1689,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         payload: { senderId: user.id, targetId: 'all', type: 'watch-party-update', data: null }
       });
     }
+    // DB update notifies other users via postgres_changes (guard prevents it closing our modal)
     if (roomId) {
       localStorage.removeItem(`watch_party_${roomId}`);
       supabase.from('rooms').update({ watch_party_data: null }).eq('id', roomId)
