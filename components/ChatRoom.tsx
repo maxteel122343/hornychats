@@ -301,7 +301,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   useEffect(() => {
     if (messages.length > 0) {
       const latestMsg = messages[messages.length - 1];
-      if (latestMsg.text && activeTab === 'cinema' && isCinemaSidebarCollapsed) {
+      // Show floating message when sidebar is collapsed OR chat is minimized via chevron icon
+      if (latestMsg.text && activeTab === 'cinema' && (isCinemaSidebarCollapsed || isChatMinimized)) {
         const newFloating = {
           id: latestMsg.id,
           text: latestMsg.text,
@@ -309,13 +310,13 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         };
         setFloatingMessages(prev => [...prev.slice(-2), newFloating]); // keep last 3 floating bubbles max
         
-        // Auto-remove after 6 seconds
+        // Auto-remove after 10 seconds
         setTimeout(() => {
           setFloatingMessages(prev => prev.filter(m => m.id !== newFloating.id));
-        }, 6000);
+        }, 10000);
       }
     }
-  }, [messages, isCinemaSidebarCollapsed, activeTab]);
+  }, [messages, isCinemaSidebarCollapsed, isChatMinimized, activeTab]);
 
 
   const peerConnections = useRef<{ [peerId: string]: RTCPeerConnection }>({});
@@ -1647,8 +1648,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     setIsWatchPartyOpen(false);
   };
 
-  const handleNewVideoSelection = () => {
-    stopWatchParty();
+  const handleNewVideoSelection = async () => {
+    // Must await stopWatchParty so its internal setIsWatchPartyOpen(false)
+    // doesn't close the modal after we set it to true below.
+    await stopWatchParty();
     setIsWatchPartyOpen(true);
   };
 
@@ -2777,22 +2780,13 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                       <button
                         onClick={() => {
                           setIsCinemaMenuOpen(false);
-                          const roomUrl = `${window.location.origin}/#/chat/${roomId}`;
-                          if (navigator.share) {
-                            navigator.share({
-                              title: 'LinkCard Chat',
-                              text: 'Assista comigo nesta sala!',
-                              url: roomUrl
-                            }).catch(() => {
-                              navigator.clipboard.writeText(roomUrl)
-                                .then(() => showToast('Link da sala copiado!', 'success'))
-                                .catch(() => prompt('Copie o link da sala:', roomUrl));
-                            });
-                          } else {
-                            navigator.clipboard.writeText(roomUrl)
-                              .then(() => showToast('Link da sala copiado!', 'success'))
-                              .catch(() => prompt('Copie o link da sala:', roomUrl));
-                          }
+                          // Use roomId from useParams (always current) to avoid stale closures
+                          const currentRoomId = roomId;
+                          const roomUrl = `${window.location.origin}/#/chat/${currentRoomId}`;
+                          const fullMessage = `Assista comigo nesta sala! ${roomUrl}`;
+                          navigator.clipboard.writeText(fullMessage)
+                            .then(() => showToast('Link da sala copiado!', 'success'))
+                            .catch(() => prompt('Copie o link da sala:', fullMessage));
                         }}
                         className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800/80 transition-all text-left text-xs font-bold uppercase tracking-wider"
                       >
@@ -2866,8 +2860,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                 )}
               </button>
 
-              {/* Floating messages overlay when chat is collapsed */}
-              {isCinemaSidebarCollapsed && floatingMessages.length > 0 && (
+              {/* Floating messages overlay when chat is collapsed or minimized */}
+              {(isCinemaSidebarCollapsed || isChatMinimized) && floatingMessages.length > 0 && (
                 <div className="absolute bottom-6 left-6 z-[520] max-w-[280px] md:max-w-sm flex flex-col gap-2 pointer-events-none animate-in fade-in">
                   {floatingMessages.map((msg) => (
                     <div key={msg.id} className="bg-slate-900/80 backdrop-blur-md border border-slate-700/30 px-4 py-2.5 rounded-2xl shadow-xl flex flex-col gap-0.5 animate-in slide-in-from-bottom-3 duration-300">
