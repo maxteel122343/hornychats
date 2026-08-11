@@ -425,10 +425,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   };
 
   useEffect(() => {
-    if (activeTab === 'cinema' || isWatchPartyOpen) {
+    if (activeTab === 'cinema' || isWatchPartyOpen || sidebarTab === 'history') {
       loadRecentVideos();
     }
-  }, [activeTab, isWatchPartyOpen, isWatchPartyHost, watchPartySource, watchPartyVideoName, watchPartyCardId]);
+  }, [activeTab, isWatchPartyOpen, sidebarTab, isWatchPartyHost, watchPartySource, watchPartyVideoName, watchPartyCardId]);
   const isDark = theme === 'dark';
 
   // WebRTC Effects
@@ -2841,6 +2841,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                           setIsCinemaMenuOpen(false);
                           setSidebarTab('history');
                           setIsCinemaSidebarCollapsed(false);
+                          setIsChatMinimized(false); // ensure sidebar is fully expanded on mobile
+                          loadRecentVideos();         // force refresh video list
                         }}
                         className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800/80 transition-all text-left text-xs font-bold uppercase tracking-wider"
                       >
