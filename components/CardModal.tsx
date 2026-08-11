@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Upload, Mic, Video, Image as ImageIcon, MessageSquare, DollarSign, Clock, Tag, Camera, StopCircle, RefreshCw, LayoutGrid, Eye, EyeOff, Maximize, Sliders, Phone, LayoutTemplate, Timer, Zap, Settings, Save, Trash2, Edit, PlayCircle, FolderOpen, CalendarClock, Palette, Layers, Repeat, Play, Pause } from 'lucide-react';
+import { X, ArrowLeft, Upload, Mic, Video, Image as ImageIcon, MessageSquare, DollarSign, Clock, Tag, Camera, StopCircle, RefreshCw, LayoutGrid, Eye, EyeOff, Maximize, Sliders, Phone, LayoutTemplate, Timer, Zap, Settings, Save, Trash2, Edit, PlayCircle, FolderOpen, CalendarClock, Palette, Layers, Repeat, Play, Pause } from 'lucide-react';
 import { CardType, MediaCard, CardDefaults } from '../types';
 import { supabase } from '../lib/supabase';
 import MediaCardItem from './MediaCardItem';
@@ -578,20 +578,29 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
     <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl overflow-y-auto animate-in fade-in duration-300">
       <div className={`bg-[#0f172a] border border-slate-800 rounded-[2.5rem] w-full ${activeTab === 'create' ? 'max-w-6xl' : 'max-w-4xl'} shadow-2xl flex flex-col max-h-[95vh] border-white/5 relative`}>
 
-        <div className="p-6 border-b border-white/5 flex justify-between items-center bg-slate-900/50">
-          <div className="flex items-center gap-2">
-            <button onClick={() => setActiveTab('create')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'create' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-800'}`}>
-              <LayoutGrid size={14} /> Avançado
+        <div className="p-4 sm:p-6 border-b border-white/5 flex items-center justify-between bg-slate-900/50 gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide no-scrollbar">
+            <button 
+              onClick={onClose} 
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition-all text-xs font-bold shrink-0"
+              title="Voltar / Fechar"
+            >
+              <ArrowLeft size={16} />
+              <span>Voltar</span>
             </button>
-            <button onClick={() => setActiveTab('simple')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'simple' ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:bg-slate-800'}`}>
+            <div className="h-4 w-[1px] bg-slate-700 mx-1 shrink-0" />
+            <button onClick={() => setActiveTab('create')} className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'create' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-800'}`}>
+              <LayoutGrid size={14} /> <span className="hidden xs:inline">Avançado</span><span className="xs:hidden">Criar</span>
+            </button>
+            <button onClick={() => setActiveTab('simple')} className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'simple' ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:bg-slate-800'}`}>
               <Zap size={14} /> Simplifica
             </button>
-            <button onClick={() => setActiveTab('library')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'library' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-800'}`}>
-              <FolderOpen size={14} /> Meus Cards
+            <button onClick={() => setActiveTab('library')} className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'library' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-800'}`}>
+              <FolderOpen size={14} /> <span className="hidden xs:inline">Meus Cards</span><span className="xs:hidden">Cards</span>
             </button>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full text-slate-500 hover:text-white transition-all">
-            <X size={24} />
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full text-slate-400 hover:text-white transition-all shrink-0">
+            <X size={20} />
           </button>
         </div>
 
