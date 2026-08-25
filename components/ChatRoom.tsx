@@ -373,6 +373,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const isHost = !!(
     roomId === user.id ||
     roomId?.startsWith('priv-') ||
+    roomId?.startsWith('guest_') ||
     (roomDetails && roomDetails.creator_id === user.id)
   );
   const isWatchPartyHost = watchPartyHostId ? watchPartyHostId === user.id : !!(localVideoUrl || isHost);
@@ -1293,28 +1294,29 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
   const handleBackgroundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !roomId || !isHost || !user.id) return;
-    if (!user.isLoggedIn) return showToast('Faça login para trocar o fundo.', 'info');
+    if (!file || !roomId || !isAdmin) return;
 
     const fileExt = file.name.split('.').pop();
     const fileName = `${roomId}_bg_${Date.now()}.${fileExt}`;
     const filePath = `room_assets/${fileName}`;
 
-    const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
-    if (uploadError) return showToast('Erro ao subir fundo.', 'error');
+    let publicUrl = URL.createObjectURL(file);
 
-    const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(filePath);
+    if (user.isLoggedIn && user.id) {
+      const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
+      if (!uploadError) {
+        const { data: { publicUrl: remoteUrl } } = supabase.storage.from('media').getPublicUrl(filePath);
+        publicUrl = remoteUrl;
 
-    // Use upsert here too to ensure room record exists
-    const { error: dbError } = await supabase.from('rooms').upsert([{
-      id: roomId,
-      creator_id: user.id,
-      name: roomDetails?.name || 'Chat',
-      image_url: roomDetails?.image_url,
-      background_url: publicUrl
-    }], { onConflict: 'id' });
-
-    if (dbError) return showToast('Erro ao persistir fundo.', 'error');
+        await supabase.from('rooms').upsert([{
+          id: roomId,
+          creator_id: user.id,
+          name: roomDetails?.name || 'Chat',
+          image_url: roomDetails?.image_url,
+          background_url: publicUrl
+        }], { onConflict: 'id' });
+      }
+    }
 
     setRoomDetails(prev => prev ? { ...prev, background_url: publicUrl } : { name: 'Chat', background_url: publicUrl });
     showToast('Plano de fundo atualizado!', 'success');
@@ -1322,49 +1324,51 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
   const handleRoomImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !roomId || !isHost || !user.id) return;
-    if (!user.isLoggedIn) return showToast('Faça login para trocar a imagem.', 'info');
+    if (!file || !roomId || !isAdmin) return;
 
     const fileExt = file.name.split('.').pop();
     const fileName = `${roomId}_thumb_${Date.now()}.${fileExt}`;
     const filePath = `room_assets/${fileName}`;
 
-    const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
-    if (uploadError) return showToast('Erro ao subir imagem da sala.', 'error');
+    let publicUrl = URL.createObjectURL(file);
 
-    const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(filePath);
+    if (user.isLoggedIn && user.id) {
+      const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
+      if (!uploadError) {
+        const { data: { publicUrl: remoteUrl } } = supabase.storage.from('media').getPublicUrl(filePath);
+        publicUrl = remoteUrl;
 
-    // Use upsert here too to ensure room record exists
-    const { error: dbError } = await supabase.from('rooms').upsert([{
-      id: roomId,
-      creator_id: user.id,
-      name: roomDetails?.name || 'Chat',
-      image_url: publicUrl,
-      background_url: roomDetails?.background_url
-    }], { onConflict: 'id' });
-
-    if (dbError) return showToast('Erro ao persistir imagem.', 'error');
+        await supabase.from('rooms').upsert([{
+          id: roomId,
+          creator_id: user.id,
+          name: roomDetails?.name || 'Chat',
+          image_url: publicUrl,
+          background_url: roomDetails?.background_url
+        }], { onConflict: 'id' });
+      }
+    }
 
     setRoomDetails(prev => prev ? { ...prev, image_url: publicUrl } : { name: 'Chat', image_url: publicUrl });
     showToast('Imagem da sala atualizada!', 'success');
   };
 
   const handleSaveRoomDetails = async () => {
-    if (!roomId || !isHost || !tempRoomName.trim() || !user.id) return;
-    if (!user.isLoggedIn) return showToast('Faça login para salvar permanentemente.', 'info');
+    if (!roomId || !isAdmin || !tempRoomName.trim()) return;
 
-    const { error } = await supabase.from('rooms').upsert([{
-      id: roomId,
-      creator_id: user.id,
-      name: tempRoomName,
-      image_url: roomDetails?.image_url,
-      background_url: roomDetails?.background_url
-    }], { onConflict: 'id' });
+    if (user.isLoggedIn && user.id) {
+      const { error } = await supabase.from('rooms').upsert([{
+        id: roomId,
+        creator_id: user.id,
+        name: tempRoomName,
+        image_url: roomDetails?.image_url,
+        background_url: roomDetails?.background_url
+      }], { onConflict: 'id' });
 
-    if (error) {
-      console.error('Room save error:', error);
-      return showToast('Erro ao salvar nome da sala.', 'error');
+      if (error) {
+        console.error('Room save error:', error);
+      }
     }
+
     setRoomDetails(prev => prev ? { ...prev, name: tempRoomName } : { name: tempRoomName });
     setIsEditingRoom(false);
     showToast('Nome da sala atualizado!', 'success');
@@ -1692,8 +1696,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     // DB update notifies other users via postgres_changes (guard prevents it closing our modal)
     if (roomId) {
       localStorage.removeItem(`watch_party_${roomId}`);
-      supabase.from('rooms').update({ watch_party_data: null }).eq('id', roomId)
-        .catch((e: any) => console.warn('Background room clear failed:', e));
+      supabase.from('rooms').update({ watch_party_data: null }).eq('id', roomId).then(({ error }) => {
+        if (error) console.warn('Background room clear failed:', error);
+      });
     }
   };
 
@@ -2106,6 +2111,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
   const startQuickRecording = async (type: 'audio' | 'video' | 'photo') => {
     try {
+      let stream: MediaStream;
       const constraints = {
         audio: type !== 'photo',
         video: type !== 'audio' ? {
@@ -2114,7 +2120,18 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           facingMode: "user"
         } : false
       };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (firstErr) {
+        console.warn("Retrying getUserMedia with basic constraints:", firstErr);
+        const basicConstraints = {
+          audio: type !== 'photo',
+          video: type !== 'audio' ? true : false
+        };
+        stream = await navigator.mediaDevices.getUserMedia(basicConstraints);
+      }
+
       setQuickStream(stream);
       setQuickRecordingType(type);
       setIsQuickRecording(true);
@@ -2140,9 +2157,14 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         recorder.start();
         recordingTimerRef.current = setInterval(() => setRecordingTime(prev => prev + 1), 1000);
       }
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao acessar dispositivos de mídia. Verifique as permissões.');
+    } catch (err: any) {
+      console.error("Camera/Mic access error:", err);
+      if (type === 'photo' && quickUploadRef.current) {
+        showToast('Câmera indisponível ou permissão negada. Abrindo seleção de imagem...', 'info');
+        quickUploadRef.current.click();
+        return;
+      }
+      showToast('Erro ao acessar mídia. Verifique as permissões do seu navegador.', 'error');
     }
   };
 
@@ -2430,26 +2452,46 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
             <button onClick={() => navigate('/')} className={`p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg ${colors.text}`}><Home size={18} /></button>
             <button onClick={() => navigate('/')} className={`p-2 hover:bg-red-500/10 rounded-xl text-slate-400 hover:text-red-500 transition-all group`} title="Fechar Chat"><X size={20} /></button>
             <div className="flex items-center gap-2 ml-1">
-              <div className={`w-10 h-10 rounded-xl overflow-hidden border ${colors.border} bg-slate-800 flex items-center justify-center`}>
+              <div 
+                onClick={() => {
+                  if (isAdmin) {
+                    setTempRoomName(roomDetails?.name || sessions.find(s => s.id === roomId)?.name || '');
+                    setIsEditingRoom(true);
+                  }
+                }}
+                className={`w-10 h-10 rounded-xl overflow-hidden border ${colors.border} bg-slate-800 flex items-center justify-center ${isAdmin ? 'cursor-pointer group relative' : ''}`}
+                title={isAdmin ? 'Editar Sala' : undefined}
+              >
                 {roomDetails?.image_url ? (
                   <img src={roomDetails.image_url} className="w-full h-full object-cover" />
                 ) : (
                   <MessageSquare size={18} className="text-slate-500" />
                 )}
+                {isAdmin && (
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                    <Edit size={12} className="text-white" />
+                  </div>
+                )}
               </div>
-              <div>
-                <h2 className={`text-sm font-black ${colors.textHighlight} uppercase tracking-tighter`}>{roomDetails?.name || sessions.find(s => s.id === roomId)?.name || 'Conversa'}</h2>
+              <div className="min-w-0">
+                <h2 className={`text-sm font-black ${colors.textHighlight} uppercase tracking-tighter truncate max-w-[110px] sm:max-w-[200px]`}>
+                  {roomDetails?.name || sessions.find(s => s.id === roomId)?.name || 'Conversa'}
+                </h2>
                 <div className="flex items-center gap-2 mt-0.5">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                  <span className={`text-[9px] font-black ${colors.text} uppercase tracking-widest`}>{isHost ? 'MEU ESPAÇO' : 'ONLINE'}</span>
+                  <span className={`text-[9px] font-black ${colors.text} uppercase tracking-widest`}>{isAdmin ? 'MEU ESPAÇO' : 'ONLINE'}</span>
                 </div>
               </div>
-              {isHost && (
+              {isAdmin && (
                 <button
-                  onClick={() => setIsEditingRoom(true)}
-                  className={`p-2 rounded-lg hover:bg-white/10 transition-all ${colors.text} opacity-50 hover:opacity-100`}
+                  onClick={() => {
+                    setTempRoomName(roomDetails?.name || sessions.find(s => s.id === roomId)?.name || '');
+                    setIsEditingRoom(true);
+                  }}
+                  className={`p-2 rounded-lg hover:bg-white/10 transition-all ${colors.text} opacity-80 hover:opacity-100 flex-shrink-0`}
+                  title="Editar Sala"
                 >
-                  <Edit size={14} />
+                  <Edit size={16} />
                 </button>
               )}
             </div>
