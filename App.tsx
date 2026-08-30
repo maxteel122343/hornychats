@@ -52,6 +52,14 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
+  useEffect(() => {
     // Check initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {

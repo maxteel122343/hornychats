@@ -2039,7 +2039,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     const newSession = { id: newId, name: `Nova Sala: ${newId.split('-')[1]}`, lastMessage: 'Chat iniciado', time: 'Agora', isActive: false };
     setSessions(prev => [newSession, ...prev]);
     navigate(`/chat/${newId}`);
-    setIsMobileMenuOpen(false);
+    showToast('Nova sala criada!', 'success');
     // Persist the room immediately so creator_id is stored and isHost works on first load
     try {
       await supabase.from('rooms').upsert([{
@@ -2475,8 +2475,24 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           const isOtherUserRoom = session.id !== user.id && !session.id.startsWith('priv-') && !session.id.startsWith('room-');
 
           return (
-            <div key={session.id} onClick={() => { navigate(`/chat/${session.id}`); setIsMobileMenuOpen(false); }} className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center gap-3 group ${isActive ? `${colors.primarySoft} ${colors.primaryBorder}` : `hover:bg-gray-100 dark:hover:bg-slate-800/60 ${colors.border}`} ${isSidebarCollapsed ? 'justify-center' : ''}`}>
-              <div className={`w-10 h-10 min-w-[2.5rem] rounded-xl flex items-center justify-center transition-colors overflow-hidden ${isActive ? `${colors.primary} text-white shadow-lg` : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>
+            <div 
+              key={session.id} 
+              onClick={() => { navigate(`/chat/${session.id}`); setIsMobileMenuOpen(false); }} 
+              className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center gap-3 group ${
+                isActive 
+                  ? (isDark 
+                      ? 'bg-blue-950/70 border-blue-500/80 text-white shadow-md ring-1 ring-blue-500/40' 
+                      : 'bg-red-50 border-red-400 text-slate-900 shadow-sm ring-1 ring-red-400/30')
+                  : (isDark 
+                      ? 'bg-slate-900/60 border-slate-800/80 text-slate-200 hover:bg-slate-800 hover:border-slate-700' 
+                      : 'bg-white border-gray-200 text-slate-800 hover:bg-gray-100 hover:border-gray-300')
+              } ${isSidebarCollapsed ? 'justify-center' : ''}`}
+            >
+              <div className={`w-10 h-10 min-w-[2.5rem] rounded-xl flex items-center justify-center transition-colors overflow-hidden ${
+                isActive 
+                  ? `${colors.primary} text-white shadow-lg` 
+                  : (isDark ? 'bg-slate-800 text-slate-400 group-hover:text-white' : 'bg-slate-100 text-slate-500 group-hover:text-slate-900')
+              }`}>
                 {displayImage ? (
                   <img src={displayImage} className="w-full h-full object-cover" />
                 ) : (
@@ -2487,7 +2503,11 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                 <div className="flex-1 min-w-0 animate-in fade-in">
                   <div className="flex justify-between items-start">
                     <div className="flex flex-col min-w-0">
-                      <h3 className={`text-sm font-semibold truncate ${isOtherUserRoom ? 'text-blue-400 dark:text-blue-400' : colors.textHighlight}`}>
+                      <h3 className={`text-sm font-bold truncate ${
+                        isOtherUserRoom 
+                          ? 'text-blue-400' 
+                          : (isActive ? (isDark ? 'text-blue-200 font-black' : 'text-red-700 font-black') : (isDark ? 'text-slate-100' : 'text-slate-900'))
+                      }`}>
                         {isActive && roomDetails?.name ? roomDetails.name : session.name}
                       </h3>
                       {isOtherUserRoom && (
@@ -2505,8 +2525,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                     </button>
                   </div>
                   <div className="flex justify-between items-center mt-1">
-                    <p className={`text-[11px] ${colors.text} truncate opacity-70`}>{session.lastMessage}</p>
-                    <span className={`text-[10px] ${colors.text} flex-shrink-0 ml-2`}>{session.time}</span>
+                    <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'} truncate font-medium`}>{session.lastMessage}</p>
+                    <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'} flex-shrink-0 ml-2 font-medium`}>{session.time}</span>
                   </div>
                 </div>
               )}

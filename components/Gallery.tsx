@@ -747,7 +747,7 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits }) =
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 md:gap-8">
             {filteredCards.map((card) => {
               const isUnlocked = card.creator_id === user.id || unlockedCardIds.has(card.id) || card.creditCost === 0;
               const creatorId = card.creator_id || 'creator_unknown';
@@ -757,41 +757,42 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits }) =
               return (
                 <div
                   key={card.id}
-                  className="group relative rounded-[2rem] overflow-hidden border border-white/10 hover:border-indigo-500/60 transition-all duration-300 shadow-2xl bg-slate-900/70 backdrop-blur-md flex flex-col justify-between"
+                  className="group relative rounded-3xl sm:rounded-[2rem] overflow-hidden border border-white/10 hover:border-indigo-500/60 transition-all duration-300 shadow-2xl bg-slate-900/80 backdrop-blur-md flex flex-col justify-between"
                 >
-                  {/* TOP THUMBNAIL AREA */}
-                  <div className="aspect-[4/5] overflow-hidden relative bg-black/40">
+                  {/* TOP THUMBNAIL AREA - Responsive aspect ratio prevents oversized zoomed images */}
+                  <div className="aspect-[16/10] sm:aspect-[4/3] w-full overflow-hidden relative bg-black/60">
                     <img
                       src={card.thumbnail || card.mediaUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80'}
                       alt={card.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 brightness-[0.75]"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 brightness-[0.85]"
+                      loading="lazy"
                     />
 
                     {/* TOP BADGES & CONTROLS */}
-                    <div className="absolute top-4 left-4 right-4 flex items-center justify-between gap-2 z-10">
+                    <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 z-10">
                       {/* Media Type Badge */}
-                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/70 backdrop-blur-md text-white border border-white/10 text-[10px] font-black uppercase tracking-wider">
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-black/75 backdrop-blur-md text-white border border-white/10 text-[9px] font-black uppercase tracking-wider">
                         {getIcon(card.type)}
                         <span>{card.type}</span>
                       </div>
 
                       {/* Credit Cost Badge */}
-                      <div className={`px-3 py-1.5 rounded-xl backdrop-blur-md text-[10px] font-black uppercase tracking-wider border shadow-md ${
+                      <div className={`px-2.5 py-1 rounded-xl backdrop-blur-md text-[9px] font-black uppercase tracking-wider border shadow-md ${
                         isUnlocked
-                          ? 'bg-emerald-500/80 text-white border-emerald-400/40'
+                          ? 'bg-emerald-500/85 text-white border-emerald-400/40'
                           : 'bg-amber-500/90 text-slate-950 border-amber-300/60'
                       }`}>
                         {isUnlocked ? 'LIBERADO' : `${card.creditCost} CR`}
                       </div>
                     </div>
 
-                    {/* CREATOR PROFILE CHIP ON CARD */}
-                    <div className="absolute top-16 left-4 right-4 z-10 flex items-center justify-between gap-2">
+                    {/* CREATOR PROFILE CHIP ON CARD (Positioned at bottom of thumbnail) */}
+                    <div className="absolute bottom-3 left-3 right-3 z-10 flex items-center justify-between gap-2">
                       {/* Clicking avatar or name filters the vitrine to this creator */}
                       <button
                         onClick={(e) => handleToggleCreatorFilter(creatorId, e)}
                         title={`Ver apenas mídias de ${creatorName}`}
-                        className={`flex items-center gap-2 pl-1.5 pr-3 py-1 rounded-2xl backdrop-blur-md border transition-all text-left group/creator ${
+                        className={`flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-xl backdrop-blur-md border transition-all text-left group/creator ${
                           isFilteredThisCreator
                             ? 'bg-indigo-600/90 border-indigo-400 text-white shadow-lg'
                             : 'bg-black/75 hover:bg-black/90 border-white/15 text-slate-200 hover:border-indigo-400/50'
@@ -801,14 +802,14 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits }) =
                           <img
                             src={card.creatorPhoto}
                             alt={creatorName}
-                            className="w-6 h-6 rounded-full object-cover border border-white/30 group-hover/creator:scale-110 transition-transform"
+                            className="w-5 h-5 rounded-full object-cover border border-white/30 group-hover/creator:scale-110 transition-transform"
                           />
                         ) : (
-                          <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-black text-[10px] border border-white/30">
+                          <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-black text-[9px] border border-white/30">
                             {creatorName.charAt(0).toUpperCase()}
                           </div>
                         )}
-                        <span className="text-[10px] font-black uppercase tracking-tight truncate max-w-[90px]">
+                        <span className="text-[9px] font-black uppercase tracking-tight truncate max-w-[85px]">
                           {creatorName}
                         </span>
                       </button>
@@ -817,17 +818,17 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits }) =
                       <button
                         onClick={(e) => handleOpenCreatorChat(creatorId, creatorName, e)}
                         title={`Entrar no Chat de ${creatorName}`}
-                        className="p-2 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-400/30 backdrop-blur-md transition-all shadow-lg hover:scale-110 active:scale-95 flex items-center justify-center"
+                        className="p-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-400/30 backdrop-blur-md transition-all shadow-lg hover:scale-110 active:scale-95 flex items-center justify-center"
                       >
-                        <MessageSquare size={14} />
+                        <MessageSquare size={13} />
                       </button>
                     </div>
 
                     {/* BLUR OVERLAY IF LOCKED */}
                     {!isUnlocked && card.isBlur && (
                       <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[6px] flex flex-col items-center justify-center p-4 text-center z-[5]">
-                        <Lock size={28} className="text-amber-400 mb-2 drop-shadow-md" />
-                        <span className="text-[9px] font-black uppercase tracking-widest text-white drop-shadow">
+                        <Lock size={24} className="text-amber-400 mb-1 drop-shadow-md" />
+                        <span className="text-[8px] font-black uppercase tracking-widest text-white drop-shadow">
                           Conteúdo Exclusivo
                         </span>
                       </div>
@@ -835,9 +836,9 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits }) =
                   </div>
 
                   {/* BOTTOM INFO AREA */}
-                  <div className="p-5 flex flex-col flex-1 justify-between bg-slate-900/90 border-t border-white/5 space-y-4">
+                  <div className="p-4 sm:p-5 flex flex-col flex-1 justify-between bg-slate-900/90 border-t border-white/5 space-y-3">
                     <div>
-                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <div className="flex items-center justify-between gap-2 mb-1">
                         <span className="text-[8px] font-black text-indigo-400 uppercase tracking-[0.2em]">
                           {card.category}
                         </span>
@@ -848,7 +849,7 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits }) =
                         )}
                       </div>
 
-                      <h3 className="text-base font-black text-white leading-snug uppercase tracking-tight line-clamp-1 mb-1.5" title={card.title}>
+                      <h3 className="text-sm sm:text-base font-black text-white leading-snug uppercase tracking-tight line-clamp-1 mb-1" title={card.title}>
                         {card.title}
                       </h3>
 
@@ -858,7 +859,7 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits }) =
 
                       {/* TAGS */}
                       {card.tags && card.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mt-3">
+                        <div className="flex flex-wrap gap-1 mt-2">
                           {card.tags.slice(0, 3).map((tag, idx) => (
                             <span
                               key={idx}
@@ -875,7 +876,7 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits }) =
                     <div className="grid grid-cols-5 gap-2 pt-2 border-t border-white/5">
                       <button
                         onClick={() => handleUnlockCard(card)}
-                        className={`col-span-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-[0.15em] transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2 ${
+                        className={`col-span-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-[9px] sm:text-[10px] font-black uppercase tracking-[0.15em] transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2 ${
                           isUnlocked
                             ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
                             : 'bg-white text-slate-950 hover:bg-indigo-600 hover:text-white'
@@ -883,12 +884,12 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits }) =
                       >
                         {isUnlocked ? (
                           <>
-                            <Eye size={14} />
+                            <Eye size={13} />
                             <span>VER MÍDIA</span>
                           </>
                         ) : (
                           <>
-                            <Lock size={14} />
+                            <Lock size={13} />
                             <span>DESBLOQUEAR ({card.creditCost} CR)</span>
                           </>
                         )}
@@ -897,9 +898,9 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits }) =
                       <button
                         onClick={(e) => handleOpenCreatorChat(creatorId, creatorName, e)}
                         title={`Entrar no Chat de ${creatorName}`}
-                        className="col-span-1 py-3 rounded-2xl bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/30 transition-all flex items-center justify-center shadow-lg active:scale-95"
+                        className="col-span-1 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/30 transition-all flex items-center justify-center shadow-lg active:scale-95"
                       >
-                        <MessageSquare size={16} />
+                        <MessageSquare size={15} />
                       </button>
                     </div>
                   </div>
