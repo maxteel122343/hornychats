@@ -362,13 +362,22 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
   // Ensure video preview is attached when stream is available
   useEffect(() => {
-    if (quickStream && quickVideoRef.current && (quickRecordingType === 'video' || quickRecordingType === 'photo')) {
-      if (quickVideoRef.current.srcObject !== quickStream) {
-        quickVideoRef.current.srcObject = quickStream;
-        quickVideoRef.current.play().catch(e => console.log("Video play error:", e));
-      }
+    if (quickStream && (quickRecordingType === 'video' || quickRecordingType === 'photo') && !isReviewing) {
+      const attachVideo = () => {
+        if (quickVideoRef.current) {
+          quickVideoRef.current.muted = true;
+          quickVideoRef.current.playsInline = true;
+          if (quickVideoRef.current.srcObject !== quickStream) {
+            quickVideoRef.current.srcObject = quickStream;
+          }
+          quickVideoRef.current.play().catch(e => console.log("Video play error:", e));
+        }
+      };
+      attachVideo();
+      const timer = setTimeout(attachVideo, 80);
+      return () => clearTimeout(timer);
     }
-  }, [quickStream, quickRecordingType]);
+  }, [quickStream, quickRecordingType, isReviewing, isQuickRecording]);
 
   const isHost = !!(
     roomId === user.id ||
@@ -2168,41 +2177,86 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
   const startQuickRecording = async (type: 'audio' | 'video' | 'photo') => {
     try {
+      cleanupQuickRecording();
       let stream: MediaStream;
-      const constraints = {
-        audio: type !== 'photo',
-        video: type !== 'audio' ? {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          facingMode: "user"
-        } : false
-      };
-
-      try {
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
-      } catch (firstErr) {
-        console.warn("Retrying getUserMedia with basic constraints:", firstErr);
-        const basicConstraints = {
-          audio: type !== 'photo',
-          video: type !== 'audio' ? true : false
-        };
-        stream = await navigator.mediaDevices.getUserMedia(basicConstraints);
+      if (type === 'audio') {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      } else {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: type === 'video',
+            video: {
+              facingMode: "user",
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          });
+        } catch (firstErr) {
+          console.warn("Retrying getUserMedia with basic constraints:", firstErr);
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              audio: type === 'video',
+              video: true
+            });
+          } catch (secondErr) {
+            console.warn("Retrying video-only getUserMedia:", secondErr);
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: true
+            });
+          }
+        }
       }
 
       setQuickStream(stream);
       setQuickRecordingType(type);
       setIsQuickRecording(true);
       setRecordingTime(0);
+      setIsReviewing(false);
+      setQuickMediaPreview(null);
 
-      // useEffect will handle attaching stream to video element
+      // Attach stream to video preview directly
+      setTimeout(() => {
+        if (quickVideoRef.current && (type === 'video' || type === 'photo')) {
+          quickVideoRef.current.muted = true;
+          quickVideoRef.current.playsInline = true;
+          quickVideoRef.current.srcObject = stream;
+          quickVideoRef.current.play().catch(e => console.log("Direct preview error:", e));
+        }
+      }, 50);
 
       if (type !== 'photo') {
-        const recorder = new MediaRecorder(stream);
+        let options: MediaRecorderOptions = {};
+        if (type === 'video') {
+          if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')) {
+            options = { mimeType: 'video/webm;codecs=vp8,opus' };
+          } else if (MediaRecorder.isTypeSupported('video/webm')) {
+            options = { mimeType: 'video/webm' };
+          } else if (MediaRecorder.isTypeSupported('video/mp4')) {
+            options = { mimeType: 'video/mp4' };
+          }
+        } else {
+          if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+            options = { mimeType: 'audio/webm;codecs=opus' };
+          } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+            options = { mimeType: 'audio/webm' };
+          } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+            options = { mimeType: 'audio/mp4' };
+          }
+        }
+
+        const recorder = new MediaRecorder(stream, options);
         mediaRecorderRef.current = recorder;
         chunksRef.current = [];
-        recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+        recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunksRef.current.push(e.data); };
         recorder.onstop = () => {
-          const blob = new Blob(chunksRef.current, { type: quickRecordingType === 'video' ? 'video/webm' : 'audio/webm' });
+          if (chunksRef.current.length === 0) {
+            console.error('No data recorded');
+            showToast('Nenhum dado gravado. Tente novamente.', 'error');
+            cleanupQuickRecording();
+            return;
+          }
+          const actualMime = recorder.mimeType || (type === 'video' ? 'video/webm' : 'audio/webm');
+          const blob = new Blob(chunksRef.current, { type: actualMime });
           const url = URL.createObjectURL(blob);
           setQuickMediaPreview(url);
           setIsReviewing(true);
@@ -2211,7 +2265,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           stream.getTracks().forEach(t => t.stop());
           clearInterval(recordingTimerRef.current);
         };
-        recorder.start();
+
+        // Timeslice 500ms ensures chunks are captured continuously
+        recorder.start(500);
         recordingTimerRef.current = setInterval(() => setRecordingTime(prev => prev + 1), 1000);
       }
     } catch (err: any) {
@@ -2672,7 +2728,11 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                   )}
                   {messages.map((msg) => (
                     <div key={msg.id} className={`flex flex-col ${msg.senderId === user.id ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-3 duration-500`}>
-                      {msg.text && (<div className={`max-w-[85%] md:max-w-[80%] px-5 py-3.5 rounded-2xl text-sm shadow-sm font-medium break-all ${msg.senderId === user.id ? `${colors.primary} text-white rounded-tr-none` : `${isDark ? 'bg-slate-800/80 text-slate-200 border-slate-700/30' : 'bg-white text-slate-800 border-gray-200'} border rounded-tl-none`}`}>{msg.text}</div>)}
+                      {msg.text && (
+                        <div className={`max-w-[88%] md:max-w-[80%] px-4 sm:px-5 py-2.5 sm:py-3.5 rounded-2xl text-xs sm:text-sm shadow-sm font-medium break-words [word-break:break-word] [overflow-wrap:anywhere] ${msg.senderId === user.id ? `${colors.primary} text-white rounded-tr-none` : `${isDark ? 'bg-slate-800/80 text-slate-200 border-slate-700/30' : 'bg-white text-slate-800 border-gray-200'} border rounded-tl-none`}`}>
+                          {msg.text}
+                        </div>
+                      )}
                       {msg.card && (
                         <MediaCardItem
                           card={msg.card}
@@ -2799,6 +2859,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                             autoPlay
                             muted
                             playsInline
+                            onLoadedMetadata={(e) => {
+                              e.currentTarget.muted = true;
+                              e.currentTarget.play().catch(err => console.log("Live quick preview play:", err));
+                            }}
                             className="w-full h-full object-cover transform scale-x-[-1]"
                           />
                         )}
@@ -2931,7 +2995,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               isWatchPartyOpen
                 ? "fixed inset-0 z-[500] bg-black flex flex-col md:flex-row overflow-hidden animate-in fade-in"
                 : activeTab === 'cinema'
-                  ? "absolute inset-0 z-[490] bg-[#050a14] flex flex-col md:flex-row overflow-hidden"
+                  ? "absolute top-[116px] md:top-[120px] bottom-0 left-0 right-0 z-[40] bg-[#050a14] flex flex-col md:flex-row overflow-hidden"
                   : "hidden"
             }
           >

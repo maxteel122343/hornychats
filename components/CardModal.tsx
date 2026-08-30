@@ -165,28 +165,74 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
   const handleStartCapture = async (mode: 'video' | 'audio' | 'photo') => {
     try {
       setCapturedMedia(null); // Clear previous
-      const constraints: MediaStreamConstraints = {
-        video: mode === 'video' || mode === 'photo',
-        audio: mode !== 'photo'
-      };
+      
+      let newStream: MediaStream;
+      if (mode === 'audio') {
+        newStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      } else {
+        try {
+          newStream = await navigator.mediaDevices.getUserMedia({
+            audio: mode === 'video',
+            video: {
+              facingMode: 'user',
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          });
+        } catch (err1) {
+          console.warn("Retrying getUserMedia with basic constraints:", err1);
+          try {
+            newStream = await navigator.mediaDevices.getUserMedia({
+              audio: mode === 'video',
+              video: true
+            });
+          } catch (err2) {
+            console.warn("Retrying video-only getUserMedia:", err2);
+            newStream = await navigator.mediaDevices.getUserMedia({
+              video: true
+            });
+          }
+        }
+      }
 
-      const newStream = await navigator.mediaDevices.getUserMedia(constraints);
       setStream(newStream);
 
-      // Pequeno delay para garantir que o vídeo esteja pronto antes de associar ao ref
+      // Directly attach stream to video element
       setTimeout(() => {
         if (videoRef.current && (mode === 'video' || mode === 'photo')) {
+          videoRef.current.muted = true;
+          videoRef.current.playsInline = true;
           videoRef.current.srcObject = newStream;
+          videoRef.current.play().catch(e => console.log("Video preview error:", e));
         }
-      }, 100);
+      }, 50);
 
       if (mode !== 'photo') {
-        const recorder = new MediaRecorder(newStream);
+        let options: MediaRecorderOptions = {};
+        if (mode === 'video') {
+          if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')) {
+            options = { mimeType: 'video/webm;codecs=vp8,opus' };
+          } else if (MediaRecorder.isTypeSupported('video/webm')) {
+            options = { mimeType: 'video/webm' };
+          } else if (MediaRecorder.isTypeSupported('video/mp4')) {
+            options = { mimeType: 'video/mp4' };
+          }
+        } else {
+          if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+            options = { mimeType: 'audio/webm;codecs=opus' };
+          } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+            options = { mimeType: 'audio/webm' };
+          } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+            options = { mimeType: 'audio/mp4' };
+          }
+        }
+
+        const recorder = new MediaRecorder(newStream, options);
         mediaRecorderRef.current = recorder;
         chunksRef.current = [];
 
         recorder.ondataavailable = (e) => {
-          if (e.data.size > 0) chunksRef.current.push(e.data);
+          if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
         };
 
         recorder.onstop = () => {
@@ -195,12 +241,13 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
             if (onShowToast) onShowToast('Nenhum dado gravado. Tente novamente.', 'error');
             setCapturedMedia(null);
             clearInterval(recordingTimerRef.current);
-            if (stream) stream.getTracks().forEach(track => track.stop());
+            if (newStream) newStream.getTracks().forEach(track => track.stop());
             setStream(null);
             return;
           }
 
-          const blob = new Blob(chunksRef.current, { type: mode === 'video' ? 'video/webm' : 'audio/webm' });
+          const actualMime = recorder.mimeType || (mode === 'video' ? 'video/webm' : 'audio/webm');
+          const blob = new Blob(chunksRef.current, { type: actualMime });
           const url = URL.createObjectURL(blob);
           setCapturedMedia(url);
           setFileToUpload(blob);
@@ -218,11 +265,12 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
           }
 
           clearInterval(recordingTimerRef.current);
-          if (stream) stream.getTracks().forEach(track => track.stop());
+          if (newStream) newStream.getTracks().forEach(track => track.stop());
           setStream(null);
         };
 
-        recorder.start();
+        // Timeslice 500ms for continuous chunk emission
+        recorder.start(500);
         setIsRecording(true);
         setRecordingTime(0);
         recordingTimerRef.current = setInterval(() => setRecordingTime(prev => prev + 1), 1000);
