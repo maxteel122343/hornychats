@@ -575,36 +575,50 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
   ];
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl overflow-y-auto animate-in fade-in duration-300">
-      <div className={`bg-[#0f172a] border border-slate-800 rounded-[2.5rem] w-full ${activeTab === 'create' ? 'max-w-6xl' : 'max-w-4xl'} shadow-2xl flex flex-col max-h-[95vh] border-white/5 relative`}>
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-0 sm:p-4 bg-black/95 sm:bg-black/90 sm:backdrop-blur-xl overflow-hidden animate-in fade-in duration-300">
+      <div className={`bg-[#0f172a] border-0 sm:border border-slate-800 rounded-none sm:rounded-[2rem] w-full h-full sm:h-auto sm:max-h-[92vh] ${activeTab === 'create' ? 'sm:max-w-6xl' : 'sm:max-w-4xl'} shadow-2xl flex flex-col relative overflow-hidden`}>
 
-        <div className="p-4 sm:p-6 border-b border-white/5 flex items-center justify-between bg-slate-900/50 gap-2">
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide no-scrollbar">
+        {/* Top Navigation Bar */}
+        <div className="p-3.5 sm:p-5 border-b border-white/5 flex items-center justify-between bg-slate-900/90 gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide no-scrollbar flex-1 min-w-0">
             <button 
               onClick={onClose} 
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition-all text-xs font-bold shrink-0"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white transition-all text-xs font-bold shrink-0 active:scale-95"
               title="Voltar / Fechar"
             >
               <ArrowLeft size={16} />
-              <span>Voltar</span>
+              <span className="inline">Voltar</span>
             </button>
-            <div className="h-4 w-[1px] bg-slate-700 mx-1 shrink-0" />
-            <button onClick={() => setActiveTab('create')} className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'create' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-800'}`}>
-              <LayoutGrid size={14} /> <span className="hidden xs:inline">Avançado</span><span className="xs:hidden">Criar</span>
+            <div className="h-4 w-[1px] bg-slate-700 mx-0.5 sm:mx-1 shrink-0" />
+            <button 
+              onClick={() => setActiveTab('create')} 
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 active:scale-95 ${activeTab === 'create' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-400 hover:bg-slate-800'}`}
+            >
+              <LayoutGrid size={14} /> <span>Criar Card</span>
             </button>
-            <button onClick={() => setActiveTab('simple')} className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'simple' ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:bg-slate-800'}`}>
-              <Zap size={14} /> Simplifica
+            <button 
+              onClick={() => setActiveTab('simple')} 
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 active:scale-95 ${activeTab === 'simple' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30' : 'text-slate-400 hover:bg-slate-800'}`}
+            >
+              <Zap size={14} /> <span>Simplifica</span>
             </button>
-            <button onClick={() => setActiveTab('library')} className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'library' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-800'}`}>
-              <FolderOpen size={14} /> <span className="hidden xs:inline">Meus Cards</span><span className="xs:hidden">Cards</span>
+            <button 
+              onClick={() => setActiveTab('library')} 
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 active:scale-95 ${activeTab === 'library' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:bg-slate-800'}`}
+            >
+              <FolderOpen size={14} /> <span>Meus Cards</span>
             </button>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full text-slate-400 hover:text-white transition-all shrink-0">
+          <button 
+            onClick={onClose} 
+            className="p-2 hover:bg-white/10 rounded-full text-slate-400 hover:text-white transition-all shrink-0"
+            title="Fechar"
+          >
             <X size={20} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto scrollbar-hide p-8">
+        <div className="flex-1 overflow-y-auto scrollbar-hide p-4 sm:p-8 overscroll-contain">
 
           {/* --- TAB: SIMPLIFICA --- */}
           {activeTab === 'simple' && (
@@ -868,9 +882,8 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
 
         {/* --- SETTINGS MODAL OVERLAY --- */}
         {showSettings && (
-          <div className="absolute inset-0 bg-[#0f172a] z-50 rounded-[2.5rem] p-8 flex flex-col animate-in slide-in-from-bottom-10">
-            {/* ... (Existing Settings Content) ... */}
-            <div className="flex justify-between items-center mb-8">
+          <div className="absolute inset-0 bg-[#0f172a] z-50 rounded-none sm:rounded-[2rem] p-4 sm:p-8 flex flex-col animate-in slide-in-from-bottom-10 overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-black text-white uppercase tracking-tighter flex items-center gap-2"><Settings className="text-slate-500" /> Configuração Padrão</h3>
               <button onClick={() => setShowSettings(false)} className="p-2 bg-slate-800 rounded-full text-white"><X size={20} /></button>
             </div>

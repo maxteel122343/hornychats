@@ -17,9 +17,9 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({ onClose,
     };
 
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
-            <div className="bg-slate-900 border border-slate-800 p-8 rounded-[3rem] w-full max-w-2xl shadow-2xl relative max-h-[90vh] overflow-y-auto scrollbar-hide">
-                <button onClick={onClose} className="absolute top-6 right-6 p-2 bg-slate-800 rounded-full text-white hover:bg-slate-700 transition-all">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 sm:p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
+            <div className="bg-slate-900 border-0 sm:border border-slate-800 p-5 sm:p-8 rounded-none sm:rounded-[2.5rem] w-full h-full sm:h-auto max-w-2xl shadow-2xl relative max-h-full sm:max-h-[90vh] overflow-y-auto scrollbar-hide">
+                <button onClick={onClose} className="absolute top-4 sm:top-6 right-4 sm:right-6 p-2 bg-slate-800 rounded-full text-white hover:bg-slate-700 transition-all">
                     <X size={20} />
                 </button>
 

@@ -57,6 +57,8 @@ const App: React.FC = () => {
       if (session) {
         syncUser(session.user);
       }
+    }).catch(err => {
+      console.warn("Initial session lookup error:", err);
     });
 
     // Listen for auth changes
@@ -99,35 +101,46 @@ const App: React.FC = () => {
   }, []);
 
   const syncUser = async (sbUser: any) => {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', sbUser.id)
-      .single();
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', sbUser.id)
+        .single();
 
-    if (profile) {
-      setUser({
-        id: profile.id,
-        name: profile.username || sbUser.email?.split('@')[0],
-        credits: profile.credits ?? 50,
-        earnings: profile.earnings ?? 0,
-        free_credits: profile.free_credits ?? 0,
-        last_free_claim_at: profile.last_free_claim_at,
-        isLoggedIn: true,
-        profilePhoto: profile.profile_photo,
-        isHost: true // Authenticated users can be hosts
-      });
-    } else {
-      // Create profile if not exists
-      const newProfile = {
+      if (profile && !error) {
+        setUser({
+          id: profile.id,
+          name: profile.username || sbUser.email?.split('@')[0],
+          credits: profile.credits ?? 50,
+          earnings: profile.earnings ?? 0,
+          free_credits: profile.free_credits ?? 0,
+          last_free_claim_at: profile.last_free_claim_at,
+          isLoggedIn: true,
+          profilePhoto: profile.profile_photo,
+          isHost: true // Authenticated users can be hosts
+        });
+      } else {
+        // Create profile if not exists
+        const newProfile = {
+          id: sbUser.id,
+          username: sbUser.email?.split('@')[0],
+          credits: 50,
+          earnings: 0,
+          free_credits: 50
+        };
+        await supabase.from('profiles').insert([newProfile]);
+        setUser({ ...newProfile, isLoggedIn: true, name: newProfile.username, isHost: true });
+      }
+    } catch (e) {
+      console.warn("syncUser profile query error:", e);
+      setUser(prev => ({
+        ...prev,
         id: sbUser.id,
-        username: sbUser.email?.split('@')[0],
-        credits: 50,
-        earnings: 0,
-        free_credits: 50
-      };
-      await supabase.from('profiles').insert([newProfile]);
-      setUser({ ...newProfile, isLoggedIn: true, name: newProfile.username, isHost: true });
+        name: sbUser.email?.split('@')[0] || prev.name,
+        isLoggedIn: true,
+        isHost: true
+      }));
     }
   };
 

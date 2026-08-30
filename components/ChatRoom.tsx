@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Plus, Home, Wallet, Share2, MessageSquare, LayoutGrid, QrCode, X, User as UserIcon, LogIn, Camera, Settings, Sun, Moon, Menu, ChevronLeft, ChevronRight, ChevronDown, Copy, CheckCircle, Loader2, RefreshCw, DollarSign, ArrowUpRight, Mic, Video, Upload, StopCircle, Trash2, Aperture, Lock, Zap, History, CreditCard, Mail, ShoppingCart, LogOut, FolderOpen, Edit, Tv, Image as ImageIcon, Cloud, MoreVertical, Minimize2, Maximize2, Power, Sliders } from 'lucide-react';
+import { Send, Plus, Home, Wallet, Share2, MessageSquare, LayoutGrid, QrCode, X, User as UserIcon, LogIn, Camera, Settings, Sun, Moon, Menu, ChevronLeft, ChevronRight, ChevronDown, Copy, CheckCircle, Loader2, RefreshCw, DollarSign, ArrowUpRight, Mic, Video, Upload, StopCircle, Trash2, Aperture, Lock, Zap, History, CreditCard, Mail, ShoppingCart, LogOut, FolderOpen, Edit, Tv, Image as ImageIcon, Cloud, MoreVertical, Minimize2, Maximize2, Power, Sliders, ArrowLeft } from 'lucide-react';
 import { User, Message, MediaCard, ChatSession, CardType, PaymentTransaction, CardDefaults } from '../types';
 import { supabase } from '../lib/supabase';
 import CardModal from './CardModal';
@@ -878,10 +878,28 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         }
       }
 
+      // LocalStorage Fallback for room customization
+      const savedDetails = localStorage.getItem(`room_details_${roomId}`);
+      let parsedCustomDetails: any = null;
+      if (savedDetails) {
+        try {
+          parsedCustomDetails = JSON.parse(savedDetails);
+        } catch (e) {}
+      }
+
       if (data) {
-        setRoomDetails(data);
-        setTempRoomName(data.name);
+        const merged = {
+          ...data,
+          name: data.name || parsedCustomDetails?.name || 'Conversa',
+          image_url: data.image_url || parsedCustomDetails?.image_url,
+          background_url: data.background_url || parsedCustomDetails?.background_url
+        };
+        setRoomDetails(merged);
+        setTempRoomName(merged.name);
         setRoomAdmins(new Set(data.admins || []));
+      } else if (parsedCustomDetails) {
+        setRoomDetails(parsedCustomDetails);
+        setTempRoomName(parsedCustomDetails.name || 'Conversa');
       }
 
       if (watchPartyData) {
@@ -1294,7 +1312,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
   const handleBackgroundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !roomId || !isAdmin) return;
+    if (!file || !roomId) return;
 
     const fileExt = file.name.split('.').pop();
     const fileName = `${roomId}_bg_${Date.now()}.${fileExt}`;
@@ -1303,20 +1321,32 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     let publicUrl = URL.createObjectURL(file);
 
     if (user.isLoggedIn && user.id) {
-      const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
-      if (!uploadError) {
-        const { data: { publicUrl: remoteUrl } } = supabase.storage.from('media').getPublicUrl(filePath);
-        publicUrl = remoteUrl;
+      try {
+        const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
+        if (!uploadError) {
+          const { data: { publicUrl: remoteUrl } } = supabase.storage.from('media').getPublicUrl(filePath);
+          publicUrl = remoteUrl;
 
-        await supabase.from('rooms').upsert([{
-          id: roomId,
-          creator_id: user.id,
-          name: roomDetails?.name || 'Chat',
-          image_url: roomDetails?.image_url,
-          background_url: publicUrl
-        }], { onConflict: 'id' });
+          await supabase.from('rooms').upsert([{
+            id: roomId,
+            creator_id: user.id,
+            name: roomDetails?.name || tempRoomName || 'Chat',
+            image_url: roomDetails?.image_url,
+            background_url: publicUrl
+          }], { onConflict: 'id' });
+        }
+      } catch (err) {
+        console.error('Error uploading background:', err);
       }
     }
+
+    // Persist locally
+    const updatedDetails = {
+      ...(roomDetails || {}),
+      name: roomDetails?.name || tempRoomName || 'Conversa',
+      background_url: publicUrl
+    };
+    localStorage.setItem(`room_details_${roomId}`, JSON.stringify(updatedDetails));
 
     setRoomDetails(prev => prev ? { ...prev, background_url: publicUrl } : { name: 'Chat', background_url: publicUrl });
     showToast('Plano de fundo atualizado!', 'success');
@@ -1324,7 +1354,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
   const handleRoomImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !roomId || !isAdmin) return;
+    if (!file || !roomId) return;
 
     const fileExt = file.name.split('.').pop();
     const fileName = `${roomId}_thumb_${Date.now()}.${fileExt}`;
@@ -1333,48 +1363,75 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     let publicUrl = URL.createObjectURL(file);
 
     if (user.isLoggedIn && user.id) {
-      const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
-      if (!uploadError) {
-        const { data: { publicUrl: remoteUrl } } = supabase.storage.from('media').getPublicUrl(filePath);
-        publicUrl = remoteUrl;
+      try {
+        const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
+        if (!uploadError) {
+          const { data: { publicUrl: remoteUrl } } = supabase.storage.from('media').getPublicUrl(filePath);
+          publicUrl = remoteUrl;
 
-        await supabase.from('rooms').upsert([{
-          id: roomId,
-          creator_id: user.id,
-          name: roomDetails?.name || 'Chat',
-          image_url: publicUrl,
-          background_url: roomDetails?.background_url
-        }], { onConflict: 'id' });
+          await supabase.from('rooms').upsert([{
+            id: roomId,
+            creator_id: user.id,
+            name: roomDetails?.name || tempRoomName || 'Chat',
+            image_url: publicUrl,
+            background_url: roomDetails?.background_url
+          }], { onConflict: 'id' });
+        }
+      } catch (err) {
+        console.error('Error uploading room image:', err);
       }
     }
+
+    // Persist locally
+    const updatedDetails = {
+      ...(roomDetails || {}),
+      name: roomDetails?.name || tempRoomName || 'Conversa',
+      image_url: publicUrl
+    };
+    localStorage.setItem(`room_details_${roomId}`, JSON.stringify(updatedDetails));
 
     setRoomDetails(prev => prev ? { ...prev, image_url: publicUrl } : { name: 'Chat', image_url: publicUrl });
     showToast('Imagem da sala atualizada!', 'success');
   };
 
   const handleSaveRoomDetails = async () => {
-    if (!roomId || !isAdmin || !tempRoomName.trim()) return;
+    if (!roomId || !tempRoomName.trim()) return;
+
+    const trimmedName = tempRoomName.trim();
 
     if (user.isLoggedIn && user.id) {
-      const { error } = await supabase.from('rooms').upsert([{
-        id: roomId,
-        creator_id: user.id,
-        name: tempRoomName,
-        image_url: roomDetails?.image_url,
-        background_url: roomDetails?.background_url
-      }], { onConflict: 'id' });
+      try {
+        const { error } = await supabase.from('rooms').upsert([{
+          id: roomId,
+          creator_id: user.id,
+          name: trimmedName,
+          image_url: roomDetails?.image_url,
+          background_url: roomDetails?.background_url
+        }], { onConflict: 'id' });
 
-      if (error) {
-        console.error('Room save error:', error);
+        if (error) {
+          console.error('Room save error:', error);
+        }
+      } catch (err) {
+        console.error('Room save exception:', err);
       }
     }
 
-    setRoomDetails(prev => prev ? { ...prev, name: tempRoomName } : { name: tempRoomName });
+    // Persist locally
+    const updatedDetails = {
+      ...(roomDetails || {}),
+      name: trimmedName,
+      image_url: roomDetails?.image_url,
+      background_url: roomDetails?.background_url
+    };
+    localStorage.setItem(`room_details_${roomId}`, JSON.stringify(updatedDetails));
+
+    setRoomDetails(prev => prev ? { ...prev, name: trimmedName } : { name: trimmedName });
     setIsEditingRoom(false);
     showToast('Nome da sala atualizado!', 'success');
 
     // Update sidebar session name if exists
-    setSessions(prev => prev.map(s => s.id === roomId ? { ...s, name: tempRoomName } : s));
+    setSessions(prev => prev.map(s => s.id === roomId ? { ...s, name: trimmedName } : s));
   };
 
   const handleCloseSession = (e: React.MouseEvent, sessionId: string) => {
@@ -2445,67 +2502,110 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       >
         <input type="file" ref={bgUploadRef} onChange={handleBackgroundUpload} className="hidden" accept="image/*" />
         <input type="file" ref={roomImageUploadRef} onChange={handleRoomImageUpload} className="hidden" accept="image/*" />
-        <header className={`h-[64px] border-b ${colors.border} flex items-center justify-between px-4 md:px-6 ${colors.headerBg} backdrop-blur-md`}>
-          {/* Header Content */}
-          <div className="flex items-center gap-2 md:gap-3">
-            <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5"><Menu size={18} className={colors.textHighlight} /></button>
-            <button onClick={() => navigate('/')} className={`p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg ${colors.text}`}><Home size={18} /></button>
-            <button onClick={() => navigate('/')} className={`p-2 hover:bg-red-500/10 rounded-xl text-slate-400 hover:text-red-500 transition-all group`} title="Fechar Chat"><X size={20} /></button>
-            <div className="flex items-center gap-2 ml-1">
-              <div 
-                onClick={() => {
-                  if (isAdmin) {
-                    setTempRoomName(roomDetails?.name || sessions.find(s => s.id === roomId)?.name || '');
-                    setIsEditingRoom(true);
-                  }
-                }}
-                className={`w-10 h-10 rounded-xl overflow-hidden border ${colors.border} bg-slate-800 flex items-center justify-center ${isAdmin ? 'cursor-pointer group relative' : ''}`}
-                title={isAdmin ? 'Editar Sala' : undefined}
-              >
+        <header className={`h-[64px] border-b ${colors.border} flex items-center justify-between px-2 sm:px-4 md:px-6 ${colors.headerBg} backdrop-blur-md gap-2`}>
+          {/* Header Left: Back + Menu + Room Title (Clickable) */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1">
+            <button 
+              onClick={() => navigate('/')} 
+              className={`p-2 sm:p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 hover:text-white transition-all flex items-center justify-center shrink-0 active:scale-95 border border-slate-700/50 shadow-sm`}
+              title="Voltar para Início"
+            >
+              <ArrowLeft size={18} />
+            </button>
+
+            <button 
+              onClick={() => setIsMobileMenuOpen(true)} 
+              className="md:hidden p-2 sm:p-2.5 rounded-xl bg-slate-800/40 hover:bg-slate-800 text-slate-300 hover:text-white transition-all shrink-0 active:scale-95"
+              title="Abrir Menu"
+            >
+              <Menu size={18} className={colors.textHighlight} />
+            </button>
+
+            {/* Room Info Clickable Area (Changes Room Photo and Name) */}
+            <div 
+              onClick={() => {
+                setTempRoomName(roomDetails?.name || sessions.find(s => s.id === roomId)?.name || 'Conversa');
+                setIsEditingRoom(true);
+              }}
+              className="flex items-center gap-2 sm:gap-3 py-1 px-1.5 sm:px-2 rounded-xl hover:bg-white/5 active:bg-white/10 cursor-pointer transition-all min-w-0 flex-1 group/header select-none"
+              title="Clique para alterar foto e nome da sala"
+            >
+              <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl overflow-hidden border ${colors.border} bg-slate-800 flex items-center justify-center shrink-0 relative group shadow-sm group-hover/header:border-blue-500/50 transition-colors`}>
                 {roomDetails?.image_url ? (
-                  <img src={roomDetails.image_url} className="w-full h-full object-cover" />
+                  <img src={roomDetails.image_url} alt="Sala" className="w-full h-full object-cover" />
                 ) : (
-                  <MessageSquare size={18} className="text-slate-500" />
+                  <MessageSquare size={18} className="text-slate-400 group-hover/header:text-blue-400 transition-colors" />
                 )}
-                {isAdmin && (
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                    <Edit size={12} className="text-white" />
-                  </div>
-                )}
-              </div>
-              <div className="min-w-0">
-                <h2 className={`text-sm font-black ${colors.textHighlight} uppercase tracking-tighter truncate max-w-[110px] sm:max-w-[200px]`}>
-                  {roomDetails?.name || sessions.find(s => s.id === roomId)?.name || 'Conversa'}
-                </h2>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                  <span className={`text-[9px] font-black ${colors.text} uppercase tracking-widest`}>{isAdmin ? 'MEU ESPAÇO' : 'ONLINE'}</span>
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/header:opacity-100 flex items-center justify-center transition-opacity">
+                  <Camera size={13} className="text-white" />
                 </div>
               </div>
-              {isAdmin && (
-                <button
-                  onClick={() => {
-                    setTempRoomName(roomDetails?.name || sessions.find(s => s.id === roomId)?.name || '');
-                    setIsEditingRoom(true);
-                  }}
-                  className={`p-2 rounded-lg hover:bg-white/10 transition-all ${colors.text} opacity-80 hover:opacity-100 flex-shrink-0`}
-                  title="Editar Sala"
-                >
-                  <Edit size={16} />
-                </button>
-              )}
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1">
+                  <h2 className={`text-xs sm:text-sm font-black ${colors.textHighlight} uppercase tracking-tighter truncate max-w-[120px] sm:max-w-[220px] group-hover/header:text-blue-400 transition-colors`}>
+                    {roomDetails?.name || sessions.find(s => s.id === roomId)?.name || 'Conversa'}
+                  </h2>
+                  <Edit size={12} className="text-slate-500 group-hover/header:text-blue-400 shrink-0 opacity-70" />
+                </div>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></div>
+                  <span className={`text-[8px] sm:text-[9px] font-black ${colors.text} uppercase tracking-widest truncate`}>
+                    {isAdmin ? 'MEU ESPAÇO • EDITAR' : 'ONLINE • EDITAR'}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 md:gap-3">
-            <button onClick={toggleTheme} className={`p-2 rounded-xl border ${colors.border} ${colors.text} hover:opacity-70 transition-all`}>{isDark ? <Sun size={18} /> : <Moon size={18} />}</button>
-            <div onClick={() => setShowQrCode(true)} className={`hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-500 text-xs border border-emerald-500/20 font-black cursor-pointer hover:bg-emerald-500/20 transition-all`}><Wallet size={16} /><span>{user.credits} c</span></div>
-            {/* Added Earnings Icon to Header for ease of access */}
+
+          {/* Header Right: Theme + Wallet/Credits + Earnings + Share + Close */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <button 
+              onClick={toggleTheme} 
+              className={`p-2 sm:p-2.5 rounded-xl border ${colors.border} ${colors.text} hover:opacity-70 transition-all active:scale-95`}
+              title="Alternar Tema"
+            >
+              {isDark ? <Sun size={17} /> : <Moon size={17} />}
+            </button>
+
+            <div 
+              onClick={() => setShowQrCode(true)} 
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl bg-emerald-500/10 text-emerald-500 text-xs border border-emerald-500/20 font-black cursor-pointer hover:bg-emerald-500/20 transition-all active:scale-95`}
+              title="Recarregar Créditos"
+            >
+              <Wallet size={15} />
+              <span className="text-[11px] sm:text-xs">{user.credits}c</span>
+            </div>
+
             {user.isLoggedIn && (
-              <button onClick={() => setShowEarningsModal(true)} className="flex sm:hidden items-center gap-2 px-3 py-2 bg-emerald-500/10 text-emerald-500 rounded-xl border border-emerald-500/20 font-black">
-                <DollarSign size={16} />
+              <button 
+                onClick={() => setShowEarningsModal(true)} 
+                className="hidden xs:flex sm:hidden items-center gap-1 px-2.5 py-2 bg-emerald-500/10 text-emerald-500 rounded-xl border border-emerald-500/20 font-black active:scale-95"
+                title="Central de Ganhos"
+              >
+                <DollarSign size={15} />
               </button>
             )}
-            <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/#/chat/${roomId}`); alert('Link copiado!'); }} className={`flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 ${colors.primarySoft} ${colors.primaryText} rounded-xl border ${colors.primaryBorder} hover:opacity-80 transition-all font-black text-xs uppercase tracking-tighter`}><Share2 size={16} /><span className="hidden sm:inline">Convidar</span></button>
+
+            <button 
+              onClick={() => { 
+                navigator.clipboard.writeText(`${window.location.origin}/#/chat/${roomId}`); 
+                showToast('Link da sala copiado!', 'success'); 
+              }} 
+              className={`hidden sm:flex items-center gap-1.5 px-3 py-2 ${colors.primarySoft} ${colors.primaryText} rounded-xl border ${colors.primaryBorder} hover:opacity-80 transition-all font-black text-xs uppercase tracking-tighter active:scale-95`}
+              title="Convidar Amigos"
+            >
+              <Share2 size={15} />
+              <span>Convidar</span>
+            </button>
+
+            <button 
+              onClick={() => navigate('/')} 
+              className="p-2 sm:p-2.5 hover:bg-red-500/10 rounded-xl text-slate-400 hover:text-red-500 transition-all active:scale-95" 
+              title="Fechar / Sair do Chat"
+            >
+              <X size={18} />
+            </button>
           </div>
         </header>
 
@@ -3418,71 +3518,99 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
         {/* ROOM EDITOR MODAL */}
         {isEditingRoom && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-in fade-in">
-            <div className="bg-slate-900 border border-slate-800 p-8 rounded-[3rem] w-full max-w-md shadow-2xl relative">
-              <button onClick={() => setIsEditingRoom(false)} className="absolute top-6 right-6 p-2 bg-slate-800 rounded-full text-white hover:bg-slate-700 transition-all"><X size={20} /></button>
-              <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-8 text-center">Customizar Sala</h3>
-
-              <div className="flex flex-col items-center gap-2">
-                <div
-                  onClick={() => roomImageUploadRef.current?.click()}
-                  className="relative w-32 h-32 rounded-[3rem] border-2 border-slate-700 bg-slate-800 flex items-center justify-center cursor-pointer group overflow-hidden shadow-2xl"
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 sm:p-4 bg-black/90 sm:backdrop-blur-md animate-in fade-in">
+            <div className="bg-slate-900 border-0 sm:border border-slate-800 p-5 sm:p-8 rounded-none sm:rounded-[2.5rem] w-full h-full sm:h-auto max-w-md shadow-2xl relative flex flex-col max-h-full sm:max-h-[90vh] overflow-y-auto scrollbar-hide">
+              
+              {/* Modal Header */}
+              <div className="flex items-center justify-between mb-6 pb-3 border-b border-slate-800">
+                <button 
+                  onClick={() => setIsEditingRoom(false)} 
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition-all text-xs font-bold active:scale-95"
                 >
-                  {roomDetails?.image_url ? (
-                    <img src={roomDetails.image_url} className="w-full h-full object-cover" />
-                  ) : (
-                    <Camera size={40} className="text-slate-600 group-hover:text-blue-500 transition-colors" />
-                  )}
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Upload size={24} className="text-white" />
-                  </div>
-                </div>
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Avatar da Sala</span>
+                  <ArrowLeft size={16} />
+                  <span>Voltar</span>
+                </button>
+                <h3 className="text-base sm:text-lg font-black text-white uppercase tracking-tighter text-center">Customizar Sala</h3>
+                <button 
+                  onClick={() => setIsEditingRoom(false)} 
+                  className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-all active:scale-95"
+                >
+                  <X size={18} />
+                </button>
               </div>
 
-              <div className="flex flex-col items-center gap-2">
-                <div
-                  onClick={() => bgUploadRef.current?.click()}
-                  className="relative w-full h-24 rounded-2xl border-2 border-dashed border-slate-700 bg-slate-800 flex items-center justify-center cursor-pointer group overflow-hidden"
-                >
-                  {roomDetails?.background_url ? (
-                    <div className="relative w-full h-full">
-                      <img src={roomDetails.background_url} className="w-full h-full object-cover opacity-50" />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <ImageIcon size={24} className="text-white drop-shadow-lg" />
-                      </div>
+              <div className="space-y-6 flex-1">
+                {/* Room Avatar */}
+                <div className="flex flex-col items-center gap-2">
+                  <div
+                    onClick={() => roomImageUploadRef.current?.click()}
+                    className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-3xl sm:rounded-[2.5rem] border-2 border-slate-700 hover:border-blue-500 bg-slate-800 flex items-center justify-center cursor-pointer group overflow-hidden shadow-2xl transition-all"
+                  >
+                    {roomDetails?.image_url ? (
+                      <img src={roomDetails.image_url} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <Camera size={36} className="text-slate-500 group-hover:text-blue-500 transition-colors" />
+                    )}
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
+                      <Upload size={22} className="text-white" />
+                      <span className="text-[9px] font-black text-white uppercase">Trocar Foto</span>
                     </div>
-                  ) : (
-                    <ImageIcon size={32} className="text-slate-600 group-hover:text-emerald-500 transition-colors" />
-                  )}
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Upload size={20} className="text-white" />
+                  </div>
+                  <div className="text-center">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Foto / Avatar da Sala</span>
+                    <span className="text-[8px] text-slate-500 font-bold block">Clique no avatar para fazer upload de nova foto</span>
                   </div>
                 </div>
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Plano de Fundo</span>
-              </div>
 
-              <div className="space-y-6">
+                {/* Room Background */}
+                <div className="flex flex-col items-center gap-2">
+                  <div
+                    onClick={() => bgUploadRef.current?.click()}
+                    className="relative w-full h-24 rounded-2xl border-2 border-dashed border-slate-700 hover:border-emerald-500 bg-slate-800 flex items-center justify-center cursor-pointer group overflow-hidden transition-all"
+                  >
+                    {roomDetails?.background_url ? (
+                      <div className="relative w-full h-full">
+                        <img src={roomDetails.background_url} alt="Fundo" className="w-full h-full object-cover opacity-60" />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <ImageIcon size={22} className="text-white drop-shadow-lg" />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-slate-500 group-hover:text-emerald-400 transition-colors">
+                        <ImageIcon size={24} />
+                        <span className="text-xs font-bold">Enviar Imagem de Fundo</span>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <Upload size={18} className="text-white" />
+                      <span className="text-[10px] font-black text-white uppercase">Alterar Fundo</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Plano de Fundo (Banner)</span>
+                </div>
+
+                {/* Room Name Input */}
                 <div>
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2 px-1">Nome da Sala</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">Nome da Sala</label>
                   <input
                     value={tempRoomName}
                     onChange={(e) => setTempRoomName(e.target.value)}
                     placeholder="Ex: Minha Sala VIP"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-4 text-white text-sm outline-none focus:border-blue-500 transition-all font-bold"
+                    className="w-full bg-slate-800/80 border border-slate-700 focus:border-blue-500 rounded-2xl p-4 text-white text-sm outline-none transition-all font-bold"
                   />
                 </div>
 
-                <div className="flex gap-4 pt-4">
+                {/* Actions */}
+                <div className="flex gap-3 pt-2">
                   <button
                     onClick={() => setIsEditingRoom(false)}
-                    className="flex-1 py-4 bg-slate-800 text-slate-400 font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-slate-700 transition-all"
+                    className="flex-1 py-3.5 sm:py-4 bg-slate-800 text-slate-400 font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-slate-700 hover:text-white transition-all active:scale-95"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={handleSaveRoomDetails}
-                    className="flex-1 py-4 bg-blue-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-blue-500 transition-all shadow-xl shadow-blue-600/20"
+                    className="flex-1 py-3.5 sm:py-4 bg-blue-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-blue-500 transition-all shadow-xl shadow-blue-600/20 active:scale-95"
                   >
                     Salvar Alterações
                   </button>
@@ -3490,8 +3618,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               </div>
             </div>
           </div>
-        )
-        }
+        )}
 
         {/* ROOM SELECTOR MODAL */}
         {
