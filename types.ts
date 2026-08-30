@@ -11,6 +11,8 @@ export enum CardType {
 export interface MediaCard {
   id: string;
   creator_id?: string;
+  creatorName?: string;
+  creatorPhoto?: string;
   type: CardType;
   title: string;
   description: string;
@@ -69,6 +71,7 @@ export interface Message {
 export interface User {
   id: string;
   name: string;
+  email?: string;
   credits: number;
   earnings: number;
   isLoggedIn: boolean;

@@ -2752,7 +2752,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                   <div ref={messagesEndRef} />
                 </div>
               ) : activeTab === 'showcase' ? (
-                <div className="max-w-6xl mx-auto w-full pb-24"><Gallery user={user} /></div>
+                <div className="max-w-6xl mx-auto w-full pb-24">
+                  <Gallery user={user} onShowToast={showToast} updateCredits={updateCredits} />
+                </div>
               ) : activeTab === 'cinema' ? (
                 isRoomDetailsLoading ? (
                   /* LOADING STATE - prevents flicker between offline/online states */

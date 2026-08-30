@@ -193,7 +193,7 @@ const App: React.FC = () => {
           />
           <Route
             path="/gallery"
-            element={<Gallery user={user} />}
+            element={<Gallery user={user} onShowToast={showToast} updateCredits={updateCredits} />}
           />
         </Routes>
         {isAuthModalOpen && <AuthModal onClose={() => setIsAuthModalOpen(false)} onShowToast={showToast} />}
