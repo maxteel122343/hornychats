@@ -833,12 +833,13 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits }) =
 
       {/* MEDIA PREVIEW / UNLOCK MODAL */}
       {activePreviewCard && (
-        <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl relative p-6 md:p-8 animate-in zoom-in-95 duration-200 flex flex-col justify-between">
+        <div className="fixed inset-0 z-[600] flex items-center justify-center p-0 sm:p-4 bg-black/90 sm:backdrop-blur-xl animate-in fade-in">
+          <div className="bg-slate-900 border-0 sm:border border-slate-800 rounded-none sm:rounded-[2.5rem] w-full h-full sm:h-auto max-w-2xl sm:max-h-[90vh] overflow-y-auto shadow-2xl relative p-5 sm:p-8 animate-in zoom-in-95 duration-200 flex flex-col justify-between">
             {/* Close Button */}
             <button
               onClick={() => setActivePreviewCard(null)}
-              className="absolute top-6 right-6 p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all z-20"
+              className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all z-20 active:scale-95"
+              title="Fechar"
             >
               <X size={18} />
             </button>

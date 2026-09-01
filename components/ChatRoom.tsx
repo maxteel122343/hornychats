@@ -3693,7 +3693,20 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           </div>
         )}
 
-        {isCardModalOpen && <CardModal onClose={() => { setIsCardModalOpen(false); setEditingCard(null); }} onSubmit={onCardCreated} userId={user.id} initialData={editingCard} onShowToast={showToast} />}
+        {isCardModalOpen && (
+          <CardModal
+            onClose={() => { setIsCardModalOpen(false); setEditingCard(null); }}
+            onSubmit={onCardCreated}
+            userId={user.id}
+            initialData={editingCard}
+            onShowToast={showToast}
+            onNavigateTab={(tab) => {
+              setIsCardModalOpen(false);
+              setEditingCard(null);
+              setActiveTab(tab);
+            }}
+          />
+        )}
 
 
         {isQuickSettingsOpen && (

@@ -81,23 +81,23 @@ export const UnlockPurchaseModal: React.FC<UnlockPurchaseModalProps> = ({
   return (
     <div 
       id="unlock-purchase-modal"
-      className="fixed inset-0 z-[800] flex items-center justify-center p-3 sm:p-5 bg-black/90 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-[800] flex items-center justify-center p-0 sm:p-5 bg-black/90 sm:backdrop-blur-md animate-in fade-in duration-200"
     >
-      <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] w-full max-w-lg shadow-2xl relative overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
+      <div className="bg-slate-900 border-0 sm:border border-slate-800 rounded-none sm:rounded-[2.5rem] w-full h-full sm:h-auto max-w-lg shadow-2xl relative overflow-hidden flex flex-col sm:max-h-[92vh] animate-in zoom-in-95 duration-200">
         {/* Glow Header Accent */}
         <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500" />
 
         {/* TOP BAR */}
-        <div className="flex items-center justify-between p-5 pb-3 border-b border-slate-800/80">
+        <div className="flex items-center justify-between p-4 sm:p-5 pb-3 border-b border-slate-800/80 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
               <Lock size={18} />
             </div>
             <div>
-              <h3 className="text-base font-black text-white uppercase tracking-tight leading-none">
+              <h3 className="text-sm sm:text-base font-black text-white uppercase tracking-tight leading-none">
                 Adquirir Acesso à Mídia
               </h3>
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1 block">
+              <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1 block">
                 Desbloqueio de Conteúdo Exclusivo
               </span>
             </div>
@@ -106,7 +106,8 @@ export const UnlockPurchaseModal: React.FC<UnlockPurchaseModalProps> = ({
           <button
             onClick={onClose}
             disabled={isProcessing}
-            className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all active:scale-95 disabled:opacity-50"
+            className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl sm:rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all active:scale-95 disabled:opacity-50 shrink-0"
+            title="Fechar"
           >
             <X size={18} />
           </button>

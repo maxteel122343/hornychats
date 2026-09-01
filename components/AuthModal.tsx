@@ -39,10 +39,14 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, onShowToast }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[600] flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-10 rounded-[3rem] w-full max-w-md shadow-2xl relative transition-all">
-        <button onClick={onClose} className="absolute top-6 right-6 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all text-slate-400">
-          <X size={24} />
+    <div className="fixed inset-0 z-[600] flex items-center justify-center p-3 sm:p-6 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 sm:p-10 rounded-[2rem] sm:rounded-[3rem] w-full max-w-md shadow-2xl relative transition-all">
+        <button 
+          onClick={onClose} 
+          className="absolute top-5 right-5 sm:top-6 sm:right-6 w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all text-slate-400 hover:text-white active:scale-95"
+          title="Fechar"
+        >
+          <X size={20} />
         </button>
 
         <div className="flex flex-col items-center gap-6">

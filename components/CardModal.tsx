@@ -1,9 +1,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, ArrowLeft, Upload, Mic, Video, Image as ImageIcon, MessageSquare, DollarSign, Clock, Tag, Camera, StopCircle, RefreshCw, LayoutGrid, Eye, EyeOff, Maximize, Sliders, Phone, LayoutTemplate, Timer, Zap, Settings, Save, Trash2, Edit, PlayCircle, FolderOpen, CalendarClock, Palette, Layers, Repeat, Play, Pause } from 'lucide-react';
+import { X, ArrowLeft, Upload, Mic, Video, Image as ImageIcon, MessageSquare, DollarSign, Clock, Tag, Camera, StopCircle, RefreshCw, LayoutGrid, Eye, EyeOff, Maximize, Sliders, Phone, LayoutTemplate, Timer, Zap, Settings, Save, Trash2, Edit, PlayCircle, FolderOpen, CalendarClock, Palette, Layers, Repeat, Play, Pause, Tv } from 'lucide-react';
 import { CardType, MediaCard, CardDefaults } from '../types';
 import { supabase } from '../lib/supabase';
 import MediaCardItem from './MediaCardItem';
+import { QuickSettingsModal } from './QuickSettingsModal';
 
 interface CardModalProps {
   onClose: () => void;
@@ -11,6 +12,7 @@ interface CardModalProps {
   userId?: string;
   initialData?: MediaCard | null;
   onShowToast?: (message: string, type: 'success' | 'error' | 'info') => void;
+  onNavigateTab?: (tab: 'chat' | 'showcase' | 'my_cards' | 'cinema') => void;
 }
 
 const DEFAULT_SETTINGS_KEY = 'linkcard_defaults';
@@ -25,7 +27,7 @@ const CARD_COLORS = [
   '#000000', // Black
 ];
 
-const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initialData, onShowToast }) => {
+const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initialData, onShowToast, onNavigateTab }) => {
   const [activeTab, setActiveTab] = useState<'create' | 'simple' | 'library'>('create');
   const [showSettings, setShowSettings] = useState(false);
 
@@ -631,45 +633,51 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
 
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center p-0 sm:p-4 bg-black/95 sm:bg-black/90 sm:backdrop-blur-xl overflow-hidden animate-in fade-in duration-300">
-      <div className={`bg-[#0f172a] border-0 sm:border border-slate-800 rounded-none sm:rounded-[2rem] w-full h-full sm:h-auto sm:max-h-[92vh] ${activeTab === 'create' ? 'sm:max-w-6xl' : 'sm:max-w-4xl'} shadow-2xl flex flex-col relative overflow-hidden`}>
+      <div className={`bg-[#0f172a] border-0 sm:border border-slate-800 rounded-none sm:rounded-[2rem] w-full h-full sm:h-[92vh] ${activeTab === 'create' ? 'sm:max-w-6xl' : 'sm:max-w-4xl'} shadow-2xl flex flex-col relative overflow-hidden`}>
 
         {/* Top Navigation Bar */}
-        <div className="p-3.5 sm:p-5 border-b border-white/5 flex items-center justify-between bg-slate-900/90 gap-2 shrink-0">
-          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide no-scrollbar flex-1 min-w-0">
+        <div className="p-3 sm:p-4 border-b border-white/10 flex items-center justify-between bg-slate-900/95 gap-2 shrink-0 z-20">
+          <button 
+            type="button"
+            onClick={onClose} 
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 border border-slate-700/80 text-slate-200 hover:bg-slate-700 hover:text-white transition-all text-xs font-bold shrink-0 active:scale-95"
+            title="Voltar"
+          >
+            <ArrowLeft size={16} />
+            <span className="font-bold text-xs uppercase">Voltar</span>
+          </button>
+
+          <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto scrollbar-hide no-scrollbar flex-1 justify-center px-1 min-w-0">
             <button 
-              onClick={onClose} 
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white transition-all text-xs font-bold shrink-0 active:scale-95"
-              title="Voltar / Fechar"
-            >
-              <ArrowLeft size={16} />
-              <span className="inline">Voltar</span>
-            </button>
-            <div className="h-4 w-[1px] bg-slate-700 mx-0.5 sm:mx-1 shrink-0" />
-            <button 
+              type="button"
               onClick={() => setActiveTab('create')} 
-              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 active:scale-95 ${activeTab === 'create' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-400 hover:bg-slate-800'}`}
+              className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shrink-0 active:scale-95 ${activeTab === 'create' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-400 bg-slate-800/60 hover:bg-slate-800'}`}
             >
-              <LayoutGrid size={14} /> <span>Criar Card</span>
+              <LayoutGrid size={13} /> <span>Avançado</span>
             </button>
             <button 
+              type="button"
               onClick={() => setActiveTab('simple')} 
-              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 active:scale-95 ${activeTab === 'simple' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30' : 'text-slate-400 hover:bg-slate-800'}`}
+              className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shrink-0 active:scale-95 ${activeTab === 'simple' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30' : 'text-slate-400 bg-slate-800/60 hover:bg-slate-800'}`}
             >
-              <Zap size={14} /> <span>Simplifica</span>
+              <Zap size={13} /> <span>Simplifica</span>
             </button>
             <button 
+              type="button"
               onClick={() => setActiveTab('library')} 
-              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 active:scale-95 ${activeTab === 'library' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:bg-slate-800'}`}
+              className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shrink-0 active:scale-95 ${activeTab === 'library' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 bg-slate-800/60 hover:bg-slate-800'}`}
             >
-              <FolderOpen size={14} /> <span>Meus Cards</span>
+              <FolderOpen size={13} /> <span>Meus Cards</span>
             </button>
           </div>
+
           <button 
+            type="button"
             onClick={onClose} 
-            className="p-2 hover:bg-white/10 rounded-full text-slate-400 hover:text-white transition-all shrink-0"
+            className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-slate-800 hover:bg-red-500/20 hover:text-red-400 border border-slate-700/80 rounded-xl text-slate-300 transition-all shrink-0 active:scale-95"
             title="Fechar"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
@@ -935,19 +943,85 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
           )}
         </div>
 
+        {/* --- PERSISTENT BOTTOM NAVIGATION BAR --- */}
+        <div className="border-t border-slate-800 bg-[#090f1f]/95 backdrop-blur-md px-3 py-2 sm:py-2.5 flex items-center justify-around shrink-0 z-20">
+          <button
+            type="button"
+            onClick={() => {
+              if (onNavigateTab) {
+                onNavigateTab('chat');
+              } else {
+                onClose();
+              }
+            }}
+            className="flex flex-col items-center justify-center gap-1 py-1.5 px-3 sm:px-5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/60 active:scale-95 transition-all"
+            title="Ir para o Feed de Mensagens"
+          >
+            <MessageSquare size={18} />
+            <span className="text-[10px] font-black uppercase tracking-wider">Feed</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (onNavigateTab) {
+                onNavigateTab('showcase');
+              } else {
+                onClose();
+              }
+            }}
+            className="flex flex-col items-center justify-center gap-1 py-1.5 px-3 sm:px-5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/60 active:scale-95 transition-all"
+            title="Ir para a Vitrine"
+          >
+            <LayoutGrid size={18} />
+            <span className="text-[10px] font-black uppercase tracking-wider">Vitrine</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('library');
+            }}
+            className={`flex flex-col items-center justify-center gap-1 py-1.5 px-3 sm:px-5 rounded-xl transition-all active:scale-95 ${
+              activeTab === 'library'
+                ? 'text-indigo-400 bg-indigo-500/15 border border-indigo-500/30 font-bold'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+            title="Ver Meus Cards"
+          >
+            <FolderOpen size={18} />
+            <span className="text-[10px] font-black uppercase tracking-wider">Meus Cards</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (onNavigateTab) {
+                onNavigateTab('cinema');
+              } else {
+                onClose();
+              }
+            }}
+            className="flex flex-col items-center justify-center gap-1 py-1.5 px-3 sm:px-5 rounded-xl text-slate-400 hover:text-indigo-400 hover:bg-slate-800/60 active:scale-95 transition-all"
+            title="Ir para o Cinema"
+          >
+            <Tv size={18} />
+            <span className="text-[10px] font-black uppercase tracking-wider">Cinema</span>
+          </button>
+        </div>
+
         {/* --- SETTINGS MODAL OVERLAY --- */}
         {showSettings && (
-          <div className="absolute inset-0 bg-[#0f172a] z-50 rounded-none sm:rounded-[2rem] p-4 sm:p-8 flex flex-col animate-in slide-in-from-bottom-10 overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-black text-white uppercase tracking-tighter flex items-center gap-2"><Settings className="text-slate-500" /> Configuração Padrão</h3>
-              <button onClick={() => setShowSettings(false)} className="p-2 bg-slate-800 rounded-full text-white"><X size={20} /></button>
-            </div>
-            {/* ... simplified for brevity, assume existing settings form here ... */}
-            <div className="flex-1 text-center text-slate-500">
-              Configurações Globais (Código existente mantido)
-              <button onClick={() => setShowSettings(false)} className="mt-4 p-2 bg-slate-700 rounded-lg">Fechar</button>
-            </div>
-          </div>
+          <QuickSettingsModal
+            onClose={() => setShowSettings(false)}
+            onSave={(newDefaults) => {
+              setDefaults(newDefaults);
+              localStorage.setItem(DEFAULT_SETTINGS_KEY, JSON.stringify(newDefaults));
+              setShowSettings(false);
+              if (onShowToast) onShowToast('Configurações padrão salvas com sucesso!', 'success');
+            }}
+            initialDefaults={defaults}
+          />
         )}
 
       </div>
