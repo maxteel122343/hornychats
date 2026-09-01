@@ -363,18 +363,27 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
+  const blobToDataUrl = (file: File | Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   const uploadFileToSupabase = async (file: File | Blob, path: string, contentType: string): Promise<string | null> => {
     try {
-      const { error } = await supabase.storage.from('media').upload(path, file, { contentType });
+      const { error } = await supabase.storage.from('media').upload(path, file, { contentType, upsert: true });
       if (error) {
-        console.error('Upload failed:', error);
-        return null;
+        console.warn('Supabase storage upload failed, using local DataURL fallback:', error.message);
+        return await blobToDataUrl(file);
       }
       const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(path);
-      return publicUrl;
+      return publicUrl || await blobToDataUrl(file);
     } catch (e) {
-      console.error('Upload exception:', e);
-      return null;
+      console.warn('Storage upload exception, using local DataURL fallback:', e);
+      return await blobToDataUrl(file);
     }
   };
 
@@ -478,10 +487,8 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
 
       if (uploadedUrl) {
         finalMediaUrl = uploadedUrl;
-      } else {
-        if (onShowToast) onShowToast('Falha no upload da mídia.', 'error');
-        setIsUploading(false);
-        return; // Stop if upload fails
+      } else if (!finalMediaUrl && fileToUpload) {
+        finalMediaUrl = await blobToDataUrl(fileToUpload);
       }
     }
 

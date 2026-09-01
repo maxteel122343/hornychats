@@ -9,10 +9,11 @@ import {
 import { User, MediaCard, CardType } from '../types';
 import { supabase } from '../lib/supabase';
 import { UnlockPurchaseModal } from './UnlockPurchaseModal';
+import { ToastType, ToastOptions } from './Toast';
 
 interface GalleryProps {
   user: User;
-  onShowToast?: (message: string, type: 'success' | 'error' | 'info') => void;
+  onShowToast?: (message: string, type?: ToastType, options?: ToastOptions) => void;
   updateCredits?: (amount: number) => Promise<void> | void;
 }
 
@@ -22,113 +23,6 @@ interface CreatorInfo {
   photo?: string;
   cardCount: number;
 }
-
-const DEMO_CARDS: MediaCard[] = [
-  {
-    id: 'demo_card_1',
-    creator_id: 'creator_sofia_vip',
-    creatorName: 'Sofia Mendes',
-    creatorPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-    type: CardType.VIDEO,
-    title: 'Aula de Produção Audiovisual & Iluminação',
-    description: 'Técnicas profissionais de iluminação e configuração de câmera para criadores de conteúdo.',
-    thumbnail: 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=800&auto=format&fit=crop&q=80',
-    mediaUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-    creditCost: 10,
-    category: 'Vídeo',
-    tags: ['Cinema', 'Masterclass', 'Dicas'],
-    duration: 180,
-    expirySeconds: 0,
-    isBlur: false,
-    blurLevel: 0,
-    saveToGallery: true,
-    createdAt: Date.now() - 3600000,
-    mediaType: 'upload'
-  },
-  {
-    id: 'demo_card_2',
-    creator_id: 'creator_sofia_vip',
-    creatorName: 'Sofia Mendes',
-    creatorPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-    type: CardType.IMAGE,
-    title: 'Presets Exclusivos Lightroom Dark Vintage',
-    description: 'Pack de filtros exclusivos em alta definição para fotos de perfil e feed.',
-    thumbnail: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&auto=format&fit=crop&q=80',
-    mediaUrl: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=1600&auto=format&fit=crop&q=80',
-    creditCost: 5,
-    category: 'Imagens',
-    tags: ['Fotografia', 'Presets', 'Design'],
-    duration: 0,
-    expirySeconds: 0,
-    isBlur: false,
-    blurLevel: 0,
-    saveToGallery: true,
-    createdAt: Date.now() - 7200000,
-    mediaType: 'upload'
-  },
-  {
-    id: 'demo_card_3',
-    creator_id: 'creator_lucas_sound',
-    creatorName: 'Lucas Beats',
-    creatorPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80',
-    type: CardType.AUDIO,
-    title: 'Podcast VIP: Bastidores do Mercado Musical',
-    description: 'Áudio exclusivo com insights sobre produção musical independente e monetização.',
-    thumbnail: 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800&auto=format&fit=crop&q=80',
-    mediaUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-    creditCost: 8,
-    category: 'Voz',
-    tags: ['Podcast', 'Música', 'Áudio'],
-    duration: 120,
-    expirySeconds: 0,
-    isBlur: false,
-    blurLevel: 0,
-    saveToGallery: true,
-    createdAt: Date.now() - 10800000,
-    mediaType: 'upload'
-  },
-  {
-    id: 'demo_card_4',
-    creator_id: 'creator_elena_fitness',
-    creatorName: 'Elena Ramos',
-    creatorPhoto: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&auto=format&fit=crop&q=80',
-    type: CardType.VIDEO,
-    title: 'Treino Hiit 15 Minutos Queima Intensa',
-    description: 'Rotina completa sem equipamentos para fazer em casa e acelerar o metabolismo.',
-    thumbnail: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=800&auto=format&fit=crop&q=80',
-    mediaUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-    creditCost: 12,
-    category: 'Vídeo',
-    tags: ['Fitness', 'Saúde', 'Treino'],
-    duration: 300,
-    expirySeconds: 0,
-    isBlur: false,
-    blurLevel: 0,
-    saveToGallery: true,
-    createdAt: Date.now() - 14400000,
-    mediaType: 'upload'
-  },
-  {
-    id: 'demo_card_5',
-    creator_id: 'creator_lucas_sound',
-    creatorName: 'Lucas Beats',
-    creatorPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80',
-    type: CardType.CHAT,
-    title: 'Consultoria de Produção 1 on 1',
-    description: 'Sessão direta de chat para análise de track e feedback profissional.',
-    thumbnail: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&auto=format&fit=crop&q=80',
-    creditCost: 15,
-    category: 'Premium',
-    tags: ['Consultoria', 'Chat VIP', 'Música'],
-    duration: 0,
-    expirySeconds: 0,
-    isBlur: false,
-    blurLevel: 0,
-    saveToGallery: true,
-    createdAt: Date.now() - 18000000,
-    mediaType: 'upload'
-  }
-];
 
 const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits }) => {
   const navigate = useNavigate();
@@ -158,7 +52,7 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits }) =
 
   const categories = ['Global', 'Vídeo', 'Voz', 'Imagens', 'Premium'];
 
-  // Load cards and profile data
+  // Load cards and profile data (ONLY real data from database)
   useEffect(() => {
     const fetchCardsAndProfiles = async () => {
       setLoading(true);
@@ -220,18 +114,13 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits }) =
             };
           });
 
-          // Combine with demo cards so the vitrine is always rich and colorful
-          const demoCardsToInclude = DEMO_CARDS.filter(
-            demo => !parsedCards.some(pc => pc.id === demo.id)
-          );
-          setCards([...parsedCards, ...demoCardsToInclude]);
+          setCards(parsedCards);
         } else {
-          // If no cards in DB yet, use demo cards
-          setCards(DEMO_CARDS);
+          setCards([]);
         }
       } catch (err) {
         console.error('Error fetching gallery:', err);
-        setCards(DEMO_CARDS);
+        setCards([]);
       } finally {
         setLoading(false);
       }
@@ -544,97 +433,99 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits }) =
         </div>
       </header>
 
-      {/* CREATORS BAR (CARROSSEL DE CRIADORES) */}
-      <section className="max-w-6xl mx-auto mb-6 bg-slate-900/60 border border-slate-800/80 rounded-3xl p-4 backdrop-blur-md">
-        <div className="flex items-center justify-between mb-3 px-1">
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
-            <UserIcon size={12} className="text-indigo-400" /> Criadores em Destaque
-          </span>
-          {selectedCreatorId && (
+      {/* CREATORS BAR (CARROSSEL DE CRIADORES - apenas se houver criadores reais com mídias) */}
+      {creators.length > 0 && (
+        <section className="max-w-6xl mx-auto mb-6 bg-slate-900/60 border border-slate-800/80 rounded-3xl p-4 backdrop-blur-md">
+          <div className="flex items-center justify-between mb-3 px-1">
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
+              <UserIcon size={12} className="text-indigo-400" /> Criadores em Destaque
+            </span>
+            {selectedCreatorId && (
+              <button
+                onClick={() => setSelectedCreatorId(null)}
+                className="text-[9px] font-bold text-indigo-400 hover:text-indigo-300 uppercase tracking-wider flex items-center gap-1"
+              >
+                <X size={12} /> Mostrar Todos
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-hide no-scrollbar -mx-2 px-2">
+            {/* "Todos" button */}
             <button
               onClick={() => setSelectedCreatorId(null)}
-              className="text-[9px] font-bold text-indigo-400 hover:text-indigo-300 uppercase tracking-wider flex items-center gap-1"
+              className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex-shrink-0 border ${
+                selectedCreatorId === null
+                  ? 'bg-indigo-600 text-white border-indigo-500 shadow-lg shadow-indigo-600/30'
+                  : 'bg-white/5 text-slate-300 border-white/5 hover:bg-white/10'
+              }`}
             >
-              <X size={12} /> Mostrar Todos
+              <Layers size={14} />
+              <span>Todos ({cards.length})</span>
             </button>
-          )}
-        </div>
 
-        <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-hide no-scrollbar -mx-2 px-2">
-          {/* "Todos" button */}
-          <button
-            onClick={() => setSelectedCreatorId(null)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex-shrink-0 border ${
-              selectedCreatorId === null
-                ? 'bg-indigo-600 text-white border-indigo-500 shadow-lg shadow-indigo-600/30'
-                : 'bg-white/5 text-slate-300 border-white/5 hover:bg-white/10'
-            }`}
-          >
-            <Layers size={14} />
-            <span>Todos ({cards.length})</span>
-          </button>
-
-          {/* Creators items */}
-          {creators.map((creator) => {
-            const isSelected = selectedCreatorId === creator.id;
-            return (
-              <div
-                key={creator.id}
-                className={`flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-2xl transition-all flex-shrink-0 border select-none group ${
-                  isSelected
-                    ? 'bg-indigo-950/80 border-indigo-500 text-white ring-2 ring-indigo-500/40 shadow-lg shadow-indigo-900/30'
-                    : 'bg-slate-800/60 border-slate-700/60 text-slate-300 hover:bg-slate-800 hover:border-slate-600'
-                }`}
-              >
-                {/* Creator Avatar (Click filters vitrine) */}
-                <button
-                  onClick={(e) => handleToggleCreatorFilter(creator.id, e)}
-                  title={`Filtrar apenas mídias de ${creator.name}`}
-                  className="relative cursor-pointer focus:outline-none"
+            {/* Creators items */}
+            {creators.map((creator) => {
+              const isSelected = selectedCreatorId === creator.id;
+              return (
+                <div
+                  key={creator.id}
+                  className={`flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-2xl transition-all flex-shrink-0 border select-none group ${
+                    isSelected
+                      ? 'bg-indigo-950/80 border-indigo-500 text-white ring-2 ring-indigo-500/40 shadow-lg shadow-indigo-900/30'
+                      : 'bg-slate-800/60 border-slate-700/60 text-slate-300 hover:bg-slate-800 hover:border-slate-600'
+                  }`}
                 >
-                  {creator.photo ? (
-                    <img
-                      src={creator.photo}
-                      alt={creator.name}
-                      className="w-8 h-8 rounded-full object-cover border-2 border-indigo-400/50 group-hover:scale-105 transition-transform"
-                    />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white font-black text-xs border border-white/20">
-                      {creator.name.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  {isSelected && (
-                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-slate-900" />
-                  )}
-                </button>
+                  {/* Creator Avatar (Click filters vitrine) */}
+                  <button
+                    onClick={(e) => handleToggleCreatorFilter(creator.id, e)}
+                    title={`Filtrar apenas mídias de ${creator.name}`}
+                    className="relative cursor-pointer focus:outline-none"
+                  >
+                    {creator.photo ? (
+                      <img
+                        src={creator.photo}
+                        alt={creator.name}
+                        className="w-8 h-8 rounded-full object-cover border-2 border-indigo-400/50 group-hover:scale-105 transition-transform"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white font-black text-xs border border-white/20">
+                        {creator.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    {isSelected && (
+                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-slate-900" />
+                    )}
+                  </button>
 
-                {/* Creator Name & Card count */}
-                <button
-                  onClick={(e) => handleToggleCreatorFilter(creator.id, e)}
-                  className="text-left focus:outline-none"
-                  title={`Filtrar apenas mídias de ${creator.name}`}
-                >
-                  <p className="text-[11px] font-black truncate max-w-[100px] leading-tight">
-                    {creator.name}
-                  </p>
-                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">
-                    {creator.cardCount} {creator.cardCount === 1 ? 'mídia' : 'mídias'}
-                  </p>
-                </button>
+                  {/* Creator Name & Card count */}
+                  <button
+                    onClick={(e) => handleToggleCreatorFilter(creator.id, e)}
+                    className="text-left focus:outline-none"
+                    title={`Filtrar apenas mídias de ${creator.name}`}
+                  >
+                    <p className="text-[11px] font-black truncate max-w-[100px] leading-tight">
+                      {creator.name}
+                    </p>
+                    <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">
+                      {creator.cardCount} {creator.cardCount === 1 ? 'mídia' : 'mídias'}
+                    </p>
+                  </button>
 
-                {/* Direct Chat Button for this Creator */}
-                <button
-                  onClick={(e) => handleOpenCreatorChat(creator.id, creator.name, e)}
-                  title={`Entrar no Chat de ${creator.name}`}
-                  className="p-1.5 rounded-xl bg-indigo-600/80 hover:bg-indigo-500 text-white transition-all shadow-md hover:scale-110 active:scale-95 focus:outline-none"
-                >
-                  <MessageSquare size={13} />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+                  {/* Direct Chat Button for this Creator */}
+                  <button
+                    onClick={(e) => handleOpenCreatorChat(creator.id, creator.name, e)}
+                    title={`Entrar no Chat de ${creator.name}`}
+                    className="p-1.5 rounded-xl bg-indigo-600/80 hover:bg-indigo-500 text-white transition-all shadow-md hover:scale-110 active:scale-95 focus:outline-none"
+                  >
+                    <MessageSquare size={13} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* ACTIVE CREATOR FILTER BANNER */}
       {selectedCreator && (
@@ -725,26 +616,55 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits }) =
             </span>
           </div>
         ) : filteredCards.length === 0 ? (
-          <div className="flex flex-col items-center justify-center opacity-70 py-24 border-2 border-dashed border-white/10 rounded-[3rem] text-center space-y-5 px-6 bg-slate-900/20">
-            <div className="p-6 bg-white/5 rounded-3xl text-slate-400">
+          <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-white/10 rounded-[2.5rem] text-center space-y-5 px-6 bg-slate-900/40 backdrop-blur-sm">
+            <div className="p-5 bg-indigo-500/10 border border-indigo-500/20 rounded-3xl text-indigo-400">
               <Grid size={36} />
             </div>
             <div>
-              <p className="text-xl font-black uppercase tracking-tight text-white">Nenhum card encontrado</p>
-              <p className="text-xs font-medium text-slate-400 mt-1 max-w-sm">
-                {selectedCreatorId
-                  ? 'Este criador ainda não possui cards nesta categoria.'
-                  : 'Tente alterar a categoria ou o termo da busca.'}
+              <p className="text-xl font-black uppercase tracking-tight text-white">
+                {cards.length === 0 ? 'Nenhum Card Publicado na Vitrine' : 'Nenhum Card Encontrado'}
+              </p>
+              <p className="text-xs font-medium text-slate-400 mt-1.5 max-w-md mx-auto">
+                {cards.length === 0
+                  ? 'A vitrine exibe apenas cards e mídias reais publicados pelos criadores. Crie seus cards na sua sala de chat e marque "Salvar na Vitrine" para exibi-los aqui!'
+                  : selectedCreatorId
+                  ? 'Este criador ainda não possui cards nesta categoria ou termo de busca.'
+                  : 'Nenhuma mídia corresponde aos filtros atuais. Tente buscar por outro termo ou categoria.'}
               </p>
             </div>
-            {selectedCreatorId && (
-              <button
-                onClick={() => setSelectedCreatorId(null)}
-                className="px-6 py-2.5 rounded-2xl bg-indigo-600 text-white text-xs font-black uppercase tracking-wider hover:bg-indigo-500 transition-all shadow-lg"
-              >
-                Limpar Filtro de Criador
-              </button>
-            )}
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              {cards.length === 0 ? (
+                <button
+                  onClick={() => navigate(`/chat/${user.id}`)}
+                  className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black uppercase tracking-wider transition-all shadow-xl active:scale-95"
+                >
+                  <Sparkles size={16} />
+                  <span>Ir para Minha Sala & Criar Card</span>
+                </button>
+              ) : (
+                <>
+                  {selectedCreatorId && (
+                    <button
+                      onClick={() => setSelectedCreatorId(null)}
+                      className="px-5 py-2.5 rounded-2xl bg-indigo-600 text-white text-xs font-black uppercase tracking-wider hover:bg-indigo-500 transition-all shadow-lg"
+                    >
+                      Limpar Filtro de Criador
+                    </button>
+                  )}
+                  {(selectedCategory !== 'Global' || searchQuery) && (
+                    <button
+                      onClick={() => {
+                        setSelectedCategory('Global');
+                        setSearchQuery('');
+                      }}
+                      className="px-5 py-2.5 rounded-2xl bg-white/10 text-slate-200 text-xs font-black uppercase tracking-wider hover:bg-white/20 transition-all border border-white/10"
+                    >
+                      Restaurar Todos os Filtros
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 md:gap-8">

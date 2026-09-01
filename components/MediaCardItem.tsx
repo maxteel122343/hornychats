@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Lock, Play, Volume2, Camera, Phone, MessageSquare, Eye, Clock, Tag, MoreVertical, X, Check, Maximize2, DownloadCloud, Timer, ImageOff, Trash2, Edit, AlertTriangle, LogIn, Link as LinkIcon, DoorOpen, CalendarClock } from 'lucide-react';
 import { MediaCard, CardType } from '../types';
+import { ToastType, ToastOptions } from './Toast';
 
 interface MediaCardItemProps {
   card: MediaCard;
@@ -12,7 +13,7 @@ interface MediaCardItemProps {
   onEdit?: (card: MediaCard) => void;
   onInsertToRoom?: (card: MediaCard) => void;
   onSchedule?: (card: MediaCard) => void;
-  onShowToast?: (message: string, type: 'success' | 'error' | 'info') => void;
+  onShowToast?: (message: string, type?: ToastType, options?: ToastOptions) => void;
 }
 
 const MediaCardItem: React.FC<MediaCardItemProps> = ({ card, canManage, onUnlock, isHostMode, onDelete, onEdit, onInsertToRoom, onSchedule, onShowToast }) => {
@@ -98,11 +99,17 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({ card, canManage, onUnlock
 
   const handleCopyLink = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const baseUrl = window.location.origin + window.location.pathname;
-    const link = `${baseUrl}#/chat/priv-${card.id}`;
+    const link = `${window.location.origin}/#/chat/priv-${card.id}`;
     navigator.clipboard.writeText(link);
-    if (onShowToast) onShowToast("Link da sala privada copiado!", "success");
-    else alert("Link da sala privada copiado!");
+    if (onShowToast) {
+      onShowToast("Link da sala privada copiado!", "success", {
+        link,
+        subMessage: `Link direto para o card exclusivo "${card.title}".`,
+        shareText: `Acesse este card exclusivo "${card.title}": ${link}`
+      });
+    } else {
+      alert("Link da sala privada copiado: " + link);
+    }
   };
 
   const handleDeleteAttempt = (e: React.MouseEvent) => {

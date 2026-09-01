@@ -4,13 +4,14 @@ import { useNavigate } from 'react-router-dom';
 import { Share2, LayoutGrid, MessageCircle, LogIn, TrendingUp, User as UserIcon, LogOut, Sun, Moon } from 'lucide-react';
 import { User } from '../types';
 import { supabase } from '../lib/supabase';
+import { ToastType, ToastOptions } from './Toast';
 
 interface HomeProps {
   user: User;
   openAuth: () => void;
   theme: 'dark' | 'light';
   toggleTheme: () => void;
-  onShowToast?: (message: string, type: 'success' | 'error' | 'info') => void;
+  onShowToast?: (message: string, type?: ToastType, options?: ToastOptions) => void;
 }
 
 const Home: React.FC<HomeProps> = ({ user, openAuth, theme, toggleTheme, onShowToast }) => {
@@ -25,8 +26,15 @@ const Home: React.FC<HomeProps> = ({ user, openAuth, theme, toggleTheme, onShowT
   const copyLink = () => {
     const link = `${window.location.origin}/#/chat/${personalRoomId}`;
     navigator.clipboard.writeText(link);
-    if (onShowToast) onShowToast('Seu link de convite foi copiado!', 'success');
-    else alert('Seu link de convite foi copiado!');
+    if (onShowToast) {
+      onShowToast('Link do seu chat copiado com sucesso!', 'success', {
+        link,
+        subMessage: 'O link da sua sala exclusiva está pronto para envio.',
+        shareText: `Venha conversar comigo no meu chat exclusivo! Acesse pelo link: ${link}`
+      });
+    } else {
+      alert('Seu link de convite foi copiado: ' + link);
+    }
   };
 
   const handleSignOut = async () => {

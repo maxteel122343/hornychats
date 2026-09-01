@@ -5,7 +5,7 @@ import ChatRoom from './components/ChatRoom';
 import Home from './components/Home';
 import Gallery from './components/Gallery';
 import AuthModal from './components/AuthModal';
-import { Toast, ToastType } from './components/Toast';
+import { Toast, ToastType, ToastOptions } from './components/Toast';
 import { User } from './types';
 import { supabase } from './lib/supabase';
 
@@ -41,14 +41,30 @@ const App: React.FC = () => {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
-  const [toast, setToast] = useState<{ message: string; type: ToastType; isVisible: boolean }>({
+  const [toast, setToast] = useState<{ 
+    message: string; 
+    type: ToastType; 
+    isVisible: boolean;
+    subMessage?: string;
+    link?: string;
+    duration?: number;
+    shareText?: string;
+  }>({
     message: '',
     type: 'info',
     isVisible: false
   });
 
-  const showToast = (message: string, type: ToastType = 'info') => {
-    setToast({ message, type, isVisible: true });
+  const showToast = (message: string, type: ToastType = 'info', options?: ToastOptions) => {
+    setToast({ 
+      message, 
+      type, 
+      isVisible: true,
+      subMessage: options?.subMessage,
+      link: options?.link,
+      duration: options?.duration,
+      shareText: options?.shareText
+    });
   };
 
   useEffect(() => {
@@ -209,6 +225,10 @@ const App: React.FC = () => {
           message={toast.message}
           type={toast.type}
           isVisible={toast.isVisible}
+          subMessage={toast.subMessage}
+          link={toast.link}
+          duration={toast.duration}
+          shareText={toast.shareText}
           onClose={() => setToast(prev => ({ ...prev, isVisible: false }))}
         />
       </div>

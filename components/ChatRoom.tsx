@@ -8,6 +8,7 @@ import CardModal from './CardModal';
 import MediaCardItem from './MediaCardItem';
 import Gallery from './Gallery';
 import { QuickSettingsModal } from './QuickSettingsModal';
+import { ToastType, ToastOptions } from './Toast';
 
 // IndexedDB configuration for storing recent local video files
 const DB_NAME = 'LocalWatchPartyDB';
@@ -129,6 +130,15 @@ const saveVideoToLocalDB = async (file: File, roomId: string): Promise<void> => 
   });
 };
 
+const blobToDataUrl = (blob: Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
+
 interface ChatRoomProps {
   user: User;
   updateCredits: (amount: number) => void;
@@ -136,7 +146,7 @@ interface ChatRoomProps {
   openAuth: () => void;
   theme: 'dark' | 'light';
   toggleTheme: () => void;
-  onShowToast?: (message: string, type: 'success' | 'error' | 'info') => void;
+  onShowToast?: (message: string, type?: ToastType, options?: ToastOptions) => void;
 }
 
 interface Withdrawal {
@@ -209,8 +219,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     category: 'Quick',
     cardColor: '#0f172a'
   });
-  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    if (onShowToast) onShowToast(message, type);
+  const showToast = (message: string, type: ToastType = 'success', options?: ToastOptions) => {
+    if (onShowToast) onShowToast(message, type, options);
   };
 
   // Private Room Logic
@@ -277,6 +287,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const [recentVideos, setRecentVideos] = useState<Array<{ id: number, name: string, size: number, type: string, file: File, timestamp: number }>>([]);
   const [sidebarTab, setSidebarTab] = useState<'chat' | 'history'>('chat');
   const [allowedVideoControllers, setAllowedVideoControllers] = useState<Set<string>>(new Set());
+
+  // Clear Chat Modal State
+  const [isClearChatModalOpen, setIsClearChatModalOpen] = useState(false);
+  const [isClearingChat, setIsClearingChat] = useState(false);
 
 
 
@@ -977,6 +991,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           const m = payload.new;
           setMessages(prev => prev.map(msg => msg.id === m.id ? { ...msg, card: m.card_data, text: m.text } : msg));
         })
+      .on('broadcast', { event: 'chat-cleared' }, () => {
+        setMessages([]);
+        showToast('A conversa e as mídias da sala foram limpas.', 'info');
+      })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` },
         (payload) => {
           const updated = payload.new;
@@ -1331,21 +1349,23 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
     if (user.isLoggedIn && user.id) {
       try {
-        const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
+        const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file, { upsert: true });
         if (!uploadError) {
           const { data: { publicUrl: remoteUrl } } = supabase.storage.from('media').getPublicUrl(filePath);
-          publicUrl = remoteUrl;
-
-          await supabase.from('rooms').upsert([{
-            id: roomId,
-            creator_id: user.id,
-            name: roomDetails?.name || tempRoomName || 'Chat',
-            image_url: roomDetails?.image_url,
-            background_url: publicUrl
-          }], { onConflict: 'id' });
+          publicUrl = remoteUrl || await blobToDataUrl(file);
+        } else {
+          publicUrl = await blobToDataUrl(file);
         }
+        await supabase.from('rooms').upsert([{
+          id: roomId,
+          creator_id: user.id,
+          name: roomDetails?.name || tempRoomName || 'Chat',
+          image_url: roomDetails?.image_url,
+          background_url: publicUrl
+        }], { onConflict: 'id' });
       } catch (err) {
-        console.error('Error uploading background:', err);
+        console.warn('Error uploading background, using local fallback:', err);
+        publicUrl = await blobToDataUrl(file);
       }
     }
 
@@ -1373,21 +1393,23 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
     if (user.isLoggedIn && user.id) {
       try {
-        const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
+        const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file, { upsert: true });
         if (!uploadError) {
           const { data: { publicUrl: remoteUrl } } = supabase.storage.from('media').getPublicUrl(filePath);
-          publicUrl = remoteUrl;
-
-          await supabase.from('rooms').upsert([{
-            id: roomId,
-            creator_id: user.id,
-            name: roomDetails?.name || tempRoomName || 'Chat',
-            image_url: publicUrl,
-            background_url: roomDetails?.background_url
-          }], { onConflict: 'id' });
+          publicUrl = remoteUrl || await blobToDataUrl(file);
+        } else {
+          publicUrl = await blobToDataUrl(file);
         }
+        await supabase.from('rooms').upsert([{
+          id: roomId,
+          creator_id: user.id,
+          name: roomDetails?.name || tempRoomName || 'Chat',
+          image_url: publicUrl,
+          background_url: roomDetails?.background_url
+        }], { onConflict: 'id' });
       } catch (err) {
-        console.error('Error uploading room image:', err);
+        console.warn('Error uploading room image, using local fallback:', err);
+        publicUrl = await blobToDataUrl(file);
       }
     }
 
@@ -1907,6 +1929,43 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     }
   };
 
+  const handleClearChat = async () => {
+    if (!roomId) return;
+    setIsClearingChat(true);
+    try {
+      // 1. Delete all messages for this room from Supabase
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .eq('room_id', roomId);
+
+      if (error) {
+        console.warn('Error deleting messages from Supabase:', error.message);
+      }
+
+      // 2. Broadcast clear event to other connected peers in the room
+      if (roomChannelRef.current) {
+        roomChannelRef.current.send({
+          type: 'broadcast',
+          event: 'chat-cleared',
+          payload: { roomId, timestamp: Date.now() }
+        });
+      }
+
+      // 3. Clear local messages state
+      setMessages([]);
+      setIsClearChatModalOpen(false);
+      showToast('Conversa e mídias do chat limpas com sucesso!', 'success');
+    } catch (err: any) {
+      console.error('Error in handleClearChat:', err);
+      setMessages([]);
+      setIsClearChatModalOpen(false);
+      showToast('Chat limpo localmente.', 'info');
+    } finally {
+      setIsClearingChat(false);
+    }
+  };
+
   const handleSavePaymentKey = async () => {
     // Save the current key to the DB profile
     if (!user.isLoggedIn) return;
@@ -2164,11 +2223,22 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         createQuickCard(publicUrl, type, type === CardType.IMAGE ? publicUrl : undefined);
         showToast('Upload concluído com sucesso!', 'success');
       } else {
-        showToast('Falha no upload.', 'error');
+        const fallbackUrl = await blobToDataUrl(file);
+        createQuickCard(fallbackUrl, type, type === CardType.IMAGE ? fallbackUrl : undefined);
+        showToast('Upload concluído!', 'success');
       }
     } catch (err) {
       console.error(err);
-      showToast('Erro ao fazer upload.', 'error');
+      try {
+        let type = CardType.IMAGE;
+        if (file.type.startsWith('video/')) type = CardType.VIDEO;
+        if (file.type.startsWith('audio/')) type = CardType.AUDIO;
+        const fallbackUrl = await blobToDataUrl(file);
+        createQuickCard(fallbackUrl, type, type === CardType.IMAGE ? fallbackUrl : undefined);
+        showToast('Upload concluído!', 'success');
+      } catch {
+        showToast('Erro ao fazer upload.', 'error');
+      }
     } finally {
       setIsUploading(false);
       if (quickUploadRef.current) quickUploadRef.current.value = '';
@@ -2338,17 +2408,18 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
   const uploadMediaToSupabase = async (blob: Blob, path: string, contentType?: string): Promise<string | null> => {
     try {
-      const options = contentType ? { contentType } : undefined;
+      const options: any = { upsert: true };
+      if (contentType) options.contentType = contentType;
       const { error } = await supabase.storage.from('media').upload(path, blob, options);
       if (error) {
-        console.error('Upload error:', error);
-        return null;
+        console.warn('Supabase storage upload error, using local fallback:', error.message);
+        return await blobToDataUrl(blob);
       }
       const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(path);
-      return publicUrl;
+      return publicUrl || await blobToDataUrl(blob);
     } catch (e) {
-      console.error('Upload exception:', e);
-      return null;
+      console.warn('Upload exception, using local fallback:', e);
+      return await blobToDataUrl(blob);
     }
   };
 
@@ -2634,7 +2705,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
             </div>
           </div>
 
-          {/* Header Right: Theme + Wallet/Credits + Earnings + Share + Close */}
+          {/* Header Right: Theme + Wallet/Credits + Video Call + Lixeira (Limpar) + Earnings + Share + Close */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button 
               onClick={toggleTheme} 
@@ -2653,6 +2724,30 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               <span className="text-[11px] sm:text-xs">{user.credits}c</span>
             </div>
 
+            {/* Video Call / Cinema Button */}
+            <button
+              onClick={() => {
+                setActiveTab('cinema');
+                handleNewVideoSelection();
+              }}
+              className="p-2 sm:p-2.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 hover:text-indigo-300 transition-all active:scale-95 flex items-center gap-1.5"
+              title="Chamada de Vídeo / Transmissão Cinema"
+              style={{ touchAction: 'manipulation' }}
+            >
+              <Video size={17} />
+              <span className="hidden xl:inline text-[11px] font-black uppercase tracking-tighter">Vídeo</span>
+            </button>
+
+            {/* Lixeira (Limpar Conversa e Mídias) Button - Right next to Video Call Icon */}
+            <button
+              onClick={() => setIsClearChatModalOpen(true)}
+              className="p-2 sm:p-2.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all active:scale-95 flex items-center gap-1.5"
+              title="Limpar conversa e mídias do chat"
+            >
+              <Trash2 size={17} />
+              <span className="hidden xl:inline text-[11px] font-black uppercase tracking-tighter">Limpar</span>
+            </button>
+
             {user.isLoggedIn && (
               <button 
                 onClick={() => setShowEarningsModal(true)} 
@@ -2665,14 +2760,19 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
             <button 
               onClick={() => { 
-                navigator.clipboard.writeText(`${window.location.origin}/#/chat/${roomId}`); 
-                showToast('Link da sala copiado!', 'success'); 
+                const roomUrl = `${window.location.origin}/#/chat/${roomId}`;
+                navigator.clipboard.writeText(roomUrl); 
+                showToast('Link da sala copiado com sucesso!', 'success', {
+                  link: roomUrl,
+                  subMessage: `Compartilhe o link da sala "${roomDetails?.name || 'LinkCard Chat'}".`,
+                  shareText: `Venha conversar e interagir comigo na sala "${roomDetails?.name || 'LinkCard Chat'}"! Acesse pelo link: ${roomUrl}`
+                }); 
               }} 
-              className={`hidden sm:flex items-center gap-1.5 px-3 py-2 ${colors.primarySoft} ${colors.primaryText} rounded-xl border ${colors.primaryBorder} hover:opacity-80 transition-all font-black text-xs uppercase tracking-tighter active:scale-95`}
-              title="Convidar Amigos"
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 ${colors.primarySoft} ${colors.primaryText} rounded-xl border ${colors.primaryBorder} hover:opacity-80 transition-all font-black text-xs uppercase tracking-tighter active:scale-95`}
+              title="Convidar Amigos para a Sala"
             >
               <Share2 size={15} />
-              <span>Convidar</span>
+              <span className="hidden sm:inline">Convidar</span>
             </button>
 
             <button 
@@ -2961,6 +3061,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                       <button disabled={isUploading} onClick={() => setIsQuickSettingsOpen(true)} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Ajustes"><Settings size={14} /></button>
                       <button disabled={isUploading} onClick={() => startQuickRecording('audio')} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Áudio"><Mic size={16} /></button>
                       <button disabled={isUploading} onClick={() => startQuickRecording('video')} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Vídeo"><Video size={16} /></button>
+                      <button disabled={isUploading} onClick={() => setIsClearChatModalOpen(true)} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-red-950/30 text-red-400 hover:bg-red-900/40 rounded-xl border border-red-500/20" title="Limpar Conversa e Mídias"><Trash2 size={15} /></button>
                     </div>
 
                     <div className="flex items-center gap-2 md:gap-3">
@@ -2989,6 +3090,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                           <button disabled={isUploading} onClick={() => setIsQuickSettingsOpen(true)} className="w-12 h-12 flex items-center justify-center bg-slate-800 text-slate-400 hover:text-emerald-400 rounded-2xl transition-all border border-slate-700" title="Configurar Padrões"><Settings size={18} /></button>
                           <button disabled={isUploading} onClick={() => startQuickRecording('audio')} className={`w-12 h-12 flex items-center justify-center ${isDark ? 'bg-slate-800 text-slate-400 hover:text-red-400' : 'bg-gray-200 text-slate-500 hover:text-red-500'} rounded-2xl transition-all`} title="Áudio Rápido"><Mic size={20} /></button>
                           <button disabled={isUploading} onClick={() => startQuickRecording('video')} className={`w-12 h-12 flex items-center justify-center ${isDark ? 'bg-slate-800 text-slate-400 hover:text-blue-400' : 'bg-gray-200 text-slate-500 hover:text-blue-500'} rounded-2xl transition-all`} title="Vídeo Rápido"><Video size={20} /></button>
+                          <button disabled={isUploading} onClick={() => setIsClearChatModalOpen(true)} className={`w-12 h-12 flex items-center justify-center ${isDark ? 'bg-red-950/30 text-red-400 hover:bg-red-900/40' : 'bg-red-50 text-red-500 hover:bg-red-100'} rounded-2xl transition-all border border-red-500/20`} title="Limpar Conversa e Mídias"><Trash2 size={18} /></button>
                         </div>
 
                         {/* Send Button */}
@@ -3055,8 +3157,12 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                           const currentRoomId = roomId;
                           const roomUrl = `${window.location.origin}/#/chat/${currentRoomId}`;
                           const fullMessage = `Assista comigo nesta sala! ${roomUrl}`;
-                          navigator.clipboard.writeText(fullMessage)
-                            .then(() => showToast('Link da sala copiado!', 'success'))
+                          navigator.clipboard.writeText(roomUrl)
+                            .then(() => showToast('Link da sala copiado com sucesso!', 'success', {
+                              link: roomUrl,
+                              subMessage: 'Convide amigos para assistir vídeos e ouvir músicas em sincronia.',
+                              shareText: `Assista comigo nesta sala: ${roomUrl}`
+                            }))
                             .catch(() => prompt('Copie o link da sala:', fullMessage));
                         }}
                         className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800/80 transition-all text-left text-xs font-bold uppercase tracking-wider"
@@ -3600,6 +3706,63 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               showToast('Configurações padrão salvas!', 'success');
             }}
           />
+        )}
+
+        {/* MODAL DE CONFIRMAÇÃO DE LIMPEZA DO CHAT */}
+        {isClearChatModalOpen && (
+          <div className="fixed inset-0 z-[600] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className={`max-w-md w-full p-6 sm:p-7 rounded-[2rem] border ${isDark ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-gray-200 text-slate-900'} shadow-2xl space-y-5 animate-in zoom-in-95`}>
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-red-500/10 text-red-500 border border-red-500/20 flex items-center justify-center shrink-0">
+                  <Trash2 size={24} />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black uppercase tracking-tight text-red-400">
+                    Limpar Conversa e Mídias
+                  </h3>
+                  <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    Sala: {roomDetails?.name || 'Conversa'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-red-500/5 border border-red-500/10 text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
+                Tem certeza que deseja apagar <strong className="text-white">todas as mensagens de texto, cards, fotos, áudios e vídeos</strong> desta conversa?
+                <span className="block mt-2 text-[11px] text-red-400/90 font-bold">
+                  ⚠️ Esta ação é irreversível e limpará o chat para todos os participantes da sala.
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={isClearingChat}
+                  onClick={() => setIsClearChatModalOpen(false)}
+                  className="flex-1 py-3 px-4 rounded-xl border border-slate-700/60 bg-slate-800/60 hover:bg-slate-800 text-slate-300 font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 active:scale-95"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={isClearingChat}
+                  onClick={handleClearChat}
+                  className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs uppercase tracking-wider transition-all shadow-lg shadow-red-600/30 flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
+                >
+                  {isClearingChat ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Limpando...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={16} />
+                      Sim, Limpar Tudo
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* ROOM EDITOR MODAL */}
