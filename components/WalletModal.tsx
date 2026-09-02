@@ -35,6 +35,7 @@ interface WalletModalProps {
   hasFreeSales?: boolean;
   claimTimer?: number | null;
   onRefreshHistory?: () => void;
+  theme?: 'dark' | 'light';
 }
 
 export const WalletModal: React.FC<WalletModalProps> = ({
@@ -50,8 +51,10 @@ export const WalletModal: React.FC<WalletModalProps> = ({
   salesHistory = [],
   hasFreeSales = false,
   claimTimer = null,
-  onRefreshHistory
+  onRefreshHistory,
+  theme = 'dark'
 }) => {
+  const isDark = theme === 'dark';
   const [activeTab, setActiveTab] = useState<'recharge' | 'earnings'>(initialTab);
 
   // PIX Recharge State
@@ -247,30 +250,44 @@ export const WalletModal: React.FC<WalletModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[600] flex items-center justify-center p-0 sm:p-4 bg-black/95 sm:bg-black/90 sm:backdrop-blur-xl animate-in fade-in duration-200 overflow-hidden">
-      <div className="bg-[#0b1329] border-0 sm:border border-slate-800 rounded-none sm:rounded-[2.5rem] w-full h-full sm:h-auto max-w-2xl sm:max-h-[92vh] shadow-2xl relative flex flex-col overflow-hidden animate-in zoom-in-95">
+    <div className="fixed inset-0 z-[600] flex items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 overflow-hidden">
+      <div className={`border-0 sm:border rounded-none sm:rounded-[2.5rem] w-full h-full sm:h-auto max-w-2xl sm:max-h-[92vh] shadow-2xl relative flex flex-col overflow-hidden animate-in zoom-in-95 ${
+        isDark ? 'bg-[#0b1329] border-slate-800 text-white' : 'bg-white border-gray-200 text-slate-900'
+      }`}>
         
         {/* TOP HEADER */}
-        <div className="p-3.5 sm:p-5 border-b border-white/10 flex items-center justify-between bg-slate-900/95 gap-2 shrink-0 z-20">
+        <div className={`p-3.5 sm:p-5 border-b flex items-center justify-between gap-2 shrink-0 z-20 ${
+          isDark ? 'border-white/10 bg-slate-900/95' : 'border-gray-200 bg-white'
+        }`}>
           <div className="flex items-center gap-2">
             <button 
               type="button"
               onClick={onClose} 
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 border border-slate-700/80 text-slate-200 hover:bg-slate-700 hover:text-white transition-all text-xs font-bold shrink-0 active:scale-95"
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border transition-all text-xs font-bold shrink-0 active:scale-95 ${
+                isDark 
+                  ? 'bg-slate-800 border-slate-700/80 text-slate-200 hover:bg-slate-700 hover:text-white' 
+                  : 'bg-gray-100 border-gray-200 text-slate-700 hover:bg-gray-200'
+              }`}
               title="Voltar"
             >
               <ArrowLeft size={16} />
               <span className="font-bold text-xs uppercase">Voltar</span>
             </button>
-            <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+            <div className={`w-10 h-10 rounded-2xl border flex items-center justify-center shrink-0 ${
+              isDark ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-emerald-50 border-emerald-200 text-emerald-600'
+            }`}>
               <Wallet size={20} />
             </div>
             <div>
-              <h3 className="text-base sm:text-lg font-black text-white uppercase tracking-tight leading-tight">
+              <h3 className={`text-base sm:text-lg font-black uppercase tracking-tight leading-tight ${
+                isDark ? 'text-white' : 'text-slate-900'
+              }`}>
                 CARTEIRA & FINANÇAS
               </h3>
-              <p className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                SALDO: <span className="text-emerald-400 font-black">{user.credits} CR</span> • GANHOS: <span className="text-blue-400 font-black">{user.earnings} CR</span>
+              <p className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${
+                isDark ? 'text-slate-400' : 'text-slate-500'
+              }`}>
+                SALDO: <span className="text-emerald-500 font-black">{user.credits} CR</span> • GANHOS: <span className="text-blue-500 font-black">{user.earnings} CR</span>
               </p>
             </div>
           </div>
@@ -278,7 +295,11 @@ export const WalletModal: React.FC<WalletModalProps> = ({
           <button 
             type="button"
             onClick={onClose} 
-            className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-slate-800 hover:bg-red-500/20 hover:text-red-400 border border-slate-700/80 rounded-xl text-slate-300 transition-all shrink-0 active:scale-95"
+            className={`w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center border rounded-xl transition-all shrink-0 active:scale-95 ${
+              isDark 
+                ? 'bg-slate-800 hover:bg-red-500/20 hover:text-red-400 border-slate-700/80 text-slate-300' 
+                : 'bg-gray-100 hover:bg-red-50 hover:text-red-500 border-gray-200 text-slate-600'
+            }`}
             title="Fechar"
           >
             <X size={18} />
@@ -286,14 +307,16 @@ export const WalletModal: React.FC<WalletModalProps> = ({
         </div>
 
         {/* TAB SWITCHER */}
-        <div className="p-2 sm:p-3 bg-slate-900/60 border-b border-white/5 flex gap-2 shrink-0">
+        <div className={`p-2 sm:p-3 border-b flex gap-2 shrink-0 ${
+          isDark ? 'bg-slate-900/60 border-white/5' : 'bg-gray-50 border-gray-200'
+        }`}>
           <button
             type="button"
             onClick={() => { setActiveTab('recharge'); setActivePayment(null); }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 border ${
               activeTab === 'recharge'
-                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
-                : 'bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-800'
+                ? 'bg-emerald-600 text-white border-emerald-600 shadow-md'
+                : (isDark ? 'bg-slate-800/80 border-slate-700/60 text-slate-400 hover:text-white' : 'bg-white border-gray-200 text-slate-600 hover:bg-gray-100')
             }`}
           >
             <Zap size={15} />
@@ -303,10 +326,10 @@ export const WalletModal: React.FC<WalletModalProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('earnings')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 border ${
               activeTab === 'earnings'
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                : 'bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-800'
+                ? 'bg-blue-600 text-white border-blue-600 shadow-md'
+                : (isDark ? 'bg-slate-800/80 border-slate-700/60 text-slate-400 hover:text-white' : 'bg-white border-gray-200 text-slate-600 hover:bg-gray-100')
             }`}
           >
             <DollarSign size={15} />
@@ -321,21 +344,29 @@ export const WalletModal: React.FC<WalletModalProps> = ({
           {activeTab === 'recharge' && (
             <div className="space-y-6 animate-in fade-in">
               {/* CURRENT BALANCE BANNER */}
-              <div className="bg-gradient-to-r from-emerald-500/10 via-slate-900 to-emerald-500/5 border border-emerald-500/20 p-5 rounded-3xl flex items-center justify-between">
+              <div className={`border p-5 rounded-3xl flex items-center justify-between shadow-sm ${
+                isDark 
+                  ? 'bg-gradient-to-r from-emerald-500/10 via-slate-900 to-emerald-500/5 border-emerald-500/20' 
+                  : 'bg-emerald-50/80 border-emerald-200'
+              }`}>
                 <div>
-                  <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block">Seu Saldo Disponível</span>
+                  <span className={`text-[10px] font-black uppercase tracking-widest block ${
+                    isDark ? 'text-emerald-400' : 'text-emerald-700'
+                  }`}>Seu Saldo Disponível</span>
                   <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-4xl font-black text-white">{user.credits}</span>
-                    <span className="text-xs font-black text-emerald-500 uppercase tracking-wider">Créditos (CR)</span>
+                    <span className={`text-4xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{user.credits}</span>
+                    <span className="text-xs font-black text-emerald-600 uppercase tracking-wider">Créditos (CR)</span>
                   </div>
                 </div>
-                <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                  isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'
+                }`}>
                   <Zap size={24} />
                 </div>
               </div>
 
               {!user.isLoggedIn && (
-                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-amber-300 text-xs font-bold flex items-center justify-between">
+                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-amber-500 text-xs font-bold flex items-center justify-between">
                   <span>Modo Visitante: Faça login para vincular seus créditos à sua conta.</span>
                   <button onClick={openAuth} className="px-3 py-1.5 bg-amber-500 text-slate-950 font-black rounded-lg uppercase text-[10px]">Entrar</button>
                 </div>
@@ -344,8 +375,10 @@ export const WalletModal: React.FC<WalletModalProps> = ({
               {/* PIX PAYMENT SECTION */}
               {!activePayment ? (
                 <div>
-                  <h4 className="text-xs font-black text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <QrCode size={15} className="text-emerald-400" />
+                  <h4 className={`text-xs font-black uppercase tracking-wider mb-3 flex items-center gap-2 ${
+                    isDark ? 'text-slate-300' : 'text-slate-700'
+                  }`}>
+                    <QrCode size={15} className="text-emerald-500" />
                     Escolha um pacote e pague via PIX
                   </h4>
 
@@ -361,22 +394,34 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                         type="button"
                         onClick={() => handleGeneratePix(pkg.amount)}
                         disabled={isGeneratingPix}
-                        className="p-4 rounded-2xl bg-slate-800/80 border border-slate-700 hover:border-emerald-500/60 hover:bg-emerald-500/10 transition-all flex items-center justify-between group active:scale-98 text-left"
+                        className={`p-4 rounded-2xl border transition-all flex items-center justify-between group active:scale-98 text-left ${
+                          isDark 
+                            ? 'bg-slate-800/80 border-slate-700 hover:border-emerald-500/60 hover:bg-emerald-500/10' 
+                            : 'bg-white border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/40 shadow-sm'
+                        }`}
                       >
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="text-white font-black text-lg">R$ {pkg.amount},00</span>
+                            <span className={`font-black text-lg ${isDark ? 'text-white' : 'text-slate-900'}`}>R$ {pkg.amount},00</span>
                             {pkg.bonus && (
-                              <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 text-[9px] font-black uppercase">
+                              <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase ${
+                                isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'
+                              }`}>
                                 {pkg.bonus}
                               </span>
                             )}
                           </div>
-                          <span className="text-xs text-slate-400 font-bold group-hover:text-emerald-300 mt-0.5 block">
+                          <span className={`text-xs font-bold mt-0.5 block ${
+                            isDark ? 'text-slate-400 group-hover:text-emerald-300' : 'text-slate-500 group-hover:text-emerald-700'
+                          }`}>
                             {pkg.credits} Créditos
                           </span>
                         </div>
-                        <div className="w-9 h-9 rounded-xl bg-slate-700/80 group-hover:bg-emerald-500 group-hover:text-slate-950 flex items-center justify-center text-slate-300 transition-all">
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
+                          isDark 
+                            ? 'bg-slate-700/80 group-hover:bg-emerald-500 group-hover:text-slate-950 text-slate-300' 
+                            : 'bg-gray-100 group-hover:bg-emerald-600 group-hover:text-white text-slate-600'
+                        }`}>
                           {isGeneratingPix && paymentAmount === pkg.amount ? (
                             <Loader2 size={16} className="animate-spin" />
                           ) : (
@@ -389,16 +434,22 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                 </div>
               ) : (
                 /* PIX QR CODE & CODE COPY */
-                <div className="bg-slate-900 border border-slate-700/80 p-5 sm:p-6 rounded-3xl text-center space-y-4 animate-in zoom-in-95">
-                  <div className="flex items-center justify-between pb-3 border-b border-white/5">
-                    <span className="text-xs font-black text-white uppercase tracking-wider">Pagamento via PIX</span>
-                    <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-xs font-black">
+                <div className={`border p-5 sm:p-6 rounded-3xl text-center space-y-4 animate-in zoom-in-95 ${
+                  isDark ? 'bg-slate-900 border-slate-700/80' : 'bg-gray-50 border-gray-200'
+                }`}>
+                  <div className={`flex items-center justify-between pb-3 border-b ${
+                    isDark ? 'border-white/5' : 'border-gray-200'
+                  }`}>
+                    <span className={`text-xs font-black uppercase tracking-wider ${
+                      isDark ? 'text-white' : 'text-slate-900'
+                    }`}>Pagamento via PIX</span>
+                    <span className="px-3 py-1 bg-emerald-500/20 text-emerald-600 rounded-full text-xs font-black">
                       R$ {activePayment.amount},00 = {activePayment.credits_amount} CR
                     </span>
                   </div>
 
                   {activePayment.qr_code_base64 ? (
-                    <div className="bg-white p-3 rounded-2xl w-48 h-48 mx-auto flex items-center justify-center shadow-lg">
+                    <div className="bg-white p-3 rounded-2xl w-48 h-48 mx-auto flex items-center justify-center shadow-lg border border-gray-200">
                       <img
                         src={`data:image/png;base64,${activePayment.qr_code_base64}`}
                         alt="QR Code PIX"
@@ -406,19 +457,25 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                       />
                     </div>
                   ) : (
-                    <div className="bg-white p-4 rounded-2xl w-48 h-48 mx-auto flex flex-col items-center justify-center shadow-lg text-slate-900">
+                    <div className="bg-white p-4 rounded-2xl w-48 h-48 mx-auto flex flex-col items-center justify-center shadow-lg text-slate-900 border border-gray-200">
                       <QrCode size={90} className="text-slate-900 mb-2" />
                       <span className="text-[10px] font-black uppercase text-slate-700">QR Code PIX</span>
                     </div>
                   )}
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Código PIX Copia e Cola</label>
+                    <label className={`text-[10px] font-black uppercase tracking-widest block ${
+                      isDark ? 'text-slate-400' : 'text-slate-500'
+                    }`}>Código PIX Copia e Cola</label>
                     <div className="flex gap-2">
                       <input
                         readOnly
                         value={activePayment.qr_code}
-                        className="bg-slate-800 border border-slate-700 text-slate-300 text-xs rounded-xl p-3 flex-1 font-mono outline-none truncate"
+                        className={`border text-xs rounded-xl p-3 flex-1 font-mono outline-none truncate ${
+                          isDark 
+                            ? 'bg-slate-800 border-slate-700 text-slate-300' 
+                            : 'bg-white border-gray-200 text-slate-900'
+                        }`}
                       />
                       <button
                         type="button"
@@ -440,7 +497,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                       type="button"
                       onClick={handleCheckStatus}
                       disabled={isCheckingStatus}
-                      className="flex-1 py-3 px-4 bg-emerald-500 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-emerald-400 active:scale-95 transition-all"
+                      className="flex-1 py-3 px-4 bg-emerald-500 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-emerald-400 active:scale-95 transition-all shadow-md"
                     >
                       {isCheckingStatus ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
                       <span>{isCheckingStatus ? 'Verificando...' : 'Já fiz o Pagamento'}</span>
@@ -449,7 +506,11 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setActivePayment(null)}
-                      className="py-3 px-4 bg-slate-800 text-slate-300 font-bold rounded-xl text-xs uppercase hover:bg-slate-700 active:scale-95 transition-all"
+                      className={`py-3 px-4 font-bold rounded-xl text-xs uppercase active:scale-95 transition-all border ${
+                        isDark 
+                          ? 'bg-slate-800 text-slate-300 hover:bg-slate-700 border-slate-700' 
+                          : 'bg-white text-slate-700 hover:bg-gray-100 border-gray-200 shadow-sm'
+                      }`}
                     >
                       Trocar Valor
                     </button>
@@ -463,26 +524,36 @@ export const WalletModal: React.FC<WalletModalProps> = ({
           {activeTab === 'earnings' && (
             <div className="space-y-6 animate-in fade-in">
               {/* AVAILABLE FOR WITHDRAWAL BANNER */}
-              <div className="bg-gradient-to-r from-blue-500/10 via-slate-900 to-indigo-500/5 border border-blue-500/20 p-5 rounded-3xl flex items-center justify-between">
+              <div className={`border p-5 rounded-3xl flex items-center justify-between shadow-sm ${
+                isDark 
+                  ? 'bg-gradient-to-r from-blue-500/10 via-slate-900 to-indigo-500/5 border-blue-500/20' 
+                  : 'bg-blue-50/80 border-blue-200'
+              }`}>
                 <div>
-                  <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest block">Disponível para Saque</span>
+                  <span className={`text-[10px] font-black uppercase tracking-widest block ${
+                    isDark ? 'text-blue-400' : 'text-blue-700'
+                  }`}>Disponível para Saque</span>
                   <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-4xl font-black text-white">{user.earnings}</span>
-                    <span className="text-xs font-black text-blue-400 uppercase tracking-wider">Créditos (CR)</span>
+                    <span className={`text-4xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{user.earnings}</span>
+                    <span className="text-xs font-black text-blue-500 uppercase tracking-wider">Créditos (CR)</span>
                   </div>
                 </div>
-                <div className="w-12 h-12 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                  isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-700'
+                }`}>
                   <DollarSign size={24} />
                 </div>
               </div>
 
               {/* FREE CREDITS CLAIM SECTION */}
-              <div className="bg-slate-800/60 border border-slate-700/80 p-4 sm:p-5 rounded-2xl space-y-3">
+              <div className={`border p-4 sm:p-5 rounded-2xl space-y-3 ${
+                isDark ? 'bg-slate-800/60 border-slate-700/80' : 'bg-gray-50 border-gray-200'
+              }`}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="text-xs font-black text-white uppercase tracking-tight">Créditos Gratuitos</h4>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                      Saldo: <span className="text-indigo-400">{user.free_credits || 0} CR</span>
+                    <h4 className={`text-xs font-black uppercase tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>Créditos Gratuitos</h4>
+                    <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Saldo: <span className="text-indigo-600 font-bold">{user.free_credits || 0} CR</span>
                     </p>
                   </div>
                   {updateFreeCredits && (
@@ -490,27 +561,33 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                       type="button"
                       onClick={() => updateFreeCredits(10, true)}
                       disabled={!!claimTimer || !hasFreeSales}
-                      className="px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
+                      className="px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95 shadow-md"
                     >
                       {claimTimer ? `Aguarde ${Math.floor(claimTimer / 60)}:${(claimTimer % 60).toString().padStart(2, '0')}` : 'Reivindicar +10 CR'}
                     </button>
                   )}
                 </div>
-                <p className="text-[9px] text-slate-400 leading-relaxed">
+                <p className={`text-[9px] leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                   Reivindique créditos grátis de usuários que interagiram com seus conteúdos e use para desbloquear cards de outros criadores!
                 </p>
               </div>
 
               {/* WITHDRAWAL FORM */}
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Método de Recebimento</label>
+              <div className={`border p-5 rounded-2xl space-y-4 ${
+                isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-200 shadow-sm'
+              }`}>
+                <label className={`text-[10px] font-black uppercase tracking-widest block ${
+                  isDark ? 'text-slate-400' : 'text-slate-500'
+                }`}>Método de Recebimento</label>
                 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <button
                     type="button"
                     onClick={() => setWithdrawalMethod('pix')}
                     className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-[10px] font-black uppercase transition-all ${
-                      withdrawalMethod === 'pix' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                      withdrawalMethod === 'pix' 
+                        ? 'bg-emerald-600 text-white' 
+                        : (isDark ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-gray-100 text-slate-600 hover:bg-gray-200')
                     }`}
                   >
                     <QrCode size={13} /> PIX
@@ -520,7 +597,9 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                     type="button"
                     onClick={() => setWithdrawalMethod('picpay')}
                     className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-[10px] font-black uppercase transition-all ${
-                      withdrawalMethod === 'picpay' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                      withdrawalMethod === 'picpay' 
+                        ? 'bg-emerald-600 text-white' 
+                        : (isDark ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-gray-100 text-slate-600 hover:bg-gray-200')
                     }`}
                   >
                     <Wallet size={13} /> PicPay
@@ -530,7 +609,9 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                     type="button"
                     onClick={() => setWithdrawalMethod('paypal')}
                     className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-[10px] font-black uppercase transition-all ${
-                      withdrawalMethod === 'paypal' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                      withdrawalMethod === 'paypal' 
+                        ? 'bg-blue-600 text-white' 
+                        : (isDark ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-gray-100 text-slate-600 hover:bg-gray-200')
                     }`}
                   >
                     <CreditCard size={13} /> PayPal
@@ -540,7 +621,9 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                     type="button"
                     onClick={() => setWithdrawalMethod('stripe')}
                     className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-[10px] font-black uppercase transition-all ${
-                      withdrawalMethod === 'stripe' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                      withdrawalMethod === 'stripe' 
+                        ? 'bg-indigo-600 text-white' 
+                        : (isDark ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-gray-100 text-slate-600 hover:bg-gray-200')
                     }`}
                   >
                     <CreditCard size={13} /> Stripe
@@ -549,7 +632,9 @@ export const WalletModal: React.FC<WalletModalProps> = ({
 
                 <div className="space-y-3">
                   <div>
-                    <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1">
+                    <label className={`text-[9px] font-bold uppercase block mb-1 ${
+                      isDark ? 'text-slate-400' : 'text-slate-600'
+                    }`}>
                       {withdrawalMethod === 'pix' ? 'Chave PIX (CPF, E-mail, Telefone ou Aleatória)' : 'E-mail da Conta de Recebimento'}
                     </label>
                     <input
@@ -557,27 +642,37 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                       onChange={(e) => setWithdrawalKey(e.target.value)}
                       onBlur={handleSavePaymentKey}
                       placeholder={withdrawalMethod === 'pix' ? 'Insira sua chave PIX' : 'seu-email@dominio.com'}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white text-xs font-bold outline-none focus:border-blue-500 transition-all"
+                      className={`w-full border rounded-xl p-3 text-xs font-bold outline-none focus:border-blue-500 transition-all ${
+                        isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-gray-50 border-gray-200 text-slate-900 focus:bg-white'
+                      }`}
                     />
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1">Seu CPF (Validação)</label>
+                      <label className={`text-[9px] font-bold uppercase block mb-1 ${
+                        isDark ? 'text-slate-400' : 'text-slate-600'
+                      }`}>Seu CPF (Validação)</label>
                       <input
                         value={withdrawalCpf}
                         onChange={(e) => setWithdrawalCpf(e.target.value)}
                         placeholder="000.000.000-00"
-                        className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white text-xs font-bold outline-none focus:border-blue-500 transition-all"
+                        className={`w-full border rounded-xl p-3 text-xs font-bold outline-none focus:border-blue-500 transition-all ${
+                          isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-gray-50 border-gray-200 text-slate-900 focus:bg-white'
+                        }`}
                       />
                     </div>
                     <div>
-                      <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1">Nome Completo</label>
+                      <label className={`text-[9px] font-bold uppercase block mb-1 ${
+                        isDark ? 'text-slate-400' : 'text-slate-600'
+                      }`}>Nome Completo</label>
                       <input
                         value={withdrawalFullName}
                         onChange={(e) => setWithdrawalFullName(e.target.value)}
                         placeholder="Nome completo do titular"
-                        className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white text-xs font-bold outline-none focus:border-blue-500 transition-all"
+                        className={`w-full border rounded-xl p-3 text-xs font-bold outline-none focus:border-blue-500 transition-all ${
+                          isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-gray-50 border-gray-200 text-slate-900 focus:bg-white'
+                        }`}
                       />
                     </div>
                   </div>
@@ -592,35 +687,43 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                   {withdrawalPending ? <Loader2 size={16} className="animate-spin" /> : <ArrowUpRight size={16} />}
                   <span>{withdrawalPending ? 'Processando...' : 'Solicitar Saque (24h)'}</span>
                 </button>
-                <p className="text-[9px] text-center text-slate-400 font-bold uppercase">
+                <p className={`text-[9px] text-center font-bold uppercase ${
+                  isDark ? 'text-slate-400' : 'text-slate-500'
+                }`}>
                   Mínimo para saque: 100 créditos • Pagamento processado em até 24 horas úteis.
                 </p>
               </div>
 
               {/* WITHDRAWAL HISTORY */}
               <div className="space-y-3">
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                <h4 className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 ${
+                  isDark ? 'text-slate-400' : 'text-slate-600'
+                }`}>
                   <History size={13} /> Histórico de Saques
                 </h4>
                 <div className="space-y-2 max-h-36 overflow-y-auto scrollbar-hide">
                   {withdrawalHistory.length === 0 ? (
-                    <p className="text-center text-slate-500 text-xs py-3 italic bg-slate-900/40 rounded-xl border border-slate-800">
+                    <p className={`text-center text-xs py-3 italic rounded-xl border ${
+                      isDark ? 'text-slate-500 bg-slate-900/40 border-slate-800' : 'text-slate-400 bg-gray-50 border-gray-200'
+                    }`}>
                       Nenhum saque solicitado ainda.
                     </p>
                   ) : (
                     withdrawalHistory.map((w) => (
-                      <div key={w.id} className="flex justify-between items-center p-3 bg-slate-800/60 rounded-xl border border-slate-700/60">
+                      <div key={w.id} className={`flex justify-between items-center p-3 rounded-xl border ${
+                        isDark ? 'bg-slate-800/60 border-slate-700/60' : 'bg-gray-50 border-gray-200'
+                      }`}>
                         <div className="flex flex-col">
-                          <span className="text-white font-bold text-xs">{w.amount} CR</span>
-                          <span className="text-[9px] text-slate-400 uppercase font-bold">{w.method}</span>
+                          <span className={`font-bold text-xs ${isDark ? 'text-white' : 'text-slate-900'}`}>{w.amount} CR</span>
+                          <span className={`text-[9px] uppercase font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{w.method}</span>
                         </div>
                         <div className="text-right">
                           <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
-                            w.status === 'paid' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+                            w.status === 'paid' ? 'bg-emerald-500/20 text-emerald-600' : 'bg-amber-500/20 text-amber-600'
                           }`}>
                             {w.status === 'paid' ? 'PAGO' : 'PROCESSANDO'}
                           </span>
-                          <span className="text-[8px] text-slate-400 block mt-0.5">
+                          <span className={`text-[8px] block mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                             {new Date(w.created_at).toLocaleDateString()}
                           </span>
                         </div>
@@ -632,29 +735,37 @@ export const WalletModal: React.FC<WalletModalProps> = ({
 
               {/* SALES HISTORY */}
               <div className="space-y-3">
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                <h4 className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 ${
+                  isDark ? 'text-slate-400' : 'text-slate-600'
+                }`}>
                   <ShoppingCart size={13} /> Vendas Realizadas (Compradores)
                 </h4>
                 <div className="space-y-2 max-h-36 overflow-y-auto scrollbar-hide">
                   {salesHistory.length === 0 ? (
-                    <p className="text-center text-slate-500 text-xs py-3 italic bg-slate-900/40 rounded-xl border border-slate-800">
+                    <p className={`text-center text-xs py-3 italic rounded-xl border ${
+                      isDark ? 'text-slate-500 bg-slate-900/40 border-slate-800' : 'text-slate-400 bg-gray-50 border-gray-200'
+                    }`}>
                       Nenhuma venda registrada ainda.
                     </p>
                   ) : (
                     salesHistory.map((sale) => (
-                      <div key={sale.id} className="flex justify-between items-center p-3 bg-slate-800/60 rounded-xl border border-slate-700/60">
+                      <div key={sale.id} className={`flex justify-between items-center p-3 rounded-xl border ${
+                        isDark ? 'bg-slate-800/60 border-slate-700/60' : 'bg-gray-50 border-gray-200'
+                      }`}>
                         <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-xs">
+                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs ${
+                            isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-700'
+                          }`}>
                             {sale.buyer_name ? sale.buyer_name.charAt(0).toUpperCase() : '?'}
                           </div>
                           <div className="flex flex-col max-w-[150px]">
-                            <span className="text-white font-bold text-xs truncate">{sale.buyer_name || 'Usuário'}</span>
-                            <span className="text-[9px] text-slate-400 truncate">{sale.card_title}</span>
+                            <span className={`font-bold text-xs truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{sale.buyer_name || 'Usuário'}</span>
+                            <span className={`text-[9px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{sale.card_title}</span>
                           </div>
                         </div>
                         <div className="text-right">
-                          <span className="text-emerald-400 font-black text-xs">+{sale.amount} CR</span>
-                          <span className="text-[8px] text-slate-400 block mt-0.5">
+                          <span className="text-emerald-500 font-black text-xs">+{sale.amount} CR</span>
+                          <span className={`text-[8px] block mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                             {new Date(sale.created_at).toLocaleDateString()}
                           </span>
                         </div>
