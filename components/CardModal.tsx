@@ -13,6 +13,7 @@ interface CardModalProps {
   initialData?: MediaCard | null;
   onShowToast?: (message: string, type: 'success' | 'error' | 'info') => void;
   onNavigateTab?: (tab: 'chat' | 'showcase' | 'my_cards' | 'cinema') => void;
+  theme?: 'dark' | 'light';
 }
 
 const DEFAULT_SETTINGS_KEY = 'linkcard_defaults';
@@ -27,7 +28,8 @@ const CARD_COLORS = [
   '#000000', // Black
 ];
 
-const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initialData, onShowToast, onNavigateTab }) => {
+const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initialData, onShowToast, onNavigateTab, theme = 'dark' }) => {
+  const isDark = theme === 'dark';
   const [activeTab, setActiveTab] = useState<'create' | 'simple' | 'library'>('create');
   const [showSettings, setShowSettings] = useState(false);
 
@@ -632,15 +634,23 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
   ];
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center p-0 sm:p-4 bg-black/95 sm:bg-black/90 sm:backdrop-blur-xl overflow-hidden animate-in fade-in duration-300">
-      <div className={`bg-[#0f172a] border-0 sm:border border-slate-800 rounded-none sm:rounded-[2rem] w-full h-full sm:h-[92vh] ${activeTab === 'create' ? 'sm:max-w-6xl' : 'sm:max-w-4xl'} shadow-2xl flex flex-col relative overflow-hidden`}>
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md overflow-hidden animate-in fade-in duration-300">
+      <div className={`border-0 sm:border rounded-none sm:rounded-[2rem] w-full h-full sm:h-[92vh] ${activeTab === 'create' ? 'sm:max-w-6xl' : 'sm:max-w-4xl'} shadow-2xl flex flex-col relative overflow-hidden ${
+        isDark ? 'bg-[#0f172a] border-slate-800 text-white' : 'bg-white border-gray-200 text-slate-900'
+      }`}>
 
         {/* Top Navigation Bar */}
-        <div className="p-3 sm:p-4 border-b border-white/10 flex items-center justify-between bg-slate-900/95 gap-2 shrink-0 z-20">
+        <div className={`p-3 sm:p-4 border-b flex items-center justify-between gap-2 shrink-0 z-20 ${
+          isDark ? 'border-white/10 bg-slate-900/95' : 'border-gray-200 bg-white'
+        }`}>
           <button 
             type="button"
             onClick={onClose} 
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 border border-slate-700/80 text-slate-200 hover:bg-slate-700 hover:text-white transition-all text-xs font-bold shrink-0 active:scale-95"
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border transition-all text-xs font-bold shrink-0 active:scale-95 ${
+              isDark 
+                ? 'bg-slate-800 border-slate-700/80 text-slate-200 hover:bg-slate-700 hover:text-white' 
+                : 'bg-gray-100 border-gray-200 text-slate-700 hover:bg-gray-200'
+            }`}
             title="Voltar"
           >
             <ArrowLeft size={16} />
@@ -651,21 +661,33 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
             <button 
               type="button"
               onClick={() => setActiveTab('create')} 
-              className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shrink-0 active:scale-95 ${activeTab === 'create' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-400 bg-slate-800/60 hover:bg-slate-800'}`}
+              className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shrink-0 active:scale-95 border ${
+                activeTab === 'create' 
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-600/30' 
+                  : (isDark ? 'text-slate-400 bg-slate-800/60 border-slate-700/60 hover:bg-slate-800 hover:text-white' : 'text-slate-600 bg-gray-100 border-gray-200 hover:bg-gray-200')
+              }`}
             >
               <LayoutGrid size={13} /> <span>Avançado</span>
             </button>
             <button 
               type="button"
               onClick={() => setActiveTab('simple')} 
-              className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shrink-0 active:scale-95 ${activeTab === 'simple' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30' : 'text-slate-400 bg-slate-800/60 hover:bg-slate-800'}`}
+              className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shrink-0 active:scale-95 border ${
+                activeTab === 'simple' 
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-600/30' 
+                  : (isDark ? 'text-slate-400 bg-slate-800/60 border-slate-700/60 hover:bg-slate-800 hover:text-white' : 'text-slate-600 bg-gray-100 border-gray-200 hover:bg-gray-200')
+              }`}
             >
               <Zap size={13} /> <span>Simplifica</span>
             </button>
             <button 
               type="button"
               onClick={() => setActiveTab('library')} 
-              className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shrink-0 active:scale-95 ${activeTab === 'library' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 bg-slate-800/60 hover:bg-slate-800'}`}
+              className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shrink-0 active:scale-95 border ${
+                activeTab === 'library' 
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-600/30' 
+                  : (isDark ? 'text-slate-400 bg-slate-800/60 border-slate-700/60 hover:bg-slate-800 hover:text-white' : 'text-slate-600 bg-gray-100 border-gray-200 hover:bg-gray-200')
+              }`}
             >
               <FolderOpen size={13} /> <span>Meus Cards</span>
             </button>
@@ -674,7 +696,11 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
           <button 
             type="button"
             onClick={onClose} 
-            className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-slate-800 hover:bg-red-500/20 hover:text-red-400 border border-slate-700/80 rounded-xl text-slate-300 transition-all shrink-0 active:scale-95"
+            className={`w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center border rounded-xl transition-all shrink-0 active:scale-95 ${
+              isDark 
+                ? 'bg-slate-800 hover:bg-red-500/20 hover:text-red-400 border-slate-700/80 text-slate-300' 
+                : 'bg-gray-100 hover:bg-red-50 hover:text-red-500 border-gray-200 text-slate-600'
+            }`}
             title="Fechar"
           >
             <X size={18} />
@@ -687,21 +713,35 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
           {activeTab === 'simple' && (
             <div className="flex flex-col items-center justify-center h-full space-y-8 animate-in fade-in zoom-in-95">
               <div className="text-center space-y-2">
-                <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Modo Rápido</h3>
-                <p className="text-slate-400 text-xs">Selecione seu arquivo e o card será criado com seus padrões.</p>
+                <h3 className={`text-2xl font-black uppercase tracking-tighter ${isDark ? 'text-white' : 'text-slate-900'}`}>Modo Rápido</h3>
+                <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Selecione seu arquivo e o card será criado com seus padrões.</p>
               </div>
               <div className="w-full max-w-sm">
-                <button onClick={() => fileInputRef.current?.click()} className="w-full aspect-square rounded-[3rem] border-2 border-dashed border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 flex flex-col items-center justify-center gap-4 transition-all group cursor-pointer">
+                <button 
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()} 
+                  className={`w-full aspect-square rounded-[3rem] border-2 border-dashed flex flex-col items-center justify-center gap-4 transition-all group cursor-pointer ${
+                    isDark 
+                      ? 'border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10' 
+                      : 'border-emerald-400 bg-emerald-50/70 hover:bg-emerald-50'
+                  }`}
+                >
                   <div className="p-6 rounded-full bg-emerald-500 text-white shadow-xl group-hover:scale-110 transition-transform">
                     <Upload size={48} />
                   </div>
                   <div className="text-center">
-                    <span className="text-sm font-black uppercase tracking-widest text-emerald-500 block">Upload Universal</span>
-                    <span className="text-[10px] font-bold text-slate-500 mt-2 block opacity-70">MP3 • JPG • MP4</span>
+                    <span className="text-sm font-black uppercase tracking-widest text-emerald-600 block">Upload Universal</span>
+                    <span className={`text-[10px] font-bold mt-2 block ${isDark ? 'text-slate-500 opacity-70' : 'text-slate-400'}`}>MP3 • JPG • MP4</span>
                   </div>
                 </button>
               </div>
-              <button onClick={() => setShowSettings(true)} className="flex items-center gap-2 px-6 py-3 rounded-full bg-slate-800 text-slate-400 text-[10px] font-black uppercase hover:bg-slate-700 transition-all">
+              <button 
+                type="button"
+                onClick={() => setShowSettings(true)} 
+                className={`flex items-center gap-2 px-6 py-3 rounded-full text-[10px] font-black uppercase transition-all border ${
+                  isDark ? 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700' : 'bg-gray-100 text-slate-700 hover:bg-gray-200 border-gray-200 shadow-sm'
+                }`}
+              >
                 <Settings size={14} /> Configurar Padrões
               </button>
               <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept="image/*,video/*,audio/*" />
@@ -712,28 +752,38 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
           {activeTab === 'library' && (
             <div className="space-y-6">
               <div className="flex justify-between items-center">
-                <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest">Gerenciar Conteúdo</h3>
-                <button onClick={fetchMyCards} className="p-2 hover:bg-slate-800 rounded-full text-slate-500"><RefreshCw size={16} /></button>
+                <h3 className={`text-sm font-black uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-600'}`}>Gerenciar Conteúdo</h3>
+                <button 
+                  type="button"
+                  onClick={fetchMyCards} 
+                  className={`p-2 rounded-full transition-colors ${
+                    isDark ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-gray-100 text-slate-600'
+                  }`}
+                >
+                  <RefreshCw size={16} />
+                </button>
               </div>
               {loadingCards ? (
                 <div className="text-center py-20 text-slate-500 text-xs font-bold uppercase animate-pulse">Carregando...</div>
               ) : myCards.length === 0 ? (
-                <div className="text-center py-20 text-slate-500 text-xs font-bold uppercase">Nenhum card criado ainda.</div>
+                <div className={`text-center py-20 text-xs font-bold uppercase ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum card criado ainda.</div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {myCards.map(card => (
-                    <div key={card.id} className="p-4 bg-slate-800/40 border border-slate-700/50 rounded-2xl flex gap-4 items-center group">
-                      <div className="w-16 h-16 rounded-xl bg-black overflow-hidden relative">
+                    <div key={card.id} className={`p-4 rounded-2xl flex gap-4 items-center group border transition-all ${
+                      isDark ? 'bg-slate-800/40 border-slate-700/50' : 'bg-white border-gray-200 shadow-sm'
+                    }`}>
+                      <div className="w-16 h-16 rounded-xl bg-black overflow-hidden relative shrink-0">
                         <img src={card.thumbnail} className="w-full h-full object-cover opacity-60" />
                         <div className="absolute inset-0 flex items-center justify-center text-white">{card.type === CardType.VIDEO ? <PlayCircle size={20} /> : <ImageIcon size={20} />}</div>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-white font-bold text-sm truncate">{card.title}</h4>
-                        <p className="text-slate-500 text-xs truncate">{card.group || 'Geral'} • {card.creditCost}cr</p>
+                        <h4 className={`font-bold text-sm truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{card.title}</h4>
+                        <p className={`text-xs truncate ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>{card.group || 'Geral'} • {card.creditCost}cr</p>
                       </div>
                       <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleEditCard(card)} className="p-2 bg-blue-600/20 text-blue-500 rounded-lg hover:bg-blue-600 hover:text-white"><Edit size={16} /></button>
-                        <button onClick={() => handleDeleteCard(card.id)} className="p-2 bg-red-600/20 text-red-500 rounded-lg hover:bg-red-600 hover:text-white"><Trash2 size={16} /></button>
+                        <button type="button" onClick={() => handleEditCard(card)} className="p-2 bg-blue-600/20 text-blue-500 rounded-lg hover:bg-blue-600 hover:text-white"><Edit size={16} /></button>
+                        <button type="button" onClick={() => handleDeleteCard(card.id)} className="p-2 bg-red-600/20 text-red-500 rounded-lg hover:bg-red-600 hover:text-white"><Trash2 size={16} /></button>
                       </div>
                     </div>
                   ))}
@@ -749,15 +799,18 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
               <div className="flex-1 overflow-y-auto scrollbar-hide pr-2">
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Tipo de Conteúdo</label>
+                    <label className={`text-[10px] font-black uppercase tracking-[0.2em] ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Tipo de Conteúdo</label>
                     <div className="grid grid-cols-4 gap-2">
                       {cardTypes.map(ct => (
                         <button
                           key={ct.id}
                           type="button"
                           onClick={() => { setType(ct.id); resetMedia(); }}
-                          className={`flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border transition-all ${type === ct.id ? 'bg-blue-600 border-blue-400 text-white' : 'bg-slate-800/40 border-slate-700/50 text-slate-500 hover:border-slate-500'
-                            }`}
+                          className={`flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border transition-all ${
+                            type === ct.id 
+                              ? 'bg-blue-600 border-blue-500 text-white shadow-md shadow-blue-500/20' 
+                              : (isDark ? 'bg-slate-800/40 border-slate-700/50 text-slate-400 hover:border-slate-500 hover:text-white' : 'bg-gray-50 border-gray-200 text-slate-600 hover:border-gray-300 hover:bg-gray-100')
+                          }`}
                         >
                           {ct.icon}
                           <span className="text-[8px] font-black uppercase tracking-widest">{ct.label}</span>
@@ -767,36 +820,70 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Captura & Mídia</label>
+                    <label className={`text-[10px] font-black uppercase tracking-[0.2em] ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Captura & Mídia</label>
                     <div className="grid grid-cols-4 gap-2">
-                      <button type="button" onClick={() => fileInputRef.current?.click()} className="h-16 rounded-xl border-2 border-dashed border-slate-700 hover:border-blue-500/50 hover:bg-blue-500/5 flex flex-col items-center justify-center gap-1 transition-all">
-                        <Upload size={16} className="text-slate-400" />
-                        <span className="text-[8px] font-black uppercase text-slate-500">Upload</span>
+                      <button 
+                        type="button" 
+                        onClick={() => fileInputRef.current?.click()} 
+                        className={`h-16 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1 transition-all ${
+                          isDark 
+                            ? 'border-slate-700 hover:border-blue-500/50 hover:bg-blue-500/5 bg-slate-800/20' 
+                            : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50/50 bg-gray-50'
+                        }`}
+                      >
+                        <Upload size={16} className={isDark ? 'text-slate-400' : 'text-slate-600'} />
+                        <span className={`text-[8px] font-black uppercase ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Upload</span>
                       </button>
 
                       {/* Botão Gravar Áudio */}
-                      <button type="button" onClick={() => { setMediaAction('audio_rec'); setType(CardType.AUDIO); handleStartCapture('audio'); }} className={`h-16 rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-1 ${mediaAction === 'audio_rec' ? 'border-red-500 bg-red-500/10' : 'border-slate-700 hover:border-red-500/50 hover:bg-red-500/5'}`}>
-                        <Mic size={16} className={mediaAction === 'audio_rec' ? "text-red-500" : "text-slate-400"} />
-                        <span className="text-[8px] font-black uppercase text-slate-500">Áudio</span>
+                      <button 
+                        type="button" 
+                        onClick={() => { setMediaAction('audio_rec'); setType(CardType.AUDIO); handleStartCapture('audio'); }} 
+                        className={`h-16 rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-1 ${
+                          mediaAction === 'audio_rec' 
+                            ? 'border-red-500 bg-red-500/10' 
+                            : (isDark ? 'border-slate-700 hover:border-red-500/50 hover:bg-red-500/5 bg-slate-800/20' : 'border-gray-300 hover:border-red-500 hover:bg-red-50/50 bg-gray-50')
+                        }`}
+                      >
+                        <Mic size={16} className={mediaAction === 'audio_rec' ? "text-red-500" : (isDark ? "text-slate-400" : "text-slate-600")} />
+                        <span className={`text-[8px] font-black uppercase ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Áudio</span>
                       </button>
 
                       {/* Botão Gravar Vídeo */}
-                      <button type="button" onClick={() => { setMediaAction('video_rec'); setType(CardType.VIDEO); handleStartCapture('video'); }} className={`h-16 rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-1 ${mediaAction === 'video_rec' ? 'border-blue-500 bg-blue-500/10' : 'border-slate-700 hover:border-blue-500/50 hover:bg-blue-500/5'}`}>
-                        <Video size={16} className={mediaAction === 'video_rec' ? "text-blue-500" : "text-slate-400"} />
-                        <span className="text-[8px] font-black uppercase text-slate-500">Vídeo</span>
+                      <button 
+                        type="button" 
+                        onClick={() => { setMediaAction('video_rec'); setType(CardType.VIDEO); handleStartCapture('video'); }} 
+                        className={`h-16 rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-1 ${
+                          mediaAction === 'video_rec' 
+                            ? 'border-blue-500 bg-blue-500/10' 
+                            : (isDark ? 'border-slate-700 hover:border-blue-500/50 hover:bg-blue-500/5 bg-slate-800/20' : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50/50 bg-gray-50')
+                        }`}
+                      >
+                        <Video size={16} className={mediaAction === 'video_rec' ? "text-blue-500" : (isDark ? "text-slate-400" : "text-slate-600")} />
+                        <span className={`text-[8px] font-black uppercase ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Vídeo</span>
                       </button>
 
                       {/* Botão Tirar Foto */}
-                      <button type="button" onClick={() => { setMediaAction('photo_cap'); setType(CardType.IMAGE); handleStartCapture('photo'); }} className={`h-16 rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-1 ${mediaAction === 'photo_cap' ? 'border-purple-500 bg-purple-500/10' : 'border-slate-700 hover:border-purple-500/50 hover:bg-purple-500/5'}`}>
-                        <Camera size={16} className={mediaAction === 'photo_cap' ? "text-purple-500" : "text-slate-400"} />
-                        <span className="text-[8px] font-black uppercase text-slate-500">Foto</span>
+                      <button 
+                        type="button" 
+                        onClick={() => { setMediaAction('photo_cap'); setType(CardType.IMAGE); handleStartCapture('photo'); }} 
+                        className={`h-16 rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-1 ${
+                          mediaAction === 'photo_cap' 
+                            ? 'border-purple-500 bg-purple-500/10' 
+                            : (isDark ? 'border-slate-700 hover:border-purple-500/50 hover:bg-purple-500/5 bg-slate-800/20' : 'border-gray-300 hover:border-purple-500 hover:bg-purple-50/50 bg-gray-50')
+                        }`}
+                      >
+                        <Camera size={16} className={mediaAction === 'photo_cap' ? "text-purple-500" : (isDark ? "text-slate-400" : "text-slate-600")} />
+                        <span className={`text-[8px] font-black uppercase ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Foto</span>
                       </button>
 
                       <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
                     </div>
 
                     {mediaAction && (
-                      <div className={`relative bg-black rounded-2xl overflow-hidden border border-slate-700 flex items-center justify-center mt-4 transition-all ${isRecording || !capturedMedia ? 'aspect-video h-48' : 'aspect-auto h-auto min-h-[12rem] bg-slate-900'}`}>
+                      <div className={`relative bg-black rounded-2xl overflow-hidden border flex items-center justify-center mt-4 transition-all ${
+                        isDark ? 'border-slate-700' : 'border-gray-300'
+                      } ${isRecording || !capturedMedia ? 'aspect-video h-48' : 'aspect-auto h-auto min-h-[12rem] bg-slate-900'}`}>
 
                         {/* LIVE STREAM VIEW */}
                         {stream && (
@@ -823,7 +910,7 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
                             ) : (
                               <img src={capturedMedia} className="w-full rounded-xl object-contain max-h-60" />
                             )}
-                            <div className="text-center text-[10px] text-slate-500 uppercase font-black">Preview da Captura</div>
+                            <div className="text-center text-[10px] text-slate-400 uppercase font-black">Preview da Captura</div>
                           </div>
                         )}
 
@@ -856,71 +943,147 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
                   </div>
 
                   <div className="space-y-4">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Visual & Organização</label>
+                    <label className={`text-[10px] font-black uppercase tracking-[0.2em] ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Visual & Organização</label>
 
                     <div className="flex items-center gap-4">
-                      <button type="button" onClick={() => thumbInputRef.current?.click()} className="flex items-center gap-3 px-4 py-3 rounded-2xl border border-slate-700 hover:bg-slate-800 transition-all group flex-1">
-                        <div className="w-10 h-10 rounded-lg bg-slate-800 overflow-hidden relative border border-slate-600 group-hover:border-slate-500">
+                      <button 
+                        type="button" 
+                        onClick={() => thumbInputRef.current?.click()} 
+                        className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all group flex-1 ${
+                          isDark 
+                            ? 'border-slate-700 hover:bg-slate-800 bg-slate-800/20' 
+                            : 'border-gray-200 hover:bg-gray-50 bg-white shadow-sm'
+                        }`}
+                      >
+                        <div className={`w-10 h-10 rounded-lg overflow-hidden relative border flex items-center justify-center ${
+                          isDark ? 'bg-slate-800 border-slate-600 group-hover:border-slate-500' : 'bg-gray-100 border-gray-200'
+                        }`}>
                           {customThumbnail ? (
                             <img src={customThumbnail} className="w-full h-full object-cover" />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-slate-500"><ImageIcon size={16} /></div>
+                            <div className={isDark ? "text-slate-400" : "text-slate-500"}><ImageIcon size={16} /></div>
                           )}
                         </div>
                         <div className="text-left">
-                          <span className="text-[9px] font-black uppercase text-slate-400 block group-hover:text-white">Thumbnail</span>
-                          <span className="text-[8px] text-slate-600 block">Personalizada</span>
+                          <span className={`text-[9px] font-black uppercase block ${isDark ? 'text-slate-300 group-hover:text-white' : 'text-slate-700 group-hover:text-slate-900'}`}>Thumbnail</span>
+                          <span className={`text-[8px] block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Personalizada</span>
                         </div>
                       </button>
                       <input type="file" ref={thumbInputRef} onChange={handleThumbUpload} className="hidden" accept="image/*" />
                     </div>
 
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => setLayoutStyle('classic')} className={`flex-1 p-2 rounded-xl text-[9px] font-black uppercase border ${layoutStyle === 'classic' ? 'bg-emerald-600/20 border-emerald-500 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-500'}`}>Clássico</button>
-                      <button type="button" onClick={() => setLayoutStyle('minimal')} className={`flex-1 p-2 rounded-xl text-[9px] font-black uppercase border ${layoutStyle === 'minimal' ? 'bg-pink-600/20 border-pink-500 text-pink-400' : 'bg-slate-800 border-slate-700 text-slate-500'}`}>Minimal</button>
+                      <button 
+                        type="button" 
+                        onClick={() => setLayoutStyle('classic')} 
+                        className={`flex-1 p-2.5 rounded-xl text-[9px] font-black uppercase border transition-all ${
+                          layoutStyle === 'classic' 
+                            ? (isDark ? 'bg-emerald-600/20 border-emerald-500 text-emerald-400' : 'bg-emerald-50 border-emerald-500 text-emerald-700 font-bold') 
+                            : (isDark ? 'bg-slate-800/40 border-slate-700 text-slate-400' : 'bg-gray-100 border-gray-200 text-slate-600')
+                        }`}
+                      >
+                        Clássico
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => setLayoutStyle('minimal')} 
+                        className={`flex-1 p-2.5 rounded-xl text-[9px] font-black uppercase border transition-all ${
+                          layoutStyle === 'minimal' 
+                            ? (isDark ? 'bg-pink-600/20 border-pink-500 text-pink-400' : 'bg-pink-50 border-pink-500 text-pink-700 font-bold') 
+                            : (isDark ? 'bg-slate-800/40 border-slate-700 text-slate-400' : 'bg-gray-100 border-gray-200 text-slate-600')
+                        }`}
+                      >
+                        Minimal
+                      </button>
                     </div>
                     <div className="flex gap-2 overflow-x-auto pb-2">
                       {CARD_COLORS.map(color => (
-                        <button key={color} type="button" onClick={() => setCardColor(color)} className={`w-6 h-6 rounded-full border-2 ${cardColor === color ? 'border-white scale-110' : 'border-transparent opacity-50'}`} style={{ backgroundColor: color }} />
+                        <button key={color} type="button" onClick={() => setCardColor(color)} className={`w-6 h-6 rounded-full border-2 transition-transform ${cardColor === color ? 'border-blue-500 scale-110 shadow' : 'border-transparent opacity-60'}`} style={{ backgroundColor: color }} />
                       ))}
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
-                      <input placeholder="Grupo (Ex: VIP)" value={group} onChange={e => setGroup(e.target.value)} className="w-full bg-slate-800/40 border border-slate-700/50 rounded-xl p-2 text-xs text-white outline-none" />
-                      <input placeholder="Tags (sep. vírgula)" value={tags} onChange={e => setTags(e.target.value)} className="w-full bg-slate-800/40 border border-slate-700/50 rounded-xl p-2 text-xs text-white outline-none" />
+                      <input 
+                        placeholder="Grupo (Ex: VIP)" 
+                        value={group} 
+                        onChange={e => setGroup(e.target.value)} 
+                        className={`w-full border rounded-xl p-2 text-xs outline-none transition-colors ${
+                          isDark 
+                            ? 'bg-slate-800/40 border-slate-700/50 text-white placeholder-slate-500 focus:border-blue-500' 
+                            : 'bg-gray-50 border-gray-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:bg-white'
+                        }`} 
+                      />
+                      <input 
+                        placeholder="Tags (sep. vírgula)" 
+                        value={tags} 
+                        onChange={e => setTags(e.target.value)} 
+                        className={`w-full border rounded-xl p-2 text-xs outline-none transition-colors ${
+                          isDark 
+                            ? 'bg-slate-800/40 border-slate-700/50 text-white placeholder-slate-500 focus:border-blue-500' 
+                            : 'bg-gray-50 border-gray-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:bg-white'
+                        }`} 
+                      />
                     </div>
 
                     <div className="space-y-1">
-                      <div className="flex justify-between text-[9px] font-black uppercase text-slate-500"><span>Blur</span><span>{blurLevel}%</span></div>
-                      <input type="range" min="0" max="100" value={blurLevel} onChange={e => setBlurLevel(parseInt(e.target.value))} className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer" />
+                      <div className={`flex justify-between text-[9px] font-black uppercase ${isDark ? 'text-slate-400' : 'text-slate-600'}`}><span>Blur</span><span>{blurLevel}%</span></div>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="100" 
+                        value={blurLevel} 
+                        onChange={e => setBlurLevel(parseInt(e.target.value))} 
+                        className={`w-full h-1.5 rounded-lg appearance-none cursor-pointer ${
+                          isDark ? 'bg-slate-700 accent-blue-500' : 'bg-gray-200 accent-blue-600'
+                        }`} 
+                      />
                     </div>
                   </div>
 
                   <div className="space-y-4">
-                    <input placeholder="Título" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-800/40 border border-slate-700/50 rounded-xl p-3 text-xs text-white font-bold outline-none" required />
-                    <textarea placeholder="Descrição" value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-slate-800/40 border border-slate-700/50 rounded-xl p-3 text-xs h-16 text-white outline-none" />
+                    <input 
+                      placeholder="Título" 
+                      value={title} 
+                      onChange={e => setTitle(e.target.value)} 
+                      className={`w-full border rounded-xl p-3 text-xs font-bold outline-none transition-colors ${
+                        isDark 
+                          ? 'bg-slate-800/40 border-slate-700/50 text-white placeholder-slate-500 focus:border-blue-500' 
+                          : 'bg-gray-50 border-gray-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:bg-white'
+                      }`} 
+                      required 
+                    />
+                    <textarea 
+                      placeholder="Descrição" 
+                      value={description} 
+                      onChange={e => setDescription(e.target.value)} 
+                      className={`w-full border rounded-xl p-3 text-xs h-16 outline-none transition-colors ${
+                        isDark 
+                          ? 'bg-slate-800/40 border-slate-700/50 text-white placeholder-slate-500 focus:border-blue-500' 
+                          : 'bg-gray-50 border-gray-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:bg-white'
+                      }`} 
+                    />
 
                     <div className="grid grid-cols-2 gap-2">
-                      <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-2">
-                        <label className="text-[8px] font-black text-slate-500 uppercase block mb-1">Preço</label>
-                        <input type="number" value={creditCost} onChange={e => setCreditCost(parseInt(e.target.value))} className="w-full bg-transparent text-sm font-black text-emerald-400 outline-none" />
+                      <div className={`border rounded-xl p-2 ${isDark ? 'bg-slate-800/40 border-slate-700/50' : 'bg-gray-50 border-gray-200'}`}>
+                        <label className={`text-[8px] font-black uppercase block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Preço (Créditos)</label>
+                        <input type="number" value={creditCost} onChange={e => setCreditCost(parseInt(e.target.value))} className="w-full bg-transparent text-sm font-black text-emerald-500 outline-none" />
                       </div>
-                      <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-2">
-                        <label className="text-[8px] font-black text-slate-500 uppercase block mb-1">Tempo (s)</label>
-                        <input type="number" value={duration} onChange={e => setDuration(parseInt(e.target.value))} className="w-full bg-transparent text-sm font-black text-white outline-none" />
+                      <div className={`border rounded-xl p-2 ${isDark ? 'bg-slate-800/40 border-slate-700/50' : 'bg-gray-50 border-gray-200'}`}>
+                        <label className={`text-[8px] font-black uppercase block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Tempo (s)</label>
+                        <input type="number" value={duration} onChange={e => setDuration(parseInt(e.target.value))} className={`w-full bg-transparent text-sm font-black outline-none ${isDark ? 'text-white' : 'text-slate-900'}`} />
                       </div>
-                      <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-2">
-                        <label className="text-[8px] font-black text-slate-500 uppercase block mb-1">Auto-Del (min)</label>
-                        <input type="number" value={expiry} onChange={e => setExpiry(parseInt(e.target.value))} className="w-full bg-transparent text-sm font-black text-red-400 outline-none" placeholder="0 = off" />
+                      <div className={`border rounded-xl p-2 ${isDark ? 'bg-slate-800/40 border-slate-700/50' : 'bg-gray-50 border-gray-200'}`}>
+                        <label className={`text-[8px] font-black uppercase block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Auto-Del (min)</label>
+                        <input type="number" value={expiry} onChange={e => setExpiry(parseInt(e.target.value))} className="w-full bg-transparent text-sm font-black text-red-500 outline-none" placeholder="0 = off" />
                       </div>
-                      <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-2">
-                        <label className="text-[8px] font-black text-slate-500 uppercase block mb-1">Repetir (min)</label>
-                        <input type="number" value={repeatInterval} onChange={e => setRepeatInterval(parseInt(e.target.value))} className="w-full bg-transparent text-sm font-black text-orange-400 outline-none" placeholder="0 = off" />
+                      <div className={`border rounded-xl p-2 ${isDark ? 'bg-slate-800/40 border-slate-700/50' : 'bg-gray-50 border-gray-200'}`}>
+                        <label className={`text-[8px] font-black uppercase block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Repetir (min)</label>
+                        <input type="number" value={repeatInterval} onChange={e => setRepeatInterval(parseInt(e.target.value))} className="w-full bg-transparent text-sm font-black text-orange-500 outline-none" placeholder="0 = off" />
                       </div>
                     </div>
                   </div>
 
-                  <button type="submit" disabled={isUploading} className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl uppercase tracking-[0.2em] text-[10px] hover:bg-blue-500 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                  <button type="submit" disabled={isUploading} className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl uppercase tracking-[0.2em] text-[10px] hover:bg-blue-500 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all">
                     {isUploading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
                     {isUploading ? 'Enviando...' : (initialData ? 'Republicar' : 'Publicar Card')}
                   </button>
@@ -928,8 +1091,10 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
               </div>
 
               {/* Preview Section */}
-              <div className="hidden lg:flex flex-col flex-1 items-center justify-center bg-black/40 rounded-[2rem] border border-white/5 p-8 relative overflow-hidden">
-                <div className="absolute top-4 left-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Live Preview</div>
+              <div className={`hidden lg:flex flex-col flex-1 items-center justify-center rounded-[2rem] border p-8 relative overflow-hidden ${
+                isDark ? 'bg-black/40 border-white/5' : 'bg-gray-50 border-gray-200 shadow-inner'
+              }`}>
+                <div className={`absolute top-4 left-4 text-[10px] font-black uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Live Preview</div>
                 <div className="pointer-events-none transform scale-110">
                   <MediaCardItem
                     card={previewCard}
@@ -944,7 +1109,9 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
         </div>
 
         {/* --- PERSISTENT BOTTOM NAVIGATION BAR --- */}
-        <div className="border-t border-slate-800 bg-[#090f1f]/95 backdrop-blur-md px-3 py-2 sm:py-2.5 flex items-center justify-around shrink-0 z-20">
+        <div className={`border-t px-3 py-2 sm:py-2.5 flex items-center justify-around shrink-0 z-20 ${
+          isDark ? 'border-slate-800 bg-[#090f1f]/95 text-slate-400' : 'border-gray-200 bg-white/95 text-slate-600'
+        }`}>
           <button
             type="button"
             onClick={() => {
@@ -954,7 +1121,9 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
                 onClose();
               }
             }}
-            className="flex flex-col items-center justify-center gap-1 py-1.5 px-3 sm:px-5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/60 active:scale-95 transition-all"
+            className={`flex flex-col items-center justify-center gap-1 py-1.5 px-3 sm:px-5 rounded-xl transition-all active:scale-95 ${
+              isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800/60' : 'text-slate-600 hover:text-slate-900 hover:bg-gray-100'
+            }`}
             title="Ir para o Feed de Mensagens"
           >
             <MessageSquare size={18} />
@@ -970,7 +1139,9 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
                 onClose();
               }
             }}
-            className="flex flex-col items-center justify-center gap-1 py-1.5 px-3 sm:px-5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/60 active:scale-95 transition-all"
+            className={`flex flex-col items-center justify-center gap-1 py-1.5 px-3 sm:px-5 rounded-xl transition-all active:scale-95 ${
+              isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800/60' : 'text-slate-600 hover:text-slate-900 hover:bg-gray-100'
+            }`}
             title="Ir para a Vitrine"
           >
             <LayoutGrid size={18} />
@@ -984,8 +1155,8 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
             }}
             className={`flex flex-col items-center justify-center gap-1 py-1.5 px-3 sm:px-5 rounded-xl transition-all active:scale-95 ${
               activeTab === 'library'
-                ? 'text-indigo-400 bg-indigo-500/15 border border-indigo-500/30 font-bold'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                ? (isDark ? 'text-indigo-400 bg-indigo-500/15 border border-indigo-500/30 font-bold' : 'text-indigo-600 bg-indigo-50 border border-indigo-200 font-bold')
+                : (isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800/60' : 'text-slate-600 hover:text-slate-900 hover:bg-gray-100')
             }`}
             title="Ver Meus Cards"
           >
@@ -1002,7 +1173,9 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
                 onClose();
               }
             }}
-            className="flex flex-col items-center justify-center gap-1 py-1.5 px-3 sm:px-5 rounded-xl text-slate-400 hover:text-indigo-400 hover:bg-slate-800/60 active:scale-95 transition-all"
+            className={`flex flex-col items-center justify-center gap-1 py-1.5 px-3 sm:px-5 rounded-xl transition-all active:scale-95 ${
+              isDark ? 'text-slate-400 hover:text-indigo-400 hover:bg-slate-800/60' : 'text-slate-600 hover:text-indigo-600 hover:bg-gray-100'
+            }`}
             title="Ir para o Cinema"
           >
             <Tv size={18} />
@@ -1014,6 +1187,7 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
         {showSettings && (
           <QuickSettingsModal
             onClose={() => setShowSettings(false)}
+            theme={theme}
             onSave={(newDefaults) => {
               setDefaults(newDefaults);
               localStorage.setItem(DEFAULT_SETTINGS_KEY, JSON.stringify(newDefaults));

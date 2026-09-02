@@ -3716,6 +3716,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
         {isCardModalOpen && (
           <CardModal
+            theme={theme}
             onClose={() => { setIsCardModalOpen(false); setEditingCard(null); }}
             onSubmit={onCardCreated}
             userId={user.id}
@@ -3732,6 +3733,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
         {isQuickSettingsOpen && (
           <QuickSettingsModal
+            theme={theme}
             onClose={() => setIsQuickSettingsOpen(false)}
             initialDefaults={quickDefaults}
             onSave={(newDefaults: CardDefaults) => {
@@ -3751,18 +3753,20 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                   <Trash2 size={24} />
                 </div>
                 <div>
-                  <h3 className="text-base sm:text-lg font-black uppercase tracking-tight text-red-400">
+                  <h3 className="text-base sm:text-lg font-black uppercase tracking-tight text-red-500">
                     Limpar Conversa e Mídias
                   </h3>
-                  <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  <p className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                     Sala: {roomDetails?.name || 'Conversa'}
                   </p>
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-red-500/5 border border-red-500/10 text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
-                Tem certeza que deseja apagar <strong className="text-white">todas as mensagens de texto, cards, fotos, áudios e vídeos</strong> desta conversa?
-                <span className="block mt-2 text-[11px] text-red-400/90 font-bold">
+              <div className={`p-4 rounded-2xl border text-xs sm:text-sm leading-relaxed font-medium ${
+                isDark ? 'bg-red-500/5 border-red-500/10 text-slate-300' : 'bg-red-50 border-red-100 text-slate-700'
+              }`}>
+                Tem certeza que deseja apagar <strong className={isDark ? 'text-white' : 'text-slate-900'}>todas as mensagens de texto, cards, fotos, áudios e vídeos</strong> desta conversa?
+                <span className="block mt-2 text-[11px] text-red-500 font-bold">
                   ⚠️ Esta ação é irreversível e limpará o chat para todos os participantes da sala.
                 </span>
               </div>
@@ -3772,7 +3776,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                   type="button"
                   disabled={isClearingChat}
                   onClick={() => setIsClearChatModalOpen(false)}
-                  className="flex-1 py-3 px-4 rounded-xl border border-slate-700/60 bg-slate-800/60 hover:bg-slate-800 text-slate-300 font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 active:scale-95"
+                  className={`flex-1 py-3 px-4 rounded-xl border font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 active:scale-95 ${
+                    isDark ? 'border-slate-700/60 bg-slate-800/60 hover:bg-slate-800 text-slate-300' : 'border-gray-200 bg-gray-100 hover:bg-gray-200 text-slate-700'
+                  }`}
                 >
                   Cancelar
                 </button>
@@ -3801,22 +3807,30 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
         {/* ROOM EDITOR MODAL */}
         {isEditingRoom && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 sm:p-4 bg-black/90 sm:backdrop-blur-md animate-in fade-in">
-            <div className="bg-slate-900 border-0 sm:border border-slate-800 p-5 sm:p-8 rounded-none sm:rounded-[2.5rem] w-full h-full sm:h-auto max-w-md shadow-2xl relative flex flex-col max-h-full sm:max-h-[90vh] overflow-y-auto scrollbar-hide">
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+            <div className={`p-5 sm:p-8 rounded-none sm:rounded-[2.5rem] w-full h-full sm:h-auto max-w-md shadow-2xl relative flex flex-col max-h-full sm:max-h-[90vh] overflow-y-auto scrollbar-hide border-0 sm:border ${
+              isDark ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-gray-200 text-slate-900'
+            }`}>
               
               {/* Modal Header */}
-              <div className="flex items-center justify-between mb-6 pb-3 border-b border-slate-800">
+              <div className={`flex items-center justify-between mb-6 pb-3 border-b ${
+                isDark ? 'border-slate-800' : 'border-gray-200'
+              }`}>
                 <button 
                   onClick={() => setIsEditingRoom(false)} 
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition-all text-xs font-bold active:scale-95"
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold active:scale-95 transition-all ${
+                    isDark ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white' : 'bg-gray-100 border-gray-200 text-slate-700 hover:bg-gray-200'
+                  }`}
                 >
                   <ArrowLeft size={16} />
                   <span>Voltar</span>
                 </button>
-                <h3 className="text-base sm:text-lg font-black text-white uppercase tracking-tighter text-center">Customizar Sala</h3>
+                <h3 className={`text-base sm:text-lg font-black uppercase tracking-tighter text-center ${isDark ? 'text-white' : 'text-slate-900'}`}>Customizar Sala</h3>
                 <button 
                   onClick={() => setIsEditingRoom(false)} 
-                  className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-all active:scale-95"
+                  className={`p-2 rounded-full transition-all active:scale-95 border ${
+                    isDark ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700' : 'bg-gray-100 border-gray-200 text-slate-600 hover:text-slate-900 hover:bg-gray-200'
+                  }`}
                 >
                   <X size={18} />
                 </button>
@@ -3827,12 +3841,14 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                 <div className="flex flex-col items-center gap-2">
                   <div
                     onClick={() => roomImageUploadRef.current?.click()}
-                    className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-3xl sm:rounded-[2.5rem] border-2 border-slate-700 hover:border-blue-500 bg-slate-800 flex items-center justify-center cursor-pointer group overflow-hidden shadow-2xl transition-all"
+                    className={`relative w-28 h-28 sm:w-32 sm:h-32 rounded-3xl sm:rounded-[2.5rem] border-2 flex items-center justify-center cursor-pointer group overflow-hidden shadow-2xl transition-all ${
+                      isDark ? 'border-slate-700 hover:border-blue-500 bg-slate-800' : 'border-gray-300 hover:border-blue-500 bg-gray-50'
+                    }`}
                   >
                     {roomDetails?.image_url ? (
                       <img src={roomDetails.image_url} alt="Avatar" className="w-full h-full object-cover" />
                     ) : (
-                      <Camera size={36} className="text-slate-500 group-hover:text-blue-500 transition-colors" />
+                      <Camera size={36} className={`${isDark ? 'text-slate-500' : 'text-slate-400'} group-hover:text-blue-500 transition-colors`} />
                     )}
                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
                       <Upload size={22} className="text-white" />
@@ -3840,7 +3856,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                     </div>
                   </div>
                   <div className="text-center">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Foto / Avatar da Sala</span>
+                    <span className={`text-[10px] font-black uppercase tracking-widest block ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Foto / Avatar da Sala</span>
                     <span className="text-[8px] text-slate-500 font-bold block">Clique no avatar para fazer upload de nova foto</span>
                   </div>
                 </div>
@@ -3849,7 +3865,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                 <div className="flex flex-col items-center gap-2">
                   <div
                     onClick={() => bgUploadRef.current?.click()}
-                    className="relative w-full h-24 rounded-2xl border-2 border-dashed border-slate-700 hover:border-emerald-500 bg-slate-800 flex items-center justify-center cursor-pointer group overflow-hidden transition-all"
+                    className={`relative w-full h-24 rounded-2xl border-2 border-dashed flex items-center justify-center cursor-pointer group overflow-hidden transition-all ${
+                      isDark ? 'border-slate-700 hover:border-emerald-500 bg-slate-800' : 'border-gray-300 hover:border-emerald-500 bg-gray-50'
+                    }`}
                   >
                     {roomDetails?.background_url ? (
                       <div className="relative w-full h-full">
@@ -3859,7 +3877,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2 text-slate-500 group-hover:text-emerald-400 transition-colors">
+                      <div className="flex items-center gap-2 text-slate-500 group-hover:text-emerald-500 transition-colors">
                         <ImageIcon size={24} />
                         <span className="text-xs font-bold">Enviar Imagem de Fundo</span>
                       </div>
@@ -3869,17 +3887,19 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                       <span className="text-[10px] font-black text-white uppercase">Alterar Fundo</span>
                     </div>
                   </div>
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Plano de Fundo (Banner)</span>
+                  <span className={`text-[10px] font-black uppercase tracking-widest ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Plano de Fundo (Banner)</span>
                 </div>
 
                 {/* Room Name Input */}
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">Nome da Sala</label>
+                  <label className={`text-[10px] font-black uppercase tracking-widest block mb-2 px-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Nome da Sala</label>
                   <input
                     value={tempRoomName}
                     onChange={(e) => setTempRoomName(e.target.value)}
                     placeholder="Ex: Minha Sala VIP"
-                    className="w-full bg-slate-800/80 border border-slate-700 focus:border-blue-500 rounded-2xl p-4 text-white text-sm outline-none transition-all font-bold"
+                    className={`w-full border focus:border-blue-500 rounded-2xl p-4 text-sm outline-none transition-all font-bold ${
+                      isDark ? 'bg-slate-800/80 border-slate-700 text-white placeholder-slate-500' : 'bg-gray-50 border-gray-200 text-slate-900 focus:bg-white placeholder-slate-400'
+                    }`}
                   />
                 </div>
 
@@ -3887,7 +3907,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                 <div className="flex gap-3 pt-2">
                   <button
                     onClick={() => setIsEditingRoom(false)}
-                    className="flex-1 py-3.5 sm:py-4 bg-slate-800 text-slate-400 font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-slate-700 hover:text-white transition-all active:scale-95"
+                    className={`flex-1 py-3.5 sm:py-4 font-black rounded-2xl uppercase tracking-widest text-xs transition-all active:scale-95 border ${
+                      isDark ? 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white' : 'bg-gray-100 border-gray-200 text-slate-600 hover:bg-gray-200 hover:text-slate-900'
+                    }`}
                   >
                     Cancelar
                   </button>
@@ -3907,20 +3929,33 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         {
           isRoomSelectorOpen && (
             <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm animate-in fade-in">
-              <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl w-full max-w-sm shadow-2xl relative">
-                <button onClick={() => setIsRoomSelectorOpen(false)} className="absolute top-4 right-4 p-2 bg-slate-800 rounded-full text-white hover:bg-slate-700 transition-all"><X size={16} /></button>
-                <h3 className="text-lg font-black text-white uppercase tracking-tighter mb-4 text-center">Enviar para...</h3>
+              <div className={`p-6 rounded-3xl w-full max-w-sm shadow-2xl relative border ${
+                isDark ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-gray-200 text-slate-900'
+              }`}>
+                <button 
+                  onClick={() => setIsRoomSelectorOpen(false)} 
+                  className={`absolute top-4 right-4 p-2 rounded-full transition-all border ${
+                    isDark ? 'bg-slate-800 border-slate-700 text-white hover:bg-slate-700' : 'bg-gray-100 border-gray-200 text-slate-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <X size={16} />
+                </button>
+                <h3 className={`text-lg font-black uppercase tracking-tighter mb-4 text-center ${isDark ? 'text-white' : 'text-slate-900'}`}>Enviar para...</h3>
                 <div className="space-y-2 max-h-60 overflow-y-auto scrollbar-hide">
                   {sessions.map(s => (
                     <button
                       key={s.id}
                       onClick={() => confirmInsertToRoom(s.id)}
-                      className="w-full p-3 rounded-xl bg-slate-800 hover:bg-emerald-600/20 hover:border-emerald-500/30 border border-slate-700 transition-all flex items-center gap-3 text-left group"
+                      className={`w-full p-3 rounded-xl border transition-all flex items-center gap-3 text-left group ${
+                        isDark 
+                          ? 'bg-slate-800 hover:bg-emerald-600/20 hover:border-emerald-500/30 border-slate-700' 
+                          : 'bg-gray-50 hover:bg-emerald-50 hover:border-emerald-300 border-gray-200'
+                      }`}
                     >
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${s.id.startsWith('priv-') ? 'bg-indigo-500/20 text-indigo-400' : 'bg-blue-500/20 text-blue-400'}`}>
                         {s.id.startsWith('priv-') ? <Settings size={14} /> : <MessageSquare size={14} />}
                       </div>
-                      <span className="text-sm font-bold text-slate-300 group-hover:text-emerald-400 truncate">{s.name}</span>
+                      <span className={`text-sm font-bold truncate group-hover:text-emerald-500 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{s.name}</span>
                     </button>
                   ))}
                 </div>
