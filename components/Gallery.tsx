@@ -4,7 +4,8 @@ import {
   ArrowLeft, Search, Grid, Play, Camera, Phone, Mic, 
   Image as ImageIcon, MessageSquare, Loader2, X, Check, 
   Lock, Sparkles, User as UserIcon, ExternalLink, ShieldCheck,
-  Volume2, Eye, Share2, Layers, QrCode, Zap, Copy, CheckCircle, RefreshCw
+  Volume2, Eye, Share2, Layers, QrCode, Zap, Copy, CheckCircle, RefreshCw,
+  Sun, Moon, Wallet
 } from 'lucide-react';
 import { User, MediaCard, CardType } from '../types';
 import { supabase } from '../lib/supabase';
@@ -17,6 +18,7 @@ interface GalleryProps {
   onShowToast?: (message: string, type?: ToastType, options?: ToastOptions) => void;
   updateCredits?: (amount: number) => Promise<void> | void;
   theme?: 'dark' | 'light';
+  toggleTheme?: () => void;
 }
 
 interface CreatorInfo {
@@ -26,7 +28,7 @@ interface CreatorInfo {
   cardCount: number;
 }
 
-const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, theme = 'dark' }) => {
+const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, theme = 'dark', toggleTheme }) => {
   const isDark = theme === 'dark';
   const navigate = useNavigate();
   const [cards, setCards] = useState<MediaCard[]>([]);
@@ -391,52 +393,80 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
       isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
     }`}>
       {/* HEADER */}
-      <header className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-5 mb-6 md:mb-8">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate('/')}
-            title="Voltar ao início"
-            className={`p-3 md:p-4 rounded-2xl md:rounded-3xl transition-all border shadow-xl flex-shrink-0 active:scale-95 ${
-              isDark 
-                ? 'bg-white/5 hover:bg-white/10 hover:border-indigo-500/30 border-white/10 text-white' 
-                : 'bg-white hover:bg-gray-100 hover:border-indigo-300 border-gray-200 text-slate-700'
-            }`}
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className={`text-2xl md:text-3xl font-black italic tracking-tighter uppercase leading-none flex items-center gap-2 ${
-                isDark ? 'text-white' : 'text-slate-900'
-              }`}>
-                Vitrine de Criadores
-              </h1>
-              <span className={`px-2.5 py-0.5 rounded-full border text-[10px] font-black tracking-wider uppercase ${
+      <header className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-5 mb-6 md:mb-8">
+        <div className="flex items-center justify-between md:justify-start gap-3 w-full md:w-auto">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <button
+              onClick={() => navigate('/')}
+              title="Voltar ao início"
+              className={`p-2.5 sm:p-3 md:p-4 rounded-2xl md:rounded-3xl transition-all border shadow-sm sm:shadow-xl flex-shrink-0 active:scale-95 ${
                 isDark 
-                  ? 'bg-indigo-500/20 border-indigo-500/30 text-indigo-300' 
-                  : 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                  ? 'bg-white/5 hover:bg-white/10 hover:border-indigo-500/30 border-white/10 text-white' 
+                  : 'bg-white hover:bg-gray-100 hover:border-indigo-300 border-gray-200 text-slate-700'
+              }`}
+            >
+              <ArrowLeft size={18} className="sm:w-5 sm:h-5" />
+            </button>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className={`text-xl sm:text-2xl md:text-3xl font-black italic tracking-tighter uppercase leading-none flex items-center gap-2 ${
+                  isDark ? 'text-white' : 'text-slate-900'
+                }`}>
+                  Vitrine de Criadores
+                </h1>
+                <span className={`px-2 sm:px-2.5 py-0.5 rounded-full border text-[9px] sm:text-[10px] font-black tracking-wider uppercase ${
+                  isDark 
+                    ? 'bg-indigo-500/20 border-indigo-500/30 text-indigo-300' 
+                    : 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                }`}>
+                  {cards.length} Mídias
+                </span>
+              </div>
+              <p className={`text-[8px] sm:text-[9px] md:text-[10px] font-bold uppercase tracking-[0.15em] sm:tracking-[0.2em] mt-1 flex items-center gap-1.5 ${
+                isDark ? 'text-indigo-400' : 'text-indigo-600'
               }`}>
-                {cards.length} Mídias
-              </span>
+                <Sparkles size={11} className="text-amber-400 shrink-0" />
+                <span className="truncate max-w-[210px] sm:max-w-none">Toque para ver mídias ou conversar com criadores</span>
+              </p>
             </div>
-            <p className={`text-[9px] md:text-[10px] font-bold uppercase tracking-[0.2em] mt-1.5 flex items-center gap-1.5 ${
-              isDark ? 'text-indigo-400' : 'text-indigo-600'
-            }`}>
-              <Sparkles size={12} className="text-amber-400" />
-              Toque na foto para ver mídias do criador ou no ícone de chat para conversar
-            </p>
+          </div>
+
+          {/* MOBILE TOP CONTROLS: WALLET + THEME */}
+          <div className="flex items-center gap-2 md:hidden">
+            {toggleTheme && (
+              <button
+                type="button"
+                onClick={toggleTheme}
+                title={isDark ? "Ativar Modo Claro" : "Ativar Modo Escuro"}
+                className={`p-2.5 rounded-xl border transition-all active:scale-95 ${
+                  isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-200 text-slate-700 shadow-sm'
+                }`}
+              >
+                {isDark ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowQrCode(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-xs font-black transition-all active:scale-95 shadow-sm"
+              title="Carteira & Depositar Créditos"
+            >
+              <Wallet size={15} />
+              <span className="font-black text-xs">{user.credits}c</span>
+            </button>
           </div>
         </div>
 
-        {/* SEARCH BAR */}
-        <div className="flex items-center gap-3 w-full md:w-auto">
+        {/* SEARCH BAR & DESKTOP CONTROLS */}
+        <div className="flex items-center gap-2.5 sm:gap-3 w-full md:w-auto">
           <div className="relative flex-1 md:w-80">
-            <Search className={`absolute left-4 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} size={16} />
+            <Search className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} size={16} />
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Buscar título, criador ou tag..."
-              className={`w-full pl-11 pr-9 py-3 border rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-medium shadow-sm ${
+              className={`w-full pl-10 pr-9 py-2.5 sm:py-3 border rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-medium shadow-sm ${
                 isDark 
                   ? 'bg-white/5 border-white/10 text-white placeholder-slate-500' 
                   : 'bg-white border-gray-200 text-slate-900 placeholder-slate-400'
@@ -450,6 +480,33 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
                 <X size={14} />
               </button>
             )}
+          </div>
+
+          {/* DESKTOP CONTROLS: THEME + WALLET DEPOSIT */}
+          <div className="hidden md:flex items-center gap-2.5">
+            {toggleTheme && (
+              <button
+                type="button"
+                onClick={toggleTheme}
+                title={isDark ? "Ativar Modo Claro" : "Ativar Modo Escuro"}
+                className={`p-3 rounded-2xl border transition-all active:scale-95 ${
+                  isDark ? 'bg-white/5 hover:bg-white/10 border-white/10 text-white' : 'bg-white hover:bg-gray-100 border-gray-200 text-slate-700 shadow-sm'
+                }`}
+              >
+                {isDark ? <Sun size={17} /> : <Moon size={17} />}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowQrCode(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-xs font-black cursor-pointer transition-all active:scale-95 shadow-sm"
+              title="Carteira & Depositar Créditos"
+            >
+              <Wallet size={16} />
+              <span className="font-black">{user.credits}c</span>
+              <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-lg">Depositar</span>
+            </button>
           </div>
         </div>
       </header>

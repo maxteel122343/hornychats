@@ -217,7 +217,7 @@ const App: React.FC = () => {
           />
           <Route
             path="/gallery"
-            element={<Gallery user={user} onShowToast={showToast} updateCredits={updateCredits} theme={theme} />}
+            element={<Gallery user={user} onShowToast={showToast} updateCredits={updateCredits} theme={theme} toggleTheme={toggleTheme} />}
           />
         </Routes>
         {isAuthModalOpen && <AuthModal onClose={() => setIsAuthModalOpen(false)} onShowToast={showToast} />}

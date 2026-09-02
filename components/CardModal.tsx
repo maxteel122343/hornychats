@@ -1101,6 +1101,7 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
                     canManage={false}
                     onUnlock={() => false}
                     isHostMode={false}
+                    theme={theme}
                   />
                 </div>
               </div>

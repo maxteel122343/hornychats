@@ -2541,9 +2541,35 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           )}
         </div>
         {!isSidebarCollapsed && (
-          <div className="text-center animate-in fade-in">
-            <h2 className={`text-xs font-black ${colors.textHighlight} uppercase tracking-[0.2em]`}>{user.name}</h2>
-            <div className="flex flex-col gap-1 mt-2"><p className={`text-[9px] ${colors.text} font-bold uppercase`}>{user.isLoggedIn ? 'Autenticado' : 'Visitante'}</p></div>
+          <div className="w-full text-center animate-in fade-in space-y-3">
+            <div>
+              <h2 className={`text-xs font-black ${colors.textHighlight} uppercase tracking-[0.2em]`}>{user.name}</h2>
+              <div className="flex flex-col gap-1 mt-1"><p className={`text-[9px] ${colors.text} font-bold uppercase`}>{user.isLoggedIn ? 'Autenticado' : 'Visitante'}</p></div>
+            </div>
+
+            {/* Wallet & Deposit Banner in Sidebar */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                openWallet('recharge');
+              }}
+              className="w-full flex items-center justify-between p-2.5 sm:p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-all active:scale-95 shadow-sm"
+              title="Carteira & Depositar Créditos"
+            >
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-xl bg-emerald-500/20 text-emerald-500">
+                  <Wallet size={16} />
+                </div>
+                <div className="text-left">
+                  <span className="text-[8px] font-black uppercase tracking-wider block text-slate-500 dark:text-slate-400">Saldo</span>
+                  <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">{user.credits} Créditos</span>
+                </div>
+              </div>
+              <span className="text-[9px] font-black uppercase tracking-wider bg-emerald-600 text-white dark:bg-emerald-500 dark:text-slate-950 px-2.5 py-1 rounded-xl shadow-sm">
+                Depositar
+              </span>
+            </button>
           </div>
         )}
       </div>
@@ -2729,15 +2755,15 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               {isDark ? <Sun size={17} /> : <Moon size={17} />}
             </button>
 
-            {/* Wallet / Credits Recharge Button */}
+            {/* Wallet / Credits Recharge Button - Always visible on mobile and desktop */}
             <button 
               type="button"
               onClick={() => openWallet('recharge')} 
-              className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 text-xs border border-emerald-500/20 font-black cursor-pointer transition-all active:scale-95 shrink-0"
-              title="Carteira & Recarregar Créditos"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs border border-emerald-500/30 font-black cursor-pointer transition-all active:scale-95 shrink-0 shadow-sm"
+              title="Carteira & Depositar Créditos"
             >
-              <Wallet size={15} />
-              <span className="text-[11px] sm:text-xs font-black">{user.credits}c</span>
+              <Wallet size={15} className="shrink-0 text-emerald-500" />
+              <span className="text-xs font-black">{user.credits}c</span>
             </button>
 
             {/* Earnings Dollar Button */}
@@ -2745,7 +2771,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               <button 
                 type="button"
                 onClick={() => openWallet('earnings')} 
-                className="flex items-center gap-1 px-2.5 py-1.5 sm:py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 rounded-xl border border-emerald-500/20 font-black active:scale-95 shrink-0"
+                className="flex items-center gap-1 px-2.5 py-1.5 sm:py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/20 font-black active:scale-95 shrink-0"
                 title="Central de Ganhos & Saques"
               >
                 <DollarSign size={15} />
@@ -2753,14 +2779,14 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               </button>
             )}
 
-            {/* Video Call / Cinema Button */}
+            {/* Video Call / Cinema Button (Desktop/Tablet, available in mobile bar) */}
             <button
               type="button"
               onClick={() => {
                 setActiveTab('cinema');
                 handleNewVideoSelection();
               }}
-              className="p-2 sm:p-2.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 hover:text-indigo-300 transition-all active:scale-95 flex items-center gap-1.5"
+              className="hidden sm:flex p-2 sm:p-2.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 hover:text-indigo-300 transition-all active:scale-95 items-center gap-1.5"
               title="Chamada de Vídeo / Transmissão Cinema"
               style={{ touchAction: 'manipulation' }}
             >
@@ -2768,11 +2794,11 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               <span className="hidden xl:inline text-[11px] font-black uppercase tracking-tighter">Vídeo</span>
             </button>
 
-            {/* Lixeira (Limpar Conversa e Mídias) Button - Right next to Video Call Icon */}
+            {/* Lixeira (Limpar Conversa e Mídias) Button - Desktop/Tablet, available in mobile bar */}
             <button
               type="button"
               onClick={() => setIsClearChatModalOpen(true)}
-              className="p-2 sm:p-2.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all active:scale-95 flex items-center gap-1.5"
+              className="hidden sm:flex p-2 sm:p-2.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all active:scale-95 items-center gap-1.5"
               title="Limpar conversa e mídias do chat"
             >
               <Trash2 size={17} />
@@ -2789,11 +2815,11 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                   shareText: `Venha conversar e interagir comigo na sala "${roomDetails?.name || 'LinkCard Chat'}"! Acesse pelo link: ${roomUrl}`
                 }); 
               }} 
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 ${colors.primarySoft} ${colors.primaryText} rounded-xl border ${colors.primaryBorder} hover:opacity-80 transition-all font-black text-xs uppercase tracking-tighter active:scale-95`}
+              className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-2 ${colors.primarySoft} ${colors.primaryText} rounded-xl border ${colors.primaryBorder} hover:opacity-80 transition-all font-black text-xs uppercase tracking-tighter active:scale-95`}
               title="Convidar Amigos para a Sala"
             >
               <Share2 size={15} />
-              <span className="hidden sm:inline">Convidar</span>
+              <span className="hidden md:inline">Convidar</span>
             </button>
 
             <button 
@@ -2885,6 +2911,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                           onInsertToRoom={handleInsertToRoom}
                           onSchedule={handleSchedule}
                           onShowToast={showToast}
+                          theme={theme}
                         />
                       )}
                       <span className={`text-[9px] ${colors.text} mt-2 uppercase font-black tracking-widest px-1 opacity-60`}>{msg.senderName} • {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -2894,7 +2921,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                 </div>
               ) : activeTab === 'showcase' ? (
                 <div className="max-w-6xl mx-auto w-full pb-24">
-                  <Gallery user={user} onShowToast={showToast} updateCredits={updateCredits} />
+                  <Gallery user={user} onShowToast={showToast} updateCredits={updateCredits} theme={theme} toggleTheme={toggleTheme} />
                 </div>
               ) : activeTab === 'cinema' ? (
                 isRoomDetailsLoading ? (
@@ -2971,6 +2998,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                             onEdit={() => handleEditCard(card)}
                             onDelete={() => handleDeleteCard(card.id)}
                             onShowToast={showToast}
+                            theme={theme}
                           />
                         </div>
                       ))}
@@ -3075,6 +3103,15 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                   <div className="flex flex-col gap-2 md:gap-3">
                     {/* Function Icons Bar (Visible on Mobile, Hidden on Desktop) */}
                     <div className="flex md:hidden items-center gap-2 overflow-x-auto pb-1 scrollbar-hide no-scrollbar -mx-2 px-2">
+                      <button 
+                        type="button" 
+                        onClick={() => openWallet('recharge')} 
+                        className="flex-shrink-0 h-9 px-2.5 flex items-center gap-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/30 text-xs font-black active:scale-95 shadow-sm" 
+                        title="Carteira & Depositar Créditos"
+                      >
+                        <Wallet size={15} className="text-emerald-500 shrink-0" />
+                        <span>{user.credits}c</span>
+                      </button>
                       <button disabled={isUploading} onClick={() => quickUploadRef.current?.click()} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Upload"><Upload size={16} /></button>
                       <button disabled={isUploading} onClick={() => startQuickRecording('photo')} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Foto"><Camera size={16} /></button>
                       <button disabled={isUploading} onClick={() => { setActiveTab('cinema'); handleNewVideoSelection(); }} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20" title="Subir Vídeo / Link" style={{touchAction:'manipulation'}}><Tv size={16} /></button>
@@ -3978,6 +4015,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           salesHistory={salesHistory}
           hasFreeSales={hasFreeSales}
           claimTimer={claimTimer}
+          theme={theme}
           onRefreshHistory={() => {
             if (user.isLoggedIn) {
               supabase.from('withdrawals').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).then(({ data }) => {

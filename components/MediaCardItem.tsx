@@ -14,19 +14,29 @@ interface MediaCardItemProps {
   onInsertToRoom?: (card: MediaCard) => void;
   onSchedule?: (card: MediaCard) => void;
   onShowToast?: (message: string, type?: ToastType, options?: ToastOptions) => void;
+  theme?: 'dark' | 'light';
 }
 
-const MediaCardItem: React.FC<MediaCardItemProps> = ({ card, canManage, onUnlock, isHostMode, onDelete, onEdit, onInsertToRoom, onSchedule, onShowToast }) => {
+const MediaCardItem: React.FC<MediaCardItemProps> = ({ 
+  card, 
+  canManage, 
+  onUnlock, 
+  isHostMode, 
+  onDelete, 
+  onEdit, 
+  onInsertToRoom, 
+  onSchedule, 
+  onShowToast,
+  theme = 'dark'
+}) => {
+  const isDark = theme === 'dark';
   const [isUnlocked, setIsUnlocked] = useState(canManage);
   const [showSession, setShowSession] = useState(false);
   const [timeLeft, setTimeLeft] = useState(card.duration);
   const [callStatus, setCallStatus] = useState<'none' | 'requesting' | 'accepted' | 'declined'>('none');
-  const [cardWidth, setCardWidth] = useState(card.defaultWidth || 200);
   const [imgError, setImgError] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
   const [expiresIn, setExpiresIn] = useState<number | null>(null);
-
-  const bgColor = card.cardColor || '#0a111f';
+  const [showControls, setShowControls] = useState(false);
 
   useEffect(() => {
     let timer: any;
@@ -159,20 +169,8 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({ card, canManage, onUnlock
   };
 
   const onResizeStart = (e: React.MouseEvent) => {
+    // Kept for backward compatibility if needed
     e.preventDefault();
-    e.stopPropagation();
-    const startX = e.clientX;
-    const startWidth = cardWidth;
-    const onMouseMove = (moveEvent: MouseEvent) => {
-      const deltaX = moveEvent.clientX - startX;
-      setCardWidth(Math.max(150, Math.min(600, startWidth + deltaX)));
-    };
-    const onMouseUp = () => {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-    };
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
   };
 
   const blurPixels = (!isUnlocked && card.isBlur) ? (card.blurLevel || 30) : 0;
@@ -189,7 +187,7 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({ card, canManage, onUnlock
 
   if (expiresIn === 0 && !isHostMode && card.id !== 'preview') {
     return (
-      <div style={{ width: `${cardWidth}px` }} className="p-4 rounded-[2.5rem] bg-slate-900/50 border border-slate-800 flex items-center justify-center my-4 opacity-50 select-none">
+      <div className={`p-4 rounded-3xl border flex items-center justify-center my-3 opacity-60 select-none max-w-[340px] w-full ${isDark ? 'bg-slate-900/50 border-slate-800' : 'bg-gray-100 border-gray-200'}`}>
         <span className="text-[10px] font-black uppercase text-slate-500">Conteúdo Expirado</span>
       </div>
     );
@@ -198,9 +196,9 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({ card, canManage, onUnlock
   const renderThumbnail = () => {
     if (imgError || !card.thumbnail) {
       return (
-        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800 text-slate-600">
-          <ImageOff size={32} />
-          <span className="text-[9px] mt-2 font-black uppercase">Sem Imagem</span>
+        <div className={`w-full h-full flex flex-col items-center justify-center ${isDark ? 'bg-slate-800 text-slate-600' : 'bg-gray-200 text-slate-400'}`}>
+          <ImageOff size={28} />
+          <span className="text-[9px] mt-1.5 font-black uppercase tracking-wider">Sem Imagem</span>
         </div>
       );
     }
@@ -210,7 +208,7 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({ card, canManage, onUnlock
         alt={card.title}
         style={imageStyle}
         onError={() => setImgError(true)}
-        className={`w-full h-full object-cover absolute inset-0 z-0 ${!isUnlocked ? 'scale-110' : 'scale-100'}`}
+        className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 brightness-[0.88] ${!isUnlocked ? 'scale-105' : 'scale-100'}`}
       />
     );
   };
@@ -218,185 +216,223 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({ card, canManage, onUnlock
   const CreatorControls = () => {
     if (!canManage || card.id === 'preview') return null;
     return (
-      <div className="absolute top-4 right-4 z-50 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute top-11 right-2.5 z-40 flex flex-col gap-1.5 bg-black/80 backdrop-blur-md p-1.5 rounded-2xl border border-white/20 shadow-2xl">
         <button
-          onClick={(e) => { handleEditAttempt(e); }}
-          className="p-2 bg-slate-100 rounded-full text-slate-900 hover:bg-white shadow-lg border border-slate-200" title="Editar Card"
+          onClick={(e) => { e.stopPropagation(); setShowControls(false); handleEditAttempt(e); }}
+          className="p-1.5 bg-white/10 hover:bg-white text-white hover:text-black rounded-xl transition-all" title="Editar Card"
         >
-          <Edit size={14} />
+          <Edit size={13} />
         </button>
         <button
-          onClick={(e) => { e.stopPropagation(); onInsertToRoom?.(card); }}
-          className="p-2 bg-emerald-600 rounded-full text-white hover:bg-emerald-500 shadow-lg" title="Inserir Room"
+          onClick={(e) => { e.stopPropagation(); setShowControls(false); onInsertToRoom?.(card); }}
+          className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-all" title="Inserir na Sala"
         >
-          <DoorOpen size={14} />
+          <DoorOpen size={13} />
         </button>
         <button
-          onClick={(e) => { e.stopPropagation(); onSchedule?.(card); }}
-          className="p-2 bg-orange-600 rounded-full text-white hover:bg-orange-500 shadow-lg" title="Programar Card"
+          onClick={(e) => { e.stopPropagation(); setShowControls(false); onSchedule?.(card); }}
+          className="p-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl transition-all" title="Programar Card"
         >
-          <CalendarClock size={14} />
+          <CalendarClock size={13} />
         </button>
         <button
-          onClick={(e) => { handleDeleteAttempt(e); }}
-          className="p-2 bg-red-600 rounded-full text-white hover:bg-red-500 shadow-lg" title="Excluir Card"
+          onClick={(e) => { e.stopPropagation(); setShowControls(false); handleDeleteAttempt(e); }}
+          className="p-1.5 bg-red-600 hover:bg-red-500 text-white rounded-xl transition-all" title="Excluir Card"
         >
-          <Trash2 size={14} />
+          <Trash2 size={13} />
         </button>
       </div>
     );
   };
 
-  // === RENDERIZAÇÃO DO MODO MINIMALISTA ===
-  if (card.layoutStyle === 'minimal') {
-    return (
-      <>
-        <div
-          ref={cardRef}
-          style={{ width: `${cardWidth}px` }}
-          className="relative group rounded-[2.5rem] overflow-hidden glass border-white/10 my-8 shadow-2xl transition-[width] ease-out border border-slate-800/50 select-none h-auto min-h-[350px] flex flex-col"
-        >
-          <div className="absolute inset-0 z-0 bg-black">
-            {renderThumbnail()}
-            <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/80 z-0" />
-          </div>
+  const creatorName = card.creatorName || (isHostMode ? 'Host' : 'Criador');
 
-          <CreatorControls />
-
-          {expiresIn !== null && expiresIn > 0 && (
-            <div className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-red-600/20 backdrop-blur-md px-3 py-1.5 rounded-full border border-red-500/30 animate-pulse">
-              <Timer size={12} className="text-red-500" />
-              <span className="text-[10px] font-black text-red-500 font-mono">{formatExpiry(expiresIn)}</span>
-            </div>
-          )}
-
-          <div onMouseDown={onResizeStart} className="absolute top-0 right-0 bottom-0 w-4 cursor-col-resize z-[40]" />
-
-          {/* Content Layer */}
-          <div className="relative z-10 flex-1 flex flex-col justify-end p-6">
-            {!isUnlocked && (
-              <div className="flex-1 flex flex-col items-center justify-center">
-                <div className="p-4 rounded-full bg-white/5 border border-white/10 mb-4 backdrop-blur-md shadow-lg">
-                  <Lock size={32} className="text-white/80" />
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-4 text-center">
-              {card.group && (
-                <div className="flex justify-center">
-                  <span className="px-3 py-1 rounded-lg bg-white/10 text-white text-[9px] font-black uppercase tracking-widest border border-white/10">
-                    {card.group}
-                  </span>
-                </div>
-              )}
-              <h3 className="font-black text-lg text-white uppercase tracking-tighter drop-shadow-lg leading-tight">{card.title}</h3>
-              <button
-                onClick={handleInteraction}
-                className={`w-full py-4 rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-xl backdrop-blur-md transition-all transform active:scale-95 border flex items-center justify-center gap-2 ${isUnlocked
-                  ? 'bg-white/20 hover:bg-white/30 text-white border-white/20'
-                  : 'bg-emerald-500 hover:bg-emerald-400 text-slate-900 border-emerald-400'
-                  }`}
-              >
-                {card.type === CardType.CHAT ? (
-                  <><LogIn size={14} /> ENTRAR ROOM</>
-                ) : (
-                  isUnlocked ? 'ACESSAR' : `LIBERAR • ${card.creditCost}`
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-        {renderFullScreenModal()}
-      </>
-    );
-  }
-
-  // === RENDERIZAÇÃO DO MODO CLÁSSICO ===
   return (
     <>
       <div
-        ref={cardRef}
-        style={{ width: `${cardWidth}px` }}
-        className="relative group rounded-[2.5rem] overflow-hidden glass border-white/10 my-8 shadow-2xl animate-in zoom-in-95 duration-300 transition-[width] ease-out border border-slate-800/50 select-none"
+        className={`group relative rounded-3xl overflow-hidden border transition-all duration-300 shadow-lg flex flex-col justify-between w-full max-w-[340px] sm:max-w-[360px] mx-auto sm:mx-0 my-3 select-none ${
+          isDark 
+            ? 'bg-slate-900/90 border-white/10 hover:border-indigo-500/60 shadow-2xl' 
+            : 'bg-white border-gray-200 hover:border-indigo-400 hover:shadow-2xl shadow-gray-200/80'
+        }`}
       >
-        <div className="relative aspect-square overflow-hidden" style={{ backgroundColor: bgColor }}>
+        {/* TOP THUMBNAIL AREA */}
+        <div className="aspect-[16/10] w-full overflow-hidden relative bg-black/60">
           {renderThumbnail()}
-          <CreatorControls />
 
-          {expiresIn !== null && expiresIn > 0 && (
-            <div className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-red-600/20 backdrop-blur-md px-3 py-1.5 rounded-full border border-red-500/30">
-              <Timer size={12} className="text-red-500 animate-pulse" />
-              <span className="text-[10px] font-black text-red-500 font-mono">{formatExpiry(expiresIn)}</span>
+          {/* TOP BADGES & CONTROLS */}
+          <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between gap-1.5 z-10">
+            {/* Media Type Badge */}
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-black/75 backdrop-blur-md text-white border border-white/10 text-[9px] font-black uppercase tracking-wider">
+              {getIcon()}
+              <span>{card.type}</span>
             </div>
-          )}
 
-          {!isUnlocked && (
-            <div className="absolute inset-0 bg-black/40 z-10 flex flex-col items-center justify-center p-8 text-center backdrop-blur-[1px]">
-              <div className="p-5 rounded-full bg-blue-600/10 border border-blue-500/20 mb-5 animate-pulse">
-                <Lock size={36} className="text-blue-400" />
+            <div className="flex items-center gap-1.5">
+              {/* Expiry Timer Badge */}
+              {expiresIn !== null && expiresIn > 0 && (
+                <div className="flex items-center gap-1 bg-red-600/80 text-white backdrop-blur-md px-2 py-0.5 rounded-xl text-[8px] font-black font-mono border border-red-400/40 animate-pulse">
+                  <Timer size={10} />
+                  <span>{formatExpiry(expiresIn)}</span>
+                </div>
+              )}
+
+              {/* Status / Credit Cost Badge */}
+              <div className={`px-2.5 py-1 rounded-xl backdrop-blur-md text-[9px] font-black uppercase tracking-wider border shadow-md ${
+                isUnlocked
+                  ? 'bg-emerald-500/90 text-white border-emerald-400/40'
+                  : 'bg-amber-500/90 text-slate-950 border-amber-300/60'
+              }`}>
+                {isUnlocked ? 'LIBERADO' : `${card.creditCost} CR`}
               </div>
-              <span className="text-white font-black text-xs tracking-[0.3em] uppercase mb-1 drop-shadow-lg">Conteúdo Exclusivo</span>
-              <p className="text-[10px] text-slate-400 font-bold mb-8 uppercase tracking-widest">{card.category}</p>
-              <button
-                onClick={handleInteraction}
-                className="px-10 py-4 rounded-2xl bg-blue-600 text-white text-[11px] font-black flex items-center gap-2 hover:bg-blue-500 transition-all shadow-xl shadow-blue-600/30 uppercase tracking-[0.2em]"
-              >
-                {card.type === CardType.CHAT ? 'ENTRAR ROOM' : `LIBERAR • ${card.creditCost} CR`}
-              </button>
+
+              {/* Creator Options Toggle (if canManage) */}
+              {canManage && card.id !== 'preview' && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setShowControls(!showControls); }}
+                  className="p-1 rounded-xl bg-black/75 hover:bg-black text-white border border-white/15 backdrop-blur-md transition-all active:scale-95"
+                  title="Gerenciar Card"
+                >
+                  <MoreVertical size={13} />
+                </button>
+              )}
             </div>
-          )}
+          </div>
 
-          {isUnlocked && callStatus === 'none' && !showSession && (
-            <div className="absolute inset-0 z-10 bg-transparent hover:bg-black/20 transition-all flex flex-col items-center justify-center group cursor-pointer" onClick={handleInteraction}>
-              <div className="absolute top-4 right-4 p-2 bg-black/40 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                <Maximize2 size={16} />
-              </div>
-              <div className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-sm text-white border border-white/20 flex items-center justify-center shadow-2xl transform scale-0 group-hover:scale-100 transition-all duration-300">
-                {getIcon()}
-              </div>
+          {/* Creator Controls Dropdown */}
+          {showControls && <CreatorControls />}
+
+          {/* CREATOR PROFILE CHIP ON CARD */}
+          <div className="absolute bottom-2.5 left-2.5 right-2.5 z-10 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-xl bg-black/75 backdrop-blur-md border border-white/15 text-slate-200">
+              {card.creatorPhoto ? (
+                <img
+                  src={card.creatorPhoto}
+                  alt={creatorName}
+                  className="w-5 h-5 rounded-full object-cover border border-white/30"
+                />
+              ) : (
+                <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-black text-[9px] border border-white/30">
+                  {creatorName.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <span className="text-[9px] font-black uppercase tracking-tight truncate max-w-[120px]">
+                {creatorName}
+              </span>
+            </div>
+
+            <button
+              onClick={handleCopyLink}
+              title="Copiar Link da Sala Exclusiva"
+              className="p-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-400/30 backdrop-blur-md transition-all shadow-lg active:scale-95 flex items-center justify-center"
+            >
+              <MessageSquare size={13} />
+            </button>
+          </div>
+
+          {/* BLUR OVERLAY IF LOCKED */}
+          {!isUnlocked && card.isBlur && (
+            <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[6px] flex flex-col items-center justify-center p-4 text-center z-[5]">
+              <Lock size={22} className="text-amber-400 mb-1 drop-shadow-md" />
+              <span className="text-[8px] font-black uppercase tracking-widest text-white drop-shadow">
+                Conteúdo Exclusivo
+              </span>
             </div>
           )}
         </div>
 
-        <div
-          onMouseDown={onResizeStart}
-          className="absolute top-0 right-0 bottom-10 w-4 cursor-col-resize z-[40] hover:bg-blue-500/10 transition-colors"
-        />
-
-        <div className="p-6 border-t border-white/5 relative z-20" style={{ backgroundColor: bgColor }}>
-          <div className="flex justify-between items-center mb-4">
-            <span className="px-3 py-1 rounded-lg bg-white/10 text-white text-[9px] font-black uppercase tracking-widest border border-white/10">
-              {card.category}
-            </span>
-            {card.group && (
-              <span className="px-3 py-1 rounded-lg bg-blue-600/20 text-blue-400 text-[9px] font-black uppercase tracking-widest border border-blue-600/20 flex items-center gap-1">
-                <Tag size={10} /> {card.group}
+        {/* BOTTOM INFO AREA */}
+        <div className={`p-4 flex flex-col flex-1 justify-between border-t space-y-3 ${
+          isDark ? 'bg-slate-900/90 border-white/5' : 'bg-white border-gray-100'
+        }`}>
+          <div>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <span className={`text-[8px] font-black uppercase tracking-[0.2em] ${
+                isDark ? 'text-indigo-400' : 'text-indigo-600'
+              }`}>
+                {card.category || 'PREMIUM'}
               </span>
+              {card.duration > 0 && (
+                <span className={`text-[8px] font-bold uppercase tracking-widest ${
+                  isDark ? 'text-slate-400' : 'text-slate-500'
+                }`}>
+                  {Math.floor(card.duration / 60)}:{(card.duration % 60).toString().padStart(2, '0')} MIN
+                </span>
+              )}
+            </div>
+
+            <h3 className={`text-sm font-black leading-snug uppercase tracking-tight line-clamp-1 mb-1 ${
+              isDark ? 'text-white' : 'text-slate-900'
+            }`} title={card.title}>
+              {card.title}
+            </h3>
+
+            <p className={`text-[10px] line-clamp-2 leading-relaxed font-medium ${
+              isDark ? 'text-slate-400' : 'text-slate-600'
+            }`}>
+              {card.description || 'Sem descrição.'}
+            </p>
+
+            {/* TAGS */}
+            {card.tags && card.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {card.tags.slice(0, 3).map((tag, idx) => (
+                  <span
+                    key={idx}
+                    className={`px-2 py-0.5 rounded-lg border text-[8px] font-bold uppercase tracking-wider ${
+                      isDark ? 'bg-white/5 border-white/5 text-slate-400' : 'bg-gray-100 border-gray-200 text-slate-600'
+                    }`}
+                  >
+                    #{tag}
+                  </span>
+                ))}
+              </div>
             )}
           </div>
-          <h3 className="font-black text-sm text-white mb-2 leading-tight uppercase tracking-tighter truncate">{card.title}</h3>
-          <p className="text-[10px] text-slate-400 font-medium line-clamp-2 leading-relaxed mb-4 h-8">
-            {card.description || 'Interação personalizada.'}
-          </p>
 
-          <div className="flex items-center gap-3 pt-4 border-t border-white/5">
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <Clock size={14} />
-              <span className="text-[10px] font-black tracking-tighter uppercase">{card.duration}S</span>
-            </div>
+          {/* ACTION BUTTONS (VER / DESBLOQUEAR & CHAT) */}
+          <div className={`grid grid-cols-5 gap-2 pt-2 border-t ${
+            isDark ? 'border-white/5' : 'border-gray-100'
+          }`}>
             <button
               onClick={handleInteraction}
-              className={`ml-auto px-5 py-2 rounded-xl text-[9px] font-black transition-all uppercase tracking-[0.1em] flex items-center gap-2 ${isUnlocked
-                ? 'bg-white/10 text-white border border-white/20 hover:bg-white/20'
-                : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-lg shadow-emerald-500/20'
-                }`}
+              className={`col-span-4 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 ${
+                card.type === CardType.CHAT
+                  ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                  : isUnlocked
+                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                  : (isDark ? 'bg-white text-slate-950 hover:bg-indigo-600 hover:text-white' : 'bg-indigo-600 hover:bg-indigo-500 text-white')
+              }`}
             >
               {card.type === CardType.CHAT ? (
-                <><LogIn size={12} /> ENTRAR</>
+                <>
+                  <LogIn size={13} />
+                  <span>ENTRAR NA SALA</span>
+                </>
+              ) : isUnlocked ? (
+                <>
+                  <Eye size={13} />
+                  <span>VER MÍDIA</span>
+                </>
               ) : (
-                isUnlocked ? 'ABRIR' : `${card.creditCost} CR`
+                <>
+                  <Lock size={13} />
+                  <span>DESBLOQUEAR ({card.creditCost} CR)</span>
+                </>
               )}
+            </button>
+
+            <button
+              onClick={handleCopyLink}
+              title="Copiar Link da Sala Exclusiva"
+              className={`col-span-1 py-2.5 rounded-xl border transition-all flex items-center justify-center shadow-md active:scale-95 ${
+                isDark 
+                  ? 'bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white border-indigo-500/30' 
+                  : 'bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white border-indigo-200'
+              }`}
+            >
+              <MessageSquare size={14} />
             </button>
           </div>
         </div>
