@@ -9,6 +9,7 @@ import {
 import { User, MediaCard, CardType } from '../types';
 import { supabase } from '../lib/supabase';
 import { UnlockPurchaseModal } from './UnlockPurchaseModal';
+import { WalletModal } from './WalletModal';
 import { ToastType, ToastOptions } from './Toast';
 
 interface GalleryProps {
@@ -996,82 +997,16 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits }) =
         />
       )}
 
-      {/* PIX RECHARGE MODAL FOR GALLERY */}
-      {showQrCode && (
-        <div className="fixed inset-0 z-[850] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-800 p-8 rounded-[3rem] w-full max-w-sm shadow-2xl relative text-center">
-            <button 
-              onClick={() => setShowQrCode(false)} 
-              className="absolute top-6 right-6 p-2 bg-slate-800 rounded-full text-white hover:bg-slate-700 transition-all"
-            >
-              <X size={20} />
-            </button>
-
-            {!activePayment ? (
-              <>
-                <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-500/20">
-                  <QrCode size={32} className="text-emerald-500" />
-                </div>
-                <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-2">Recarregar Créditos</h3>
-                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-8">Escolha um pacote e pague via PIX</p>
-
-                <div className="space-y-3">
-                  {[5, 10, 20].map((amount) => (
-                    <button
-                      key={amount}
-                      onClick={() => handleGeneratePix(amount)}
-                      disabled={isGeneratingPix}
-                      className="w-full p-4 rounded-2xl bg-slate-800 border border-slate-700 hover:border-emerald-500 hover:bg-emerald-500/10 transition-all flex items-center justify-between group"
-                    >
-                      <div className="flex flex-col items-start bg-transparent">
-                        <span className="text-white font-black text-lg">R$ {amount},00</span>
-                        <span className="text-[10px] text-slate-500 uppercase font-bold group-hover:text-emerald-400">
-                          {amount === 5 ? '50 créditos' : amount === 10 ? '120 créditos (+20%)' : '300 créditos (+50%)'}
-                        </span>
-                      </div>
-                      <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center group-hover:bg-emerald-500 transition-all">
-                        <Zap size={16} className="text-slate-400 group-hover:text-white" />
-                      </div>
-                    </button>
-                  ))}
-                </div>
-                {isGeneratingPix && <div className="mt-4 text-emerald-500 font-bold text-xs uppercase animate-pulse">Gerando QR Code...</div>}
-              </>
-            ) : (
-              <>
-                <h3 className="text-lg font-black text-white uppercase tracking-tighter mb-6">Pagamento PIX</h3>
-                <div className="bg-white p-4 rounded-2xl mb-6 mx-auto w-64 h-64 flex items-center justify-center">
-                  {activePayment.qr_code_base64 ? (
-                    <img src={`data:image/png;base64,${activePayment.qr_code_base64}`} className="w-full h-full object-contain" alt="QR Code PIX" />
-                  ) : (
-                    <div className="w-full h-full bg-slate-200 animate-pulse rounded-xl flex items-center justify-center text-slate-500 text-xs font-bold">
-                      QR Code PIX
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-3">
-                  <button 
-                    onClick={handleCopyPix} 
-                    className="w-full py-4 bg-slate-800 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-slate-700 transition-all flex items-center justify-center gap-2"
-                  >
-                    {copySuccess ? <CheckCircle size={16} className="text-emerald-500" /> : <Copy size={16} />}
-                    {copySuccess ? 'Copia Cola Copiado!' : 'Copiar Código PIX'}
-                  </button>
-                  <button 
-                    onClick={handleCheckStatus} 
-                    disabled={isCheckingStatus} 
-                    className="w-full py-4 bg-emerald-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-emerald-500 transition-all flex items-center justify-center gap-2"
-                  >
-                    {isCheckingStatus ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                    Verificar Pagamento
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {/* UNIFIED WALLET / RECHARGE MODAL FOR GALLERY */}
+      <WalletModal
+        isOpen={showQrCode}
+        onClose={() => setShowQrCode(false)}
+        initialTab="recharge"
+        user={user}
+        updateCredits={updateCredits || (() => {})}
+        openAuth={() => {}}
+        onShowToast={(msg, type) => onShowToast && onShowToast(msg, type)}
+      />
     </div>
   );
 };

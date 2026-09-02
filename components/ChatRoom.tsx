@@ -8,6 +8,7 @@ import CardModal from './CardModal';
 import MediaCardItem from './MediaCardItem';
 import Gallery from './Gallery';
 import { QuickSettingsModal } from './QuickSettingsModal';
+import { WalletModal } from './WalletModal';
 import { ToastType, ToastOptions } from './Toast';
 
 // IndexedDB configuration for storing recent local video files
@@ -189,6 +190,13 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const [uploadingWatchParty, setUploadingWatchParty] = useState(false);
   const [showQrCode, setShowQrCode] = useState(false);
   const [showEarningsModal, setShowEarningsModal] = useState(false);
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
+  const [walletInitialTab, setWalletInitialTab] = useState<'recharge' | 'earnings'>('recharge');
+
+  const openWallet = (tab: 'recharge' | 'earnings' = 'recharge') => {
+    setWalletInitialTab(tab);
+    setIsWalletModalOpen(true);
+  };
   const [withdrawalPending, setWithdrawalPending] = useState(false);
 
   // Withdrawal & Sales State
@@ -839,7 +847,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const handleUnlockPrivateRoom = async () => {
     if (!user.isLoggedIn) { openAuth(); return; }
     if (!privateRoomCard) return;
-    if (user.credits < privateRoomCard.creditCost) { setShowQrCode(true); return; }
+    if (user.credits < privateRoomCard.creditCost) { openWallet('recharge'); return; }
 
     updateCredits(-privateRoomCard.creditCost);
     const earnings = Math.floor(privateRoomCard.creditCost * 0.8);
@@ -2035,7 +2043,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     const isPurchased = purchasedCardIds.has(card.id);
 
     if (!isMyCard && !isPurchased) {
-      if (user.credits < card.creditCost) { setShowQrCode(true); return false; }
+      if (user.credits < card.creditCost) { openWallet('recharge'); return false; }
 
       const useFreeCredits = (user.free_credits || 0) >= card.creditCost;
 
@@ -2521,7 +2529,12 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           </div>
           {/* Earnings Icon in Sidebar */}
           {user.isLoggedIn && (
-            <button onClick={() => setShowEarningsModal(true)} className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col items-center justify-center text-emerald-500 hover:bg-emerald-500/20 transition-all cursor-pointer">
+            <button 
+              type="button"
+              onClick={() => openWallet('earnings')} 
+              className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col items-center justify-center text-emerald-400 hover:bg-emerald-500/20 transition-all cursor-pointer"
+              title="Central de Ganhos"
+            >
               <DollarSign size={20} />
               <span className="text-[9px] font-black">{user.earnings}</span>
             </button>
@@ -2708,6 +2721,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           {/* Header Right: Theme + Wallet/Credits + Video Call + Lixeira (Limpar) + Earnings + Share + Close */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button 
+              type="button"
               onClick={toggleTheme} 
               className={`p-2 sm:p-2.5 rounded-xl border ${colors.border} ${colors.text} hover:opacity-70 transition-all active:scale-95`}
               title="Alternar Tema"
@@ -2715,17 +2729,33 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               {isDark ? <Sun size={17} /> : <Moon size={17} />}
             </button>
 
-            <div 
-              onClick={() => setShowQrCode(true)} 
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl bg-emerald-500/10 text-emerald-500 text-xs border border-emerald-500/20 font-black cursor-pointer hover:bg-emerald-500/20 transition-all active:scale-95`}
-              title="Recarregar Créditos"
+            {/* Wallet / Credits Recharge Button */}
+            <button 
+              type="button"
+              onClick={() => openWallet('recharge')} 
+              className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 text-xs border border-emerald-500/20 font-black cursor-pointer transition-all active:scale-95 shrink-0"
+              title="Carteira & Recarregar Créditos"
             >
               <Wallet size={15} />
-              <span className="text-[11px] sm:text-xs">{user.credits}c</span>
-            </div>
+              <span className="text-[11px] sm:text-xs font-black">{user.credits}c</span>
+            </button>
+
+            {/* Earnings Dollar Button */}
+            {user.isLoggedIn && (
+              <button 
+                type="button"
+                onClick={() => openWallet('earnings')} 
+                className="flex items-center gap-1 px-2.5 py-1.5 sm:py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 rounded-xl border border-emerald-500/20 font-black active:scale-95 shrink-0"
+                title="Central de Ganhos & Saques"
+              >
+                <DollarSign size={15} />
+                <span className="hidden xs:inline text-[11px] font-black">{user.earnings}</span>
+              </button>
+            )}
 
             {/* Video Call / Cinema Button */}
             <button
+              type="button"
               onClick={() => {
                 setActiveTab('cinema');
                 handleNewVideoSelection();
@@ -2740,6 +2770,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
             {/* Lixeira (Limpar Conversa e Mídias) Button - Right next to Video Call Icon */}
             <button
+              type="button"
               onClick={() => setIsClearChatModalOpen(true)}
               className="p-2 sm:p-2.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all active:scale-95 flex items-center gap-1.5"
               title="Limpar conversa e mídias do chat"
@@ -2747,16 +2778,6 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               <Trash2 size={17} />
               <span className="hidden xl:inline text-[11px] font-black uppercase tracking-tighter">Limpar</span>
             </button>
-
-            {user.isLoggedIn && (
-              <button 
-                onClick={() => setShowEarningsModal(true)} 
-                className="hidden xs:flex sm:hidden items-center gap-1 px-2.5 py-2 bg-emerald-500/10 text-emerald-500 rounded-xl border border-emerald-500/20 font-black active:scale-95"
-                title="Central de Ganhos"
-              >
-                <DollarSign size={15} />
-              </button>
-            )}
 
             <button 
               onClick={() => { 
@@ -3908,206 +3929,28 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           )
         }
 
-        {/* Earnings Modal with Withdraw Tabs */}
-        {
-          showEarningsModal && (
-            <div className="fixed inset-0 z-[160] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md animate-in fade-in">
-              <div className="bg-slate-900 border border-slate-800 p-8 rounded-[3rem] w-full max-w-lg shadow-2xl relative max-h-[90vh] overflow-y-auto scrollbar-hide">
-                <button onClick={() => setShowEarningsModal(false)} className="absolute top-6 right-6 p-2 bg-slate-800 rounded-full text-white hover:bg-slate-700 transition-all"><X size={20} /></button>
-                <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-6">Central de Ganhos</h3>
-
-                <div className="bg-emerald-500/10 border border-emerald-500/20 p-6 rounded-3xl mb-8 text-center relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-4 opacity-20"><DollarSign size={64} className="text-emerald-500" /></div>
-                  <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest block mb-2 relative z-10">Disponível para Saque</span>
-                  <span className="text-5xl font-black text-white relative z-10 tracking-tight">{user.earnings} <span className="text-sm font-bold text-slate-500">CR</span></span>
-                </div>
-
-                <div className="mb-6">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-3">Método de Recebimento</label>
-                  <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-                    <button onClick={() => setWithdrawalMethod('pix')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${withdrawalMethod === 'pix' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-500'}`}><QrCode size={14} /> PIX</button>
-                    <button onClick={() => setWithdrawalMethod('picpay')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${withdrawalMethod === 'picpay' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-500'}`}><Wallet size={14} /> PicPay</button>
-                    <button onClick={() => setWithdrawalMethod('paypal')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${withdrawalMethod === 'paypal' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-500'}`}><CreditCard size={14} /> PayPal</button>
-                    <button onClick={() => setWithdrawalMethod('stripe')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${withdrawalMethod === 'stripe' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-500'}`}><CreditCard size={14} /> Stripe</button>
-                  </div>
-
-                  <input
-                    value={withdrawalKey}
-                    onChange={(e) => setWithdrawalKey(e.target.value)}
-                    onBlur={handleSavePaymentKey}
-                    placeholder={withdrawalMethod === 'pix' ? "Chave PIX (CPF, Email, Aleatória)" : "Seu E-mail da conta"}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-4 text-white text-sm outline-none focus:border-emerald-500 transition-all font-bold mb-4"
-                  />
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input
-                      value={withdrawalCpf}
-                      onChange={(e) => setWithdrawalCpf(e.target.value)}
-                      placeholder="Seu CPF"
-                      className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-4 text-white text-sm outline-none focus:border-emerald-500 transition-all font-bold"
-                    />
-                    <input
-                      value={withdrawalFullName}
-                      onChange={(e) => setWithdrawalFullName(e.target.value)}
-                      placeholder="Nome Completo"
-                      className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-4 text-white text-sm outline-none focus:border-emerald-500 transition-all font-bold"
-                    />
-                  </div>
-                  <p className="text-[8px] text-slate-500 mt-2 font-bold uppercase">* Verificamos CPF e Nome para sua segurança.</p>
-                </div>
-
-                <div className="bg-slate-800/50 p-6 rounded-3xl mb-4 border border-slate-700">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex-1 mr-4">
-                      <h4 className="text-xs font-black text-white uppercase tracking-tight">Créditos Gratuitos</h4>
-                      <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-1">Saldo: {user.free_credits || 0} CR</p>
-                      <p className="text-[8px] text-slate-400 font-bold uppercase leading-tight italic">
-                        Reinvindique créditos grátis dos usuários que usaram créditos grátis e use para comprar cards de outros criadores!
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <button
-                        onClick={() => updateFreeCredits(10, true)}
-                        disabled={!!claimTimer || !hasFreeSales}
-                        className="px-4 py-2 bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 rounded-xl text-[10px] font-black uppercase hover:enabled:bg-indigo-600 hover:enabled:text-white transition-all disabled:opacity-40 disabled:grayscale"
-                      >
-                        {claimTimer ? `Aguarde ${Math.floor(claimTimer / 60)}:${(claimTimer % 60).toString().padStart(2, '0')}` : 'Reivindicar +10'}
-                      </button>
-                      {!hasFreeSales && !claimTimer && (
-                        <span className="text-[7px] text-red-500/70 font-black uppercase tracking-tighter">Nenhuma "venda grátis" pendente</span>
-                      )}
-                    </div>
-                  </div>
-                  <p className="text-[8px] text-slate-600 font-bold uppercase leading-relaxed border-t border-slate-700/50 pt-3 mt-2">
-                    * Este é um incentivo para você interagir com a plataforma quando alguém consome seu conteúdo gratuitamente.
-                  </p>
-                </div>
-
-                <button
-                  onClick={handleWithdraw}
-                  disabled={user.earnings < 100 || withdrawalPending || !withdrawalKey}
-                  className="w-full py-4 bg-white text-slate-900 font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-slate-200 flex items-center justify-center gap-2 disabled:opacity-50 transition-all mb-4"
-                >
-                  {withdrawalPending ? <Loader2 className="animate-spin" /> : <ArrowUpRight size={16} />}
-                  {withdrawalPending ? 'Processando...' : 'Solicitar Saque (24h)'}
-                </button>
-                <p className="text-[9px] text-center text-slate-500 uppercase font-bold mb-8">Mínimo para saque: 100 créditos</p>
-
-                <div className="border-t border-slate-800 pt-6">
-                  <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2"><History size={12} /> Histórico de Saques</h4>
-                  <div className="space-y-2 max-h-40 overflow-y-auto scrollbar-hide mb-6">
-                    {withdrawalHistory.length === 0 ? (
-                      <p className="text-center text-slate-600 text-xs italic">Nenhum saque registrado.</p>
-                    ) : (
-                      withdrawalHistory.map(w => (
-                        <div key={w.id} className="flex justify-between items-center p-3 bg-slate-800/50 rounded-xl">
-                          <div className="flex flex-col">
-                            <span className="text-white font-bold text-xs">{w.amount} CR</span>
-                            <span className="text-[9px] text-slate-500 uppercase">{w.method}</span>
-                          </div>
-                          <div className="text-right">
-                            <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-lg ${w.status === 'paid' ? 'bg-emerald-500/20 text-emerald-500' : 'bg-yellow-500/20 text-yellow-500'}`}>{w.status}</span>
-                            <span className="text-[8px] text-slate-600 block mt-1">{new Date(w.created_at).toLocaleDateString()}</span>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  {/* SALES HISTORY SECTION */}
-                  <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2"><ShoppingCart size={12} /> Histórico de Vendas (Quem comprou)</h4>
-                  <div className="space-y-2 max-h-40 overflow-y-auto scrollbar-hide">
-                    {salesHistory.length === 0 ? (
-                      <p className="text-center text-slate-600 text-xs italic">Nenhuma venda realizada ainda.</p>
-                    ) : (
-                      salesHistory.map(sale => (
-                        <div key={sale.id} className="flex justify-between items-center p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500 font-bold text-xs">
-                              {sale.buyer_name ? sale.buyer_name.charAt(0).toUpperCase() : '?'}
-                            </div>
-                            <div className="flex flex-col max-w-[120px]">
-                              <span className="text-white font-bold text-xs truncate">{sale.buyer_name || 'Usuário'}</span>
-                              <span className="text-[9px] text-slate-500 truncate">{sale.card_title}</span>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-emerald-400 font-black text-xs">+{sale.amount} CR</span>
-                            <span className="text-[8px] text-slate-600 block mt-1">{new Date(sale.created_at).toLocaleDateString()}</span>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )
-        }
-
-        {
-          showQrCode && (
-            <div className="fixed inset-0 z-[160] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md animate-in fade-in">
-              <div className="bg-slate-900 border border-slate-800 p-8 rounded-[3rem] w-full max-w-sm shadow-2xl relative text-center">
-                <button onClick={() => setShowQrCode(false)} className="absolute top-6 right-6 p-2 bg-slate-800 rounded-full text-white hover:bg-slate-700 transition-all"><X size={20} /></button>
-
-                {!activePayment ? (
-                  <>
-                    <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-500/20">
-                      <QrCode size={32} className="text-emerald-500" />
-                    </div>
-                    <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-2">Recarregar Créditos</h3>
-                    <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-8">Escolha um pacote e pague via PIX</p>
-
-                    <div className="space-y-3">
-                      {[5, 10, 20].map((amount) => (
-                        <button
-                          key={amount}
-                          onClick={() => handleGeneratePix(amount)}
-                          disabled={isGeneratingPix}
-                          className="w-full p-4 rounded-2xl bg-slate-800 border border-slate-700 hover:border-emerald-500 hover:bg-emerald-500/10 transition-all flex items-center justify-between group"
-                        >
-                          <div className="flex flex-col items-start bg-transparent">
-                            <span className="text-white font-black text-lg">R$ {amount},00</span>
-                            <span className="text-[10px] text-slate-500 uppercase font-bold group-hover:text-emerald-400">
-                              {amount === 5 ? '50 créditos' : amount === 10 ? '120 créditos (+20%)' : '300 créditos (+50%)'}
-                            </span>
-                          </div>
-                          <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center group-hover:bg-emerald-500 transition-all">
-                            <Zap size={16} className="text-slate-400 group-hover:text-white" />
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                    {isGeneratingPix && <div className="mt-4 text-emerald-500 font-bold text-xs uppercase animate-pulse">Gerando QR Code...</div>}
-                  </>
-                ) : (
-                  <>
-                    <h3 className="text-lg font-black text-white uppercase tracking-tighter mb-6">Pagamento PIX</h3>
-                    <div className="bg-white p-4 rounded-2xl mb-6 mx-auto w-64 h-64 flex items-center justify-center">
-                      {activePayment.qr_code_base64 ? (
-                        <img src={`data:image/png;base64,${activePayment.qr_code_base64}`} className="w-full h-full object-contain" />
-                      ) : (
-                        <div className="w-full h-full bg-slate-200 animate-pulse rounded-xl" />
-                      )}
-                    </div>
-
-                    <div className="space-y-3">
-                      <button onClick={handleCopyPix} className="w-full py-4 bg-slate-800 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-slate-700 transition-all flex items-center justify-center gap-2">
-                        {copySuccess ? <CheckCircle size={16} className="text-emerald-500" /> : <Copy size={16} />}
-                        {copySuccess ? 'Copia Cola Copiado!' : 'Copiar Código PIX'}
-                      </button>
-                      <button onClick={handleCheckStatus} disabled={isCheckingStatus} className="w-full py-4 bg-emerald-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-emerald-500 transition-all flex items-center justify-center gap-2">
-                        {isCheckingStatus ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                        Verificar Pagamento
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          )
-        }
+        {/* Unified Wallet & Earnings Modal */}
+        <WalletModal
+          isOpen={isWalletModalOpen}
+          onClose={() => setIsWalletModalOpen(false)}
+          initialTab={walletInitialTab}
+          user={user}
+          updateCredits={updateCredits}
+          updateFreeCredits={updateFreeCredits}
+          openAuth={openAuth}
+          onShowToast={showToast}
+          withdrawalHistory={withdrawalHistory}
+          salesHistory={salesHistory}
+          hasFreeSales={hasFreeSales}
+          claimTimer={claimTimer}
+          onRefreshHistory={() => {
+            if (user.isLoggedIn) {
+              supabase.from('withdrawals').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).then(({ data }) => {
+                if (data) setWithdrawalHistory(data);
+              });
+            }
+          }}
+        />
       </main >
     </div >
   );
