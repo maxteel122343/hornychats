@@ -53,6 +53,7 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
   const [defaultWidth, setDefaultWidth] = useState(250);
   const [layoutStyle, setLayoutStyle] = useState<'classic' | 'minimal'>('classic');
   const [cardColor, setCardColor] = useState(CARD_COLORS[0]);
+  const [postToChat, setPostToChat] = useState(true);
 
   // Media State
   const [isRecording, setIsRecording] = useState(false);
@@ -89,14 +90,23 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
     defaultWidth: 250,
     repeatInterval: 0,
     category: 'Premium',
-    cardColor: CARD_COLORS[0]
+    cardColor: CARD_COLORS[0],
+    postToChat: true
   });
 
   useEffect(() => {
     const saved = localStorage.getItem(DEFAULT_SETTINGS_KEY);
     const savedThumb = localStorage.getItem(DEFAULT_SETTINGS_KEY + '_thumb');
     if (saved) {
-      setDefaults(JSON.parse(saved));
+      try {
+        const parsed = JSON.parse(saved);
+        setDefaults(parsed);
+        if (parsed.postToChat !== undefined && !initialData) {
+          setPostToChat(parsed.postToChat);
+        }
+      } catch (e) {
+        console.warn('Error parsing defaults:', e);
+      }
     }
     if (savedThumb) {
       setDefaultThumbnail(savedThumb);
@@ -426,6 +436,7 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
       isBlur: true,
       blurLevel: defaults.blurLevel,
       saveToGallery: true,
+      postToChat: postToChat,
       mediaType: 'upload',
       thumbnail: defaultThumbnail || customThumbnail || finalMediaUrl, // Use uploaded URL if generic thumb fails
       mediaUrl: finalMediaUrl,
@@ -522,6 +533,7 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
       isBlur,
       blurLevel,
       saveToGallery: true,
+      postToChat: postToChat,
       mediaType: mediaAction ? 'record' : 'upload',
       thumbnail: effectiveThumbnail || undefined,
       mediaUrl: finalMediaUrl,
@@ -583,6 +595,9 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
     setCapturedMedia(card.mediaUrl || null);
     setCustomThumbnail(card.thumbnail || null);
     setMediaAction('upload');
+    if (card.postToChat !== undefined) {
+      setPostToChat(card.postToChat);
+    }
 
     setActiveTab('create');
   };
@@ -735,6 +750,60 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
                   </div>
                 </button>
               </div>
+
+              {/* Toggle de Destino no Modo Rápido */}
+              <div className={`w-full max-w-sm p-3.5 rounded-2xl border transition-all ${
+                postToChat 
+                  ? (isDark ? 'bg-blue-600/10 border-blue-500/40' : 'bg-blue-50 border-blue-200')
+                  : (isDark ? 'bg-slate-800/40 border-slate-700/60' : 'bg-gray-50 border-gray-200')
+              }`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
+                      postToChat
+                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                        : (isDark ? 'bg-slate-700 text-slate-400' : 'bg-gray-200 text-slate-500')
+                    }`}>
+                      {postToChat ? <MessageSquare size={16} /> : <LayoutGrid size={16} />}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                          Publicar no Chat
+                        </span>
+                        <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
+                          postToChat 
+                            ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
+                            : (isDark ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' : 'bg-amber-100 text-amber-700 border border-amber-200')
+                        }`}>
+                          {postToChat ? 'Chat + Vitrine' : 'Apenas Vitrine'}
+                        </span>
+                      </div>
+                      <p className={`text-[9px] mt-0.5 font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {postToChat ? 'Aparecerá no chat e na vitrine' : 'Aparecerá apenas na vitrine (não no chat)'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={postToChat}
+                    onClick={() => setPostToChat(!postToChat)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      postToChat ? 'bg-blue-600' : (isDark ? 'bg-slate-700' : 'bg-gray-300')
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        postToChat ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
               <button 
                 type="button"
                 onClick={() => setShowSettings(true)} 
@@ -1083,9 +1152,69 @@ const CardModal: React.FC<CardModalProps> = ({ onClose, onSubmit, userId, initia
                     </div>
                   </div>
 
+                  {/* Toggle de Destino da Publicação (Chat + Vitrine ou Apenas Vitrine) */}
+                  <div className={`p-4 rounded-2xl border transition-all ${
+                    postToChat 
+                      ? (isDark ? 'bg-blue-600/10 border-blue-500/40' : 'bg-blue-50 border-blue-200')
+                      : (isDark ? 'bg-slate-800/40 border-slate-700/60' : 'bg-gray-50 border-gray-200')
+                  }`}>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+                          postToChat
+                            ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                            : (isDark ? 'bg-slate-700 text-slate-400' : 'bg-gray-200 text-slate-500')
+                        }`}>
+                          {postToChat ? <MessageSquare size={18} /> : <LayoutGrid size={18} />}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                              Publicar no Chat
+                            </span>
+                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
+                              postToChat 
+                                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
+                                : (isDark ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' : 'bg-amber-100 text-amber-700 border border-amber-200')
+                            }`}>
+                              {postToChat ? 'Chat + Vitrine' : 'Apenas Vitrine'}
+                            </span>
+                          </div>
+                          <p className={`text-[10px] mt-0.5 font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {postToChat 
+                              ? 'Ativado: O card aparecerá no chat e na vitrine.' 
+                              : 'Desativado: O card aparecerá apenas na vitrine (não aparece no chat).'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Toggle Switch */}
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={postToChat}
+                        onClick={() => setPostToChat(!postToChat)}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          postToChat ? 'bg-blue-600' : (isDark ? 'bg-slate-700' : 'bg-gray-300')
+                        }`}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                            postToChat ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
                   <button type="submit" disabled={isUploading} className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl uppercase tracking-[0.2em] text-[10px] hover:bg-blue-500 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all">
                     {isUploading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-                    {isUploading ? 'Enviando...' : (initialData ? 'Republicar' : 'Publicar Card')}
+                    {isUploading 
+                      ? 'Enviando...' 
+                      : (postToChat 
+                          ? (initialData ? 'Republicar no Chat e Vitrine' : 'Publicar no Chat e Vitrine') 
+                          : (initialData ? 'Salvar Apenas na Vitrine' : 'Publicar Apenas na Vitrine'))}
                   </button>
                 </form>
               </div>

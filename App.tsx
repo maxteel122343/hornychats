@@ -9,6 +9,46 @@ import { Toast, ToastType, ToastOptions } from './components/Toast';
 import { User } from './types';
 import { supabase } from './lib/supabase';
 
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("ErrorBoundary caught:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-950 text-white text-center">
+          <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-2xl space-y-4">
+            <h2 className="text-xl font-black text-red-500 uppercase tracking-wide">Ocorreu um erro inesperado</h2>
+            <p className="text-sm text-slate-400">
+              Desculpe pelo transtorno. Clique no botão abaixo para recarregar a tela.
+            </p>
+            <button
+              onClick={() => {
+                this.setState({ hasError: false, error: null });
+                window.location.reload();
+              }}
+              className="w-full py-3 px-4 bg-red-600 hover:bg-red-500 text-white font-black rounded-xl uppercase tracking-wider text-xs transition-all shadow-lg active:scale-95"
+            >
+              Recarregar Aplicativo
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const App: React.FC = () => {
   const [user, setUser] = useState<User>(() => {
     if (typeof window !== 'undefined') {
@@ -238,35 +278,37 @@ const App: React.FC = () => {
   };
 
   return (
-    <Router>
-      <div className={`min-h-screen w-full max-w-full overflow-x-hidden transition-colors duration-300 ${theme === 'dark' ? 'bg-slate-950 text-white selection:bg-indigo-500/30' : 'bg-gray-50 text-slate-900 selection:bg-red-500/30'}`}>
-        <Routes>
-          <Route
-            path="/"
-            element={<Home user={user} openAuth={() => setIsAuthModalOpen(true)} theme={theme} toggleTheme={toggleTheme} onShowToast={showToast} />}
+    <ErrorBoundary>
+      <Router>
+        <div className={`min-h-screen w-full max-w-full overflow-x-hidden transition-colors duration-300 ${theme === 'dark' ? 'bg-slate-950 text-white selection:bg-indigo-500/30' : 'bg-gray-50 text-slate-900 selection:bg-red-500/30'}`}>
+          <Routes>
+            <Route
+              path="/"
+              element={<Home user={user} openAuth={() => setIsAuthModalOpen(true)} theme={theme} toggleTheme={toggleTheme} onShowToast={showToast} />}
+            />
+            <Route
+              path="/chat/:roomId"
+              element={<ChatRoom user={user} updateCredits={updateCredits} updateFreeCredits={updateFreeCredits} openAuth={() => setIsAuthModalOpen(true)} theme={theme} toggleTheme={toggleTheme} onShowToast={showToast} />}
+            />
+            <Route
+              path="/gallery"
+              element={<Gallery user={user} onShowToast={showToast} updateCredits={updateCredits} theme={theme} toggleTheme={toggleTheme} />}
+            />
+          </Routes>
+          {isAuthModalOpen && <AuthModal onClose={() => setIsAuthModalOpen(false)} onShowToast={showToast} />}
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            isVisible={toast.isVisible}
+            subMessage={toast.subMessage}
+            link={toast.link}
+            duration={toast.duration}
+            shareText={toast.shareText}
+            onClose={() => setToast(prev => ({ ...prev, isVisible: false }))}
           />
-          <Route
-            path="/chat/:roomId"
-            element={<ChatRoom user={user} updateCredits={updateCredits} updateFreeCredits={updateFreeCredits} openAuth={() => setIsAuthModalOpen(true)} theme={theme} toggleTheme={toggleTheme} onShowToast={showToast} />}
-          />
-          <Route
-            path="/gallery"
-            element={<Gallery user={user} onShowToast={showToast} updateCredits={updateCredits} theme={theme} toggleTheme={toggleTheme} />}
-          />
-        </Routes>
-        {isAuthModalOpen && <AuthModal onClose={() => setIsAuthModalOpen(false)} onShowToast={showToast} />}
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          isVisible={toast.isVisible}
-          subMessage={toast.subMessage}
-          link={toast.link}
-          duration={toast.duration}
-          shareText={toast.shareText}
-          onClose={() => setToast(prev => ({ ...prev, isVisible: false }))}
-        />
-      </div>
-    </Router>
+        </div>
+      </Router>
+    </ErrorBoundary>
   );
 };
 

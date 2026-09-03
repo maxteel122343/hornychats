@@ -29,6 +29,7 @@ export interface MediaCard {
   isBlur: boolean;
   blurLevel: number;
   saveToGallery: boolean;
+  postToChat?: boolean;
   createdAt: number;
   defaultWidth?: number;
   layoutStyle?: 'classic' | 'minimal';
@@ -49,6 +50,7 @@ export interface CardDefaults {
   repeatInterval: number;
   category: string;
   cardColor: string;
+  postToChat?: boolean;
 }
 
 export interface ChatSession {
@@ -104,4 +106,17 @@ export interface CreditTransaction {
   type: 'purchase' | 'fee' | 'transfer';
   card_id?: string;
   created_at: string;
+}
+
+export interface PaidChatConfig {
+  enabled: boolean;
+  intervalMinutes: number;
+  costCredits: number;
+  warningSeconds: number;
+  autoDebitDefault?: boolean;
+}
+
+export interface QuickPhrasesConfig {
+  creatorPhrases: string[];
+  visitorPhrases: string[];
 }

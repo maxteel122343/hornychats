@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { X, ArrowLeft, Wallet, DollarSign, QrCode, Zap, ArrowUpRight, Loader2, Copy, CheckCircle, RefreshCw, CreditCard, History, ShoppingCart, Lock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, ArrowLeft, Wallet, DollarSign, QrCode, Zap, ArrowUpRight, Loader2, Copy, CheckCircle, RefreshCw, CreditCard, History, ShoppingCart, Lock, Users, UserCheck, UserMinus, UserPlus, MessageSquare } from 'lucide-react';
 import { User, PaymentTransaction } from '../types';
 import { supabase } from '../lib/supabase';
 import { ToastType } from './Toast';
+import { getFollowers, getFollowing, unfollowUser, followUser, FollowerUser } from '../lib/followers';
 
 export interface Withdrawal {
   id: string;
@@ -24,7 +25,7 @@ export interface Sale {
 interface WalletModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'recharge' | 'earnings';
+  initialTab?: 'recharge' | 'earnings' | 'followers';
   user: User;
   updateCredits: (amount: number) => void;
   updateFreeCredits?: (amount: number, updateTimestamp?: boolean) => void;
@@ -35,6 +36,7 @@ interface WalletModalProps {
   hasFreeSales?: boolean;
   claimTimer?: number | null;
   onRefreshHistory?: () => void;
+  onNavigateToChat?: (userId: string, name?: string) => void;
   theme?: 'dark' | 'light';
 }
 
@@ -52,10 +54,17 @@ export const WalletModal: React.FC<WalletModalProps> = ({
   hasFreeSales = false,
   claimTimer = null,
   onRefreshHistory,
+  onNavigateToChat,
   theme = 'dark'
 }) => {
   const isDark = theme === 'dark';
-  const [activeTab, setActiveTab] = useState<'recharge' | 'earnings'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'recharge' | 'earnings' | 'followers'>(initialTab);
+
+  // Followers & Following State
+  const [followersList, setFollowersList] = useState<FollowerUser[]>([]);
+  const [followingList, setFollowingList] = useState<FollowerUser[]>([]);
+  const [followersSubTab, setFollowersSubTab] = useState<'followers' | 'following'>('followers');
+  const [isLoadingFollowers, setIsLoadingFollowers] = useState(false);
 
   // PIX Recharge State
   const [paymentAmount, setPaymentAmount] = useState<number | null>(null);
@@ -66,12 +75,87 @@ export const WalletModal: React.FC<WalletModalProps> = ({
 
   // Withdrawal State
   const [withdrawalMethod, setWithdrawalMethod] = useState<'pix' | 'picpay' | 'paypal' | 'stripe'>('pix');
-  const [withdrawalKey, setWithdrawalKey] = useState(user.pixKey || '');
+  const [withdrawalKey, setWithdrawalKey] = useState(user?.pixKey || '');
   const [withdrawalCpf, setWithdrawalCpf] = useState('');
   const [withdrawalFullName, setWithdrawalFullName] = useState('');
   const [withdrawalPending, setWithdrawalPending] = useState(false);
 
+  // Sync activeTab when modal is reopened with a different initialTab
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
+
+  // Load followers and following
+  useEffect(() => {
+    if (isOpen && user?.id) {
+      setIsLoadingFollowers(true);
+      Promise.all([
+        getFollowers(user.id),
+        getFollowing(user.id)
+      ]).then(([fList, flgList]) => {
+        setFollowersList(fList);
+        setFollowingList(flgList);
+      }).catch(e => {
+        console.warn('Error fetching followers:', e);
+      }).finally(() => {
+        setIsLoadingFollowers(false);
+      });
+    }
+  }, [isOpen, user?.id]);
+
+  const handleUnfollow = async (targetId: string, targetName: string) => {
+    if (!user.id) return;
+    await unfollowUser(user.id, targetId);
+    setFollowingList(prev => prev.filter(item => item.id !== targetId));
+    if (onShowToast) onShowToast(`Você deixou de seguir ${targetName}.`, 'info');
+  };
+
+  const handleFollowBack = async (targetId: string, targetName: string) => {
+    if (!user.id) return;
+    await followUser(user.id, targetId);
+    const updated = await getFollowing(user.id);
+    setFollowingList(updated);
+    if (onShowToast) onShowToast(`Agora você segue ${targetName}!`, 'success');
+  };
+
+  // Sync withdrawalKey when user profile updates
+  React.useEffect(() => {
+    if (user?.pixKey) {
+      setWithdrawalKey(user.pixKey);
+    }
+  }, [user?.pixKey]);
+
+  // Escuta atualização em tempo real do status do pagamento (ALWAYS called unconditionally before early return)
+  React.useEffect(() => {
+    if (!isOpen || !activePayment || !activePayment.id || activePayment.id.startsWith('sim-')) return;
+    const channel = supabase.channel(`wallet_payment_${activePayment.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'payment_transactions',
+        filter: `id=eq.${activePayment.id}`
+      }, (payload) => {
+        const updated = payload.new as PaymentTransaction;
+        if (updated && updated.status === 'approved') {
+          handleApprovedPayment(updated);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isOpen, activePayment?.id]);
+
   if (!isOpen) return null;
+
+  const safeWithdrawals = Array.isArray(withdrawalHistory) ? withdrawalHistory : [];
+  const safeSales = Array.isArray(salesHistory) ? salesHistory : [];
+  const currentCredits = user?.credits ?? 0;
+  const currentEarnings = user?.earnings ?? 0;
+  const currentFreeCredits = user?.free_credits ?? 0;
 
   const showToast = (message: string, type: ToastType = 'success') => {
     if (onShowToast) onShowToast(message, type);
@@ -145,28 +229,6 @@ export const WalletModal: React.FC<WalletModalProps> = ({
       setIsGeneratingPix(false);
     }
   };
-
-  // Escuta atualização em tempo real do status do pagamento
-  React.useEffect(() => {
-    if (!activePayment || activePayment.id.startsWith('sim-')) return;
-    const channel = supabase.channel(`wallet_payment_${activePayment.id}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'payment_transactions',
-        filter: `id=eq.${activePayment.id}`
-      }, (payload) => {
-        const updated = payload.new as PaymentTransaction;
-        if (updated && updated.status === 'approved') {
-          handleApprovedPayment(updated);
-        }
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [activePayment?.id]);
 
   const handleCheckStatus = async () => {
     if (!activePayment) return;
@@ -320,12 +382,12 @@ export const WalletModal: React.FC<WalletModalProps> = ({
               <h3 className={`text-base sm:text-lg font-black uppercase tracking-tight leading-tight ${
                 isDark ? 'text-white' : 'text-slate-900'
               }`}>
-                CARTEIRA & FINANÇAS
+                CARTEIRA & COMUNIDADE
               </h3>
               <p className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${
                 isDark ? 'text-slate-400' : 'text-slate-500'
               }`}>
-                SALDO: <span className="text-emerald-500 font-black">{user.credits} CR</span> • GANHOS: <span className="text-blue-500 font-black">{user.earnings} CR</span>
+                SALDO: <span className="text-emerald-500 font-black">{currentCredits} CR</span> • GANHOS: <span className="text-blue-500 font-black">{currentEarnings} CR</span> • <span className="text-purple-400 font-black">{followersList.length} SEGUIDORES</span> • <span className="text-purple-400 font-black">{followingList.length} SEGUINDO</span>
               </p>
             </div>
           </div>
@@ -345,33 +407,46 @@ export const WalletModal: React.FC<WalletModalProps> = ({
         </div>
 
         {/* TAB SWITCHER */}
-        <div className={`p-2 sm:p-3 border-b flex gap-2 shrink-0 ${
+        <div className={`p-2 sm:p-3 border-b flex gap-1.5 sm:gap-2 shrink-0 ${
           isDark ? 'bg-slate-900/60 border-white/5' : 'bg-gray-50 border-gray-200'
         }`}>
           <button
             type="button"
             onClick={() => { setActiveTab('recharge'); setActivePayment(null); }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 border ${
+            className={`flex-1 flex items-center justify-center gap-1 sm:gap-2 py-2 sm:py-2.5 px-2 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wider transition-all active:scale-95 border ${
               activeTab === 'recharge'
                 ? 'bg-emerald-600 text-white border-emerald-600 shadow-md'
                 : (isDark ? 'bg-slate-800/80 border-slate-700/60 text-slate-400 hover:text-white' : 'bg-white border-gray-200 text-slate-600 hover:bg-gray-100')
             }`}
           >
-            <Zap size={15} />
-            <span>Recarregar Créditos</span>
+            <Zap size={14} className="shrink-0" />
+            <span className="truncate">Recarregar</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('earnings')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 border ${
+            className={`flex-1 flex items-center justify-center gap-1 sm:gap-2 py-2 sm:py-2.5 px-2 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wider transition-all active:scale-95 border ${
               activeTab === 'earnings'
                 ? 'bg-blue-600 text-white border-blue-600 shadow-md'
                 : (isDark ? 'bg-slate-800/80 border-slate-700/60 text-slate-400 hover:text-white' : 'bg-white border-gray-200 text-slate-600 hover:bg-gray-100')
             }`}
           >
-            <DollarSign size={15} />
-            <span>Ganhos & Saques</span>
+            <DollarSign size={14} className="shrink-0" />
+            <span className="truncate">Ganhos</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('followers')}
+            className={`flex-1 flex items-center justify-center gap-1 sm:gap-2 py-2 sm:py-2.5 px-2 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wider transition-all active:scale-95 border ${
+              activeTab === 'followers'
+                ? 'bg-purple-600 text-white border-purple-600 shadow-md'
+                : (isDark ? 'bg-slate-800/80 border-slate-700/60 text-slate-400 hover:text-white' : 'bg-white border-gray-200 text-slate-600 hover:bg-gray-100')
+            }`}
+          >
+            <Users size={14} className="shrink-0" />
+            <span className="truncate">Seguidores ({followersList.length})</span>
           </button>
         </div>
 
@@ -392,7 +467,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                     isDark ? 'text-emerald-400' : 'text-emerald-700'
                   }`}>Seu Saldo Disponível</span>
                   <div className="flex items-baseline gap-2 mt-1">
-                    <span className={`text-4xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{user.credits}</span>
+                    <span className={`text-4xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{currentCredits}</span>
                     <span className="text-xs font-black text-emerald-600 uppercase tracking-wider">Créditos (CR)</span>
                   </div>
                 </div>
@@ -572,7 +647,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                     isDark ? 'text-blue-400' : 'text-blue-700'
                   }`}>Disponível para Saque</span>
                   <div className="flex items-baseline gap-2 mt-1">
-                    <span className={`text-4xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{user.earnings}</span>
+                    <span className={`text-4xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{currentEarnings}</span>
                     <span className="text-xs font-black text-blue-500 uppercase tracking-wider">Créditos (CR)</span>
                   </div>
                 </div>
@@ -591,7 +666,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                   <div>
                     <h4 className={`text-xs font-black uppercase tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>Créditos Gratuitos</h4>
                     <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                      Saldo: <span className="text-indigo-600 font-bold">{user.free_credits || 0} CR</span>
+                      Saldo: <span className="text-indigo-600 font-bold">{currentFreeCredits} CR</span>
                     </p>
                   </div>
                   {updateFreeCredits && (
@@ -719,7 +794,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                 <button
                   type="button"
                   onClick={handleWithdraw}
-                  disabled={user.earnings < 100 || withdrawalPending || !withdrawalKey}
+                  disabled={currentEarnings < 100 || withdrawalPending || !withdrawalKey}
                   className="w-full py-3.5 bg-blue-600 text-white font-black rounded-xl uppercase tracking-wider text-xs hover:bg-blue-500 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-98 shadow-lg shadow-blue-600/30"
                 >
                   {withdrawalPending ? <Loader2 size={16} className="animate-spin" /> : <ArrowUpRight size={16} />}
@@ -740,14 +815,14 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                   <History size={13} /> Histórico de Saques
                 </h4>
                 <div className="space-y-2 max-h-36 overflow-y-auto scrollbar-hide">
-                  {withdrawalHistory.length === 0 ? (
+                  {safeWithdrawals.length === 0 ? (
                     <p className={`text-center text-xs py-3 italic rounded-xl border ${
                       isDark ? 'text-slate-500 bg-slate-900/40 border-slate-800' : 'text-slate-400 bg-gray-50 border-gray-200'
                     }`}>
                       Nenhum saque solicitado ainda.
                     </p>
                   ) : (
-                    withdrawalHistory.map((w) => (
+                    safeWithdrawals.map((w) => (
                       <div key={w.id} className={`flex justify-between items-center p-3 rounded-xl border ${
                         isDark ? 'bg-slate-800/60 border-slate-700/60' : 'bg-gray-50 border-gray-200'
                       }`}>
@@ -762,7 +837,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                             {w.status === 'paid' ? 'PAGO' : 'PROCESSANDO'}
                           </span>
                           <span className={`text-[8px] block mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                            {new Date(w.created_at).toLocaleDateString()}
+                            {w.created_at ? new Date(w.created_at).toLocaleDateString() : ''}
                           </span>
                         </div>
                       </div>
@@ -779,14 +854,14 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                   <ShoppingCart size={13} /> Vendas Realizadas (Compradores)
                 </h4>
                 <div className="space-y-2 max-h-36 overflow-y-auto scrollbar-hide">
-                  {salesHistory.length === 0 ? (
+                  {safeSales.length === 0 ? (
                     <p className={`text-center text-xs py-3 italic rounded-xl border ${
                       isDark ? 'text-slate-500 bg-slate-900/40 border-slate-800' : 'text-slate-400 bg-gray-50 border-gray-200'
                     }`}>
                       Nenhuma venda registrada ainda.
                     </p>
                   ) : (
-                    salesHistory.map((sale) => (
+                    safeSales.map((sale) => (
                       <div key={sale.id} className={`flex justify-between items-center p-3 rounded-xl border ${
                         isDark ? 'bg-slate-800/60 border-slate-700/60' : 'bg-gray-50 border-gray-200'
                       }`}>
@@ -794,7 +869,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                           <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs ${
                             isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-700'
                           }`}>
-                            {sale.buyer_name ? sale.buyer_name.charAt(0).toUpperCase() : '?'}
+                            {sale.buyer_name ? String(sale.buyer_name).charAt(0).toUpperCase() : '?'}
                           </div>
                           <div className="flex flex-col max-w-[150px]">
                             <span className={`font-bold text-xs truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{sale.buyer_name || 'Usuário'}</span>
@@ -804,7 +879,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                         <div className="text-right">
                           <span className="text-emerald-500 font-black text-xs">+{sale.amount} CR</span>
                           <span className={`text-[8px] block mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                            {new Date(sale.created_at).toLocaleDateString()}
+                            {sale.created_at ? new Date(sale.created_at).toLocaleDateString() : ''}
                           </span>
                         </div>
                       </div>
@@ -815,8 +890,245 @@ export const WalletModal: React.FC<WalletModalProps> = ({
             </div>
           )}
 
+          {/* TAB 3: SEGUIDORES & COMUNIDADE */}
+          {activeTab === 'followers' && (
+            <div className="space-y-6 animate-in fade-in">
+              {/* SUMMARY METRICS BANNER */}
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                <div className={`p-4 sm:p-5 rounded-2xl border text-center ${
+                  isDark ? 'bg-purple-950/20 border-purple-500/30' : 'bg-purple-50 border-purple-200'
+                }`}>
+                  <span className={`text-[9px] sm:text-[10px] font-black uppercase tracking-wider block ${
+                    isDark ? 'text-purple-400' : 'text-purple-700'
+                  }`}>
+                    Quem te segue
+                  </span>
+                  <div className="flex items-center justify-center gap-1.5 mt-1">
+                    <Users size={18} className="text-purple-500" />
+                    <span className={`text-2xl sm:text-3xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                      {followersList.length}
+                    </span>
+                  </div>
+                  <span className="text-[9px] text-slate-400 uppercase font-bold">Seguidores</span>
+                </div>
+
+                <div className={`p-4 sm:p-5 rounded-2xl border text-center ${
+                  isDark ? 'bg-blue-950/20 border-blue-500/30' : 'bg-blue-50 border-blue-200'
+                }`}>
+                  <span className={`text-[9px] sm:text-[10px] font-black uppercase tracking-wider block ${
+                    isDark ? 'text-blue-400' : 'text-blue-700'
+                  }`}>
+                    Você segue
+                  </span>
+                  <div className="flex items-center justify-center gap-1.5 mt-1">
+                    <UserCheck size={18} className="text-blue-500" />
+                    <span className={`text-2xl sm:text-3xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                      {followingList.length}
+                    </span>
+                  </div>
+                  <span className="text-[9px] text-slate-400 uppercase font-bold">Criadores</span>
+                </div>
+              </div>
+
+              {/* SUBTAB SWITCHER */}
+              <div className={`p-1.5 rounded-xl border flex gap-1 ${
+                isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-gray-100 border-gray-200'
+              }`}>
+                <button
+                  type="button"
+                  onClick={() => setFollowersSubTab('followers')}
+                  className={`flex-1 py-2 px-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+                    followersSubTab === 'followers'
+                      ? 'bg-purple-600 text-white shadow-md'
+                      : (isDark ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
+                  }`}
+                >
+                  <Users size={14} />
+                  <span>Seguidores ({followersList.length})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFollowersSubTab('following')}
+                  className={`flex-1 py-2 px-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+                    followersSubTab === 'following'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : (isDark ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
+                  }`}
+                >
+                  <UserCheck size={14} />
+                  <span>Seguindo ({followingList.length})</span>
+                </button>
+              </div>
+
+              {/* LIST DISPLAY */}
+              {isLoadingFollowers ? (
+                <div className="flex flex-col items-center justify-center py-10 space-y-3">
+                  <Loader2 size={24} className="animate-spin text-purple-500" />
+                  <p className="text-xs text-slate-400">Carregando lista de conexões...</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {followersSubTab === 'followers' ? (
+                    followersList.length === 0 ? (
+                      <div className={`p-8 rounded-2xl border text-center space-y-2 ${
+                        isDark ? 'bg-slate-900/40 border-slate-800 text-slate-400' : 'bg-gray-50 border-gray-200 text-slate-500'
+                      }`}>
+                        <Users size={28} className="mx-auto text-purple-500/50 mb-1" />
+                        <p className="text-sm font-bold">Nenhum seguidor ainda</p>
+                        <p className="text-xs max-w-xs mx-auto text-slate-400">
+                          Compartilhe seus cards e sua sala de chat para atrair pessoas para sua rede!
+                        </p>
+                      </div>
+                    ) : (
+                      followersList.map(follower => {
+                        const alreadyFollow = followingList.some(f => f.id === follower.id);
+                        return (
+                          <div
+                            key={follower.id}
+                            className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all ${
+                              isDark ? 'bg-slate-800/60 border-slate-700/60 hover:border-purple-500/40' : 'bg-white border-gray-200 shadow-sm'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              {follower.profile_photo ? (
+                                <img
+                                  src={follower.profile_photo}
+                                  alt={follower.name}
+                                  className="w-10 h-10 rounded-xl object-cover border border-purple-500/30 shrink-0"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white font-black text-sm shrink-0 shadow-md">
+                                  {follower.name.charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <h5 className={`text-xs sm:text-sm font-black truncate uppercase tracking-tight ${
+                                  isDark ? 'text-white' : 'text-slate-900'
+                                }`}>
+                                  {follower.name}
+                                </h5>
+                                <span className="text-[9px] text-purple-400 font-bold uppercase tracking-wider block">
+                                  Te segue
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              {onNavigateToChat && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onClose();
+                                    onNavigateToChat(follower.id, follower.name);
+                                  }}
+                                  title={`Enviar mensagem para ${follower.name}`}
+                                  className="p-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md active:scale-95"
+                                >
+                                  <MessageSquare size={14} />
+                                </button>
+                              )}
+
+                              {!alreadyFollow ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleFollowBack(follower.id, follower.name)}
+                                  className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95"
+                                >
+                                  <UserPlus size={12} />
+                                  <span>Seguir de volta</span>
+                                </button>
+                              ) : (
+                                <span className="text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                  Amigos
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )
+                  ) : (
+                    followingList.length === 0 ? (
+                      <div className={`p-8 rounded-2xl border text-center space-y-2 ${
+                        isDark ? 'bg-slate-900/40 border-slate-800 text-slate-400' : 'bg-gray-50 border-gray-200 text-slate-500'
+                      }`}>
+                        <UserCheck size={28} className="mx-auto text-blue-500/50 mb-1" />
+                        <p className="text-sm font-bold">Você ainda não segue ninguém</p>
+                        <p className="text-xs max-w-xs mx-auto text-slate-400">
+                          Acesse a Vitrine e clique em 'Seguir' nos cards dos seus criadores favoritos!
+                        </p>
+                      </div>
+                    ) : (
+                      followingList.map(creator => (
+                        <div
+                          key={creator.id}
+                          className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all ${
+                            isDark ? 'bg-slate-800/60 border-slate-700/60 hover:border-blue-500/40' : 'bg-white border-gray-200 shadow-sm'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            {creator.profile_photo ? (
+                              <img
+                                src={creator.profile_photo}
+                                alt={creator.name}
+                                className="w-10 h-10 rounded-xl object-cover border border-blue-500/30 shrink-0"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-sm shrink-0 shadow-md">
+                                {creator.name.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <h5 className={`text-xs sm:text-sm font-black truncate uppercase tracking-tight ${
+                                isDark ? 'text-white' : 'text-slate-900'
+                              }`}>
+                                {creator.name}
+                              </h5>
+                              <span className="text-[9px] text-blue-400 font-bold uppercase tracking-wider block">
+                                Criador
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {onNavigateToChat && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onClose();
+                                  onNavigateToChat(creator.id, creator.name);
+                                }}
+                                title={`Abrir chat de ${creator.name}`}
+                                className="p-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md active:scale-95"
+                              >
+                                <MessageSquare size={14} />
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleUnfollow(creator.id, creator.name)}
+                              className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white border border-red-500/20 text-[10px] font-black uppercase tracking-wider transition-all active:scale-95"
+                              title="Deixar de seguir"
+                            >
+                              <UserMinus size={12} />
+                              <span>Deixar de seguir</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
         </div>
       </div>
     </div>
   );
 };
+
+export default WalletModal;

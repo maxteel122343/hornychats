@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Lock, Play, Volume2, Camera, Phone, MessageSquare, Eye, Clock, Tag, MoreVertical, X, Check, Maximize2, DownloadCloud, Timer, ImageOff, Trash2, Edit, AlertTriangle, LogIn, Link as LinkIcon, DoorOpen, CalendarClock } from 'lucide-react';
+import { Lock, Play, Volume2, Camera, Phone, MessageSquare, Eye, Clock, Tag, MoreVertical, X, Check, Maximize2, DownloadCloud, Timer, ImageOff, Trash2, Edit, AlertTriangle, LogIn, Link as LinkIcon, DoorOpen, CalendarClock, ZoomIn } from 'lucide-react';
 import { MediaCard, CardType } from '../types';
 import { ToastType, ToastOptions } from './Toast';
+import ImageViewerModal from './ImageViewerModal';
 
 interface MediaCardItemProps {
   card: MediaCard;
@@ -37,6 +38,7 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
   const [imgError, setImgError] = useState(false);
   const [expiresIn, setExpiresIn] = useState<number | null>(null);
   const [showControls, setShowControls] = useState(false);
+  const [isZoomOpen, setIsZoomOpen] = useState(false);
 
   useEffect(() => {
     let timer: any;
@@ -438,6 +440,12 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
         </div>
       </div>
       {renderFullScreenModal()}
+      <ImageViewerModal
+        isOpen={isZoomOpen}
+        imageUrl={card.mediaUrl || card.thumbnail || null}
+        title={card.title}
+        onClose={() => setIsZoomOpen(false)}
+      />
     </>
   );
 
@@ -459,8 +467,18 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
         <div className="w-full h-full flex flex-col items-center justify-center p-4 md:p-10">
           {card.type === CardType.VIDEO && card.mediaUrl ? (
             <video src={card.mediaUrl} autoPlay controls className="max-w-full max-h-full rounded-lg shadow-2xl" />
-          ) : card.type === CardType.IMAGE && card.mediaUrl ? (
-            <img src={card.mediaUrl} className="max-w-full max-h-full object-contain shadow-2xl rounded-lg" />
+          ) : card.type === CardType.IMAGE && (card.mediaUrl || card.thumbnail) ? (
+            <div 
+              onClick={() => setIsZoomOpen(true)}
+              className="relative group cursor-zoom-in flex items-center justify-center max-w-full max-h-full"
+              title="Clique para Tela Cheia com Zoom In / Zoom Out"
+            >
+              <img src={card.mediaUrl || card.thumbnail} className="max-w-full max-h-full object-contain shadow-2xl rounded-lg group-hover:scale-[1.01] transition-transform" />
+              <div className="absolute bottom-4 bg-black/80 backdrop-blur-md px-4 py-2 rounded-2xl flex items-center gap-2 text-white text-xs font-black border border-white/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-2xl">
+                <ZoomIn size={14} className="text-indigo-400" />
+                <span>Clique para Zoom In / Zoom Out</span>
+              </div>
+            </div>
           ) : card.type === CardType.AUDIO && card.mediaUrl ? (
             <div className="text-center p-8 space-y-8 max-w-md w-full">
               {/* Audio visualization similar to original */}

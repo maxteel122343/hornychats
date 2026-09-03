@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Plus, Home, Wallet, Share2, MessageSquare, LayoutGrid, QrCode, X, User as UserIcon, LogIn, Camera, Settings, Sun, Moon, Menu, ChevronLeft, ChevronRight, ChevronDown, Copy, CheckCircle, Loader2, RefreshCw, DollarSign, ArrowUpRight, Mic, Video, Upload, StopCircle, Trash2, Aperture, Lock, Zap, History, CreditCard, Mail, ShoppingCart, LogOut, FolderOpen, Edit, Tv, Image as ImageIcon, Cloud, MoreVertical, Minimize2, Maximize2, Power, Sliders, ArrowLeft } from 'lucide-react';
+import { Send, Plus, Home, Wallet, Share2, MessageSquare, LayoutGrid, QrCode, X, User as UserIcon, LogIn, Camera, Settings, Sun, Moon, Menu, ChevronLeft, ChevronRight, ChevronDown, Copy, CheckCircle, Loader2, RefreshCw, DollarSign, ArrowUpRight, Mic, Video, Upload, StopCircle, Trash2, Aperture, Lock, Zap, History, CreditCard, Mail, ShoppingCart, LogOut, FolderOpen, Edit, Tv, Image as ImageIcon, Cloud, MoreVertical, Minimize2, Maximize2, Power, Sliders, ArrowLeft, Users } from 'lucide-react';
 import { User, Message, MediaCard, ChatSession, CardType, PaymentTransaction, CardDefaults } from '../types';
 import { supabase } from '../lib/supabase';
 import CardModal from './CardModal';
@@ -10,6 +10,7 @@ import Gallery from './Gallery';
 import { QuickSettingsModal } from './QuickSettingsModal';
 import { WalletModal } from './WalletModal';
 import { ToastType, ToastOptions } from './Toast';
+import { getFollowers, getFollowing } from '../lib/followers';
 
 // IndexedDB configuration for storing recent local video files
 const DB_NAME = 'LocalWatchPartyDB';
@@ -191,9 +192,11 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const [showQrCode, setShowQrCode] = useState(false);
   const [showEarningsModal, setShowEarningsModal] = useState(false);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
-  const [walletInitialTab, setWalletInitialTab] = useState<'recharge' | 'earnings'>('recharge');
+  const [walletInitialTab, setWalletInitialTab] = useState<'recharge' | 'earnings' | 'followers'>('recharge');
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
 
-  const openWallet = (tab: 'recharge' | 'earnings' = 'recharge') => {
+  const openWallet = (tab: 'recharge' | 'earnings' | 'followers' = 'recharge') => {
     setWalletInitialTab(tab);
     setIsWalletModalOpen(true);
   };
@@ -606,7 +609,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
   // Load Withdrawal Settings & History when modal opens
   useEffect(() => {
-    if (showEarningsModal && user.isLoggedIn) {
+    if ((showEarningsModal || isWalletModalOpen) && user.isLoggedIn) {
       const fetchSettings = async () => {
         const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
         if (data) {
@@ -637,7 +640,15 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       };
       fetchSettings();
     }
-  }, [showEarningsModal, user.isLoggedIn]);
+  }, [showEarningsModal, isWalletModalOpen, user.isLoggedIn]);
+
+  // Load followers/following count for user
+  useEffect(() => {
+    if (user.isLoggedIn && user.id) {
+      getFollowers(user.id).then(f => setFollowersCount(f.length)).catch(console.warn);
+      getFollowing(user.id).then(f => setFollowingCount(f.length)).catch(console.warn);
+    }
+  }, [user.isLoggedIn, user.id, isWalletModalOpen]);
 
   // Handle Free Credits Claim Timer
   useEffect(() => {
@@ -676,7 +687,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
   // Update input key when method changes
   useEffect(() => {
-    if (showEarningsModal && user.isLoggedIn) {
+    if ((showEarningsModal || isWalletModalOpen) && user.isLoggedIn) {
       // We need to fetch again or use the cached user object values
       const data = {
         pix_key: user.pixKey,
@@ -855,23 +866,28 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     const earnings = Math.floor(privateRoomCard.creditCost * 0.8);
     // Use direct property access now that type definition is updated
     if (privateRoomCard.creator_id) {
-      await supabase.rpc('process_card_purchase', {
+      const { error: rpcError } = await supabase.rpc('process_card_purchase', {
         p_card_id: privateRoomCard.id,
         p_buyer_id: user.id,
         p_creator_id: privateRoomCard.creator_id,
         p_amount: privateRoomCard.creditCost,
-        p_earnings: earnings
+        p_earnings: earnings,
+        p_card_title: privateRoomCard.title || 'Sala Privada',
+        p_buyer_name: user.name || 'Usuário'
       });
 
-      // Log sales transaction manually for history display
-      await supabase.from('sales_transactions').insert([{
-        seller_id: privateRoomCard.creator_id,
-        buyer_id: user.id,
-        buyer_name: user.name,
-        card_id: privateRoomCard.id,
-        card_title: privateRoomCard.title,
-        amount: earnings
-      }]);
+      if (rpcError) {
+        console.warn("RPC process_card_purchase error in private room, executing fallback:", rpcError);
+        // Log sales transaction manually for history display
+        await supabase.from('sales_transactions').insert([{
+          seller_id: privateRoomCard.creator_id,
+          buyer_id: user.id,
+          buyer_name: user.name,
+          card_id: privateRoomCard.id,
+          card_title: privateRoomCard.title,
+          amount: earnings
+        }]);
+      }
     }
     setIsPrivateLocked(false);
     alert(`Sala desbloqueada! -${privateRoomCard.creditCost} créditos.`);
@@ -930,9 +946,51 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         setRoomDetails(merged);
         setTempRoomName(merged.name);
         setRoomAdmins(new Set(data.admins || []));
-      } else if (parsedCustomDetails) {
-        setRoomDetails(parsedCustomDetails);
-        setTempRoomName(parsedCustomDetails.name || 'Conversa');
+      } else {
+        // Check if roomId corresponds to a Creator profile (e.g. clicked chat button on creator card)
+        try {
+          const { data: creatorProfile } = await supabase
+            .from('profiles')
+            .select('id, name, avatar_url')
+            .eq('id', roomId)
+            .single();
+
+          if (creatorProfile) {
+            const creatorRoom = {
+              name: `Chat com ${creatorProfile.name || 'Criador'}`,
+              image_url: creatorProfile.avatar_url,
+              creator_id: creatorProfile.id,
+              admins: [creatorProfile.id]
+            };
+            setRoomDetails(creatorRoom);
+            setTempRoomName(creatorRoom.name);
+            setRoomAdmins(new Set([creatorProfile.id]));
+
+            setSessions(prev => {
+              const idx = prev.findIndex(s => s.id === roomId);
+              if (idx !== -1) {
+                const next = [...prev];
+                next[idx] = { ...next[idx], name: creatorRoom.name };
+                return next;
+              }
+              return [{
+                id: roomId,
+                name: creatorRoom.name,
+                lastMessage: 'Conversa com criador',
+                time: 'Agora',
+                isActive: true
+              }, ...prev];
+            });
+          } else if (parsedCustomDetails) {
+            setRoomDetails(parsedCustomDetails);
+            setTempRoomName(parsedCustomDetails.name || 'Conversa');
+          }
+        } catch (e) {
+          if (parsedCustomDetails) {
+            setRoomDetails(parsedCustomDetails);
+            setTempRoomName(parsedCustomDetails.name || 'Conversa');
+          }
+        }
       }
 
       if (watchPartyData) {
@@ -1298,6 +1356,99 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       supabase.removeChannel(channel);
     };
   }, [roomId, isPrivateLocked, user.id, isWatchPartyHost]);
+
+  // Incoming Messages & Creator Inbox Listener:
+  // When a user writes to a creator's room (room_id = user.id), notify the creator and populate sessions
+  useEffect(() => {
+    if (!user?.id || !user.isLoggedIn) return;
+
+    const fetchIncomingConversations = async () => {
+      try {
+        const { data: incomingMsgs } = await supabase
+          .from('messages')
+          .select('id, room_id, sender_id, sender_name, text, created_at')
+          .eq('room_id', user.id)
+          .neq('sender_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (incomingMsgs && incomingMsgs.length > 0) {
+          const senderMap = new Map<string, any>();
+          for (const msg of incomingMsgs) {
+            if (!senderMap.has(msg.sender_id)) {
+              senderMap.set(msg.sender_id, msg);
+            }
+          }
+
+          setSessions(prev => {
+            const next = [...prev];
+            senderMap.forEach((msg) => {
+              const sessionTitle = `Chat de: ${msg.sender_name || 'Usuário'}`;
+              const exists = next.find(s => s.id === user.id);
+              if (exists) {
+                exists.name = sessionTitle;
+                exists.lastMessage = msg.text || 'Nova mensagem recebida';
+                exists.time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              } else {
+                next.unshift({
+                  id: user.id,
+                  name: sessionTitle,
+                  lastMessage: msg.text || 'Nova mensagem recebida',
+                  time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                  isActive: roomId === user.id
+                });
+              }
+            });
+            return next;
+          });
+        }
+      } catch (err) {
+        console.warn("Could not fetch incoming messages:", err);
+      }
+    };
+
+    fetchIncomingConversations();
+
+    // Subscribe to incoming messages directed to current user's room
+    const inboxChannel = supabase.channel(`creator-inbox:${user.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `room_id=eq.${user.id}`
+      }, (payload) => {
+        const msg = payload.new;
+        if (msg.sender_id !== user.id) {
+          if (onShowToast) {
+            onShowToast(`Mensagem de ${msg.sender_name || 'Usuário'}: "${(msg.text || '').slice(0, 35)}"`, 'info');
+          }
+          setSessions(prev => {
+            const next = [...prev];
+            const sessionTitle = `Chat de: ${msg.sender_name || 'Usuário'}`;
+            const exists = next.find(s => s.id === user.id);
+            if (exists) {
+              exists.name = sessionTitle;
+              exists.lastMessage = msg.text || 'Nova mensagem';
+              exists.time = 'Agora';
+            } else {
+              next.unshift({
+                id: user.id,
+                name: sessionTitle,
+                lastMessage: msg.text || 'Nova mensagem',
+                time: 'Agora',
+                isActive: roomId === user.id
+              });
+            }
+            return next;
+          });
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(inboxChannel);
+    };
+  }, [user?.id, user?.isLoggedIn, roomId, onShowToast]);
 
   useEffect(() => {
     // Only scroll the specific internal chat container, NEVER window.scrollIntoView which moves/minimizes header
@@ -1860,24 +2011,28 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
     } else {
       // CREATE new message
-      if (!roomId) {
-        // If no room, we just save to gallery/my cards and maybe prompt insert?
-        // Logic handled below
-      }
-
       setIsCardModalOpen(false);
 
-      if (roomId) {
+      const shouldPostToChat = card.postToChat !== false;
+
+      if (roomId && shouldPostToChat) {
         const { error } = await supabase.from('messages').insert([{
           room_id: roomId,
           sender_id: user.id,
           sender_name: user.name,
           card_data: card
         }]);
-        if (error) alert('Erro ao criar card');
+        if (error) {
+          console.error('Error creating card message:', error);
+          showToast('Erro ao criar card no chat.', 'error');
+        } else {
+          showToast('Card publicado no chat e na vitrine!', 'success');
+        }
+      } else {
+        showToast('Card publicado exclusivamente na vitrine!', 'success');
       }
 
-      if (card.type === CardType.CHAT) addPrivateSession(card.id, card.title);
+      if (card.type === CardType.CHAT && shouldPostToChat) addPrivateSession(card.id, card.title);
       if (card.saveToGallery && user.isLoggedIn) {
         await supabase.from('cards').upsert([{
           id: card.id,
@@ -1900,11 +2055,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           layout_style: card.layoutStyle
         }]);
         // Update My Cards optimistically for new create too
-        if (activeTab === 'my_cards') {
-          // Fetch again or append? fetching is safer for ID consistency if dealing with DB-gen IDs, 
-          // but here ID is client-gen mostly.
-          setMyCards(prev => [card, ...prev]);
-        }
+        setMyCards(prev => [card, ...prev.filter(c => c.id !== card.id)]);
       }
     }
   };
@@ -2093,18 +2244,29 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         if (user.isLoggedIn) {
           const { data: cardData } = await supabase.from('cards').select('creator_id').eq('id', card.id).single();
           if (cardData && cardData.creator_id) {
-            await supabase.rpc('process_card_purchase', { p_card_id: card.id, p_buyer_id: user.id, p_creator_id: cardData.creator_id, p_amount: card.creditCost, p_earnings: earnings });
+            const { error: rpcError } = await supabase.rpc('process_card_purchase', { 
+              p_card_id: card.id, 
+              p_buyer_id: user.id, 
+              p_creator_id: cardData.creator_id, 
+              p_amount: card.creditCost, 
+              p_earnings: earnings,
+              p_card_title: card.title || 'Card',
+              p_buyer_name: user.name || 'Usuário'
+            });
 
-            // Log transaction for frontend history
-            await supabase.from('sales_transactions').insert([{
-              seller_id: cardData.creator_id,
-              buyer_id: user.id,
-              buyer_name: user.name,
-              card_id: card.id,
-              card_title: card.title,
-              amount: earnings,
-              is_free: false
-            }]);
+            if (rpcError) {
+              console.warn("RPC process_card_purchase error, executing fallback:", rpcError);
+              // Fallback log transaction for frontend history
+              await supabase.from('sales_transactions').insert([{
+                seller_id: cardData.creator_id,
+                buyer_id: user.id,
+                buyer_name: user.name || 'Usuário',
+                card_id: card.id,
+                card_title: card.title || 'Card',
+                amount: earnings,
+                is_free: false
+              }]);
+            }
           }
           setPurchasedCardIds(prev => new Set(prev).add(card.id));
         }
@@ -2573,7 +2735,25 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           <div className="w-full text-center animate-in fade-in space-y-3">
             <div>
               <h2 className={`text-xs font-black ${colors.textHighlight} uppercase tracking-[0.2em]`}>{user.name}</h2>
-              <div className="flex flex-col gap-1 mt-1"><p className={`text-[9px] ${colors.text} font-bold uppercase`}>{user.isLoggedIn ? 'Autenticado' : 'Visitante'}</p></div>
+              <div className="flex flex-col items-center gap-1.5 mt-1">
+                <p className={`text-[9px] ${colors.text} font-bold uppercase`}>{user.isLoggedIn ? 'Autenticado' : 'Visitante'}</p>
+                {user.isLoggedIn && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      openWallet('followers');
+                    }}
+                    className="inline-flex items-center justify-center gap-1.5 py-1 px-2.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/20 transition-all text-[9px] font-black uppercase tracking-wider mx-auto active:scale-95 shadow-xs cursor-pointer"
+                    title="Ver quem te segue e seus seguidores"
+                  >
+                    <Users size={11} />
+                    <span>{followersCount} Seguidores</span>
+                    <span className="opacity-40">•</span>
+                    <span>{followingCount} Seguindo</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Wallet & Deposit Banner in Sidebar */}
@@ -4036,7 +4216,13 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         {/* Unified Wallet & Earnings Modal */}
         <WalletModal
           isOpen={isWalletModalOpen}
-          onClose={() => setIsWalletModalOpen(false)}
+          onClose={() => {
+            setIsWalletModalOpen(false);
+            if (user.isLoggedIn && user.id) {
+              getFollowers(user.id).then(f => setFollowersCount(f.length)).catch(console.warn);
+              getFollowing(user.id).then(f => setFollowingCount(f.length)).catch(console.warn);
+            }
+          }}
           initialTab={walletInitialTab}
           user={user}
           updateCredits={updateCredits}

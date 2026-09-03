@@ -5,13 +5,15 @@ import {
   Image as ImageIcon, MessageSquare, Loader2, X, Check, 
   Lock, Sparkles, User as UserIcon, ExternalLink, ShieldCheck,
   Volume2, Eye, Share2, Layers, QrCode, Zap, Copy, CheckCircle, RefreshCw,
-  Sun, Moon, Wallet
+  Sun, Moon, Wallet, ZoomIn, Users, UserPlus, UserCheck
 } from 'lucide-react';
 import { User, MediaCard, CardType } from '../types';
 import { supabase } from '../lib/supabase';
 import { UnlockPurchaseModal } from './UnlockPurchaseModal';
 import { WalletModal } from './WalletModal';
+import { ImageViewerModal } from './ImageViewerModal';
 import { ToastType, ToastOptions } from './Toast';
+import { followUser, unfollowUser, getFollowing, getFollowers } from '../lib/followers';
 
 interface GalleryProps {
   user: User;
@@ -37,6 +39,16 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Global');
   const [selectedCreatorId, setSelectedCreatorId] = useState<string | null>(null);
+  
+  // Followers state
+  const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
+  const [followersCounts, setFollowersCounts] = useState<Record<string, number>>({});
+
+  // Fullscreen Zoom Lightbox State
+  const [zoomModal, setZoomModal] = useState<{ isOpen: boolean; url: string | null; title?: string }>({
+    isOpen: false,
+    url: null
+  });
   
   // Modal Preview / Unlock State
   const [activePreviewCard, setActivePreviewCard] = useState<MediaCard | null>(null);
@@ -192,6 +204,49 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
     }
   };
 
+  // Load following list for current user
+  useEffect(() => {
+    if (user?.id) {
+      getFollowing(user.id).then(list => {
+        setFollowingIds(new Set(list.map(f => f.id)));
+      }).catch(console.warn);
+    }
+  }, [user?.id]);
+
+  const handleToggleFollow = async (creatorId: string, creatorName: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!user.isLoggedIn || !user.id) {
+      if (onShowToast) onShowToast("Faça login para seguir este criador!", "info");
+      return;
+    }
+    const isCurrentlyFollowing = followingIds.has(creatorId);
+    if (isCurrentlyFollowing) {
+      await unfollowUser(user.id, creatorId);
+      setFollowingIds(prev => {
+        const next = new Set(prev);
+        next.delete(creatorId);
+        return next;
+      });
+      setFollowersCounts(prev => ({
+        ...prev,
+        [creatorId]: Math.max(0, (prev[creatorId] || 1) - 1)
+      }));
+      if (onShowToast) onShowToast(`Você deixou de seguir ${creatorName}.`, 'info');
+    } else {
+      await followUser(user.id, creatorId);
+      setFollowingIds(prev => {
+        const next = new Set(prev);
+        next.add(creatorId);
+        return next;
+      });
+      setFollowersCounts(prev => ({
+        ...prev,
+        [creatorId]: (prev[creatorId] || 0) + 1
+      }));
+      if (onShowToast) onShowToast(`Agora você segue ${creatorName}!`, 'success');
+    }
+  };
+
   const handleOpenCreatorChat = (creatorId: string, creatorName?: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     const name = creatorName || 'Criador';
@@ -265,23 +320,28 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
         try {
           const earnings = Math.floor(cost * 0.8);
           if (card.creator_id && card.creator_id !== user.id) {
-            await supabase.rpc('process_card_purchase', {
+            const { error: rpcError } = await supabase.rpc('process_card_purchase', {
               p_card_id: card.id,
               p_buyer_id: user.id,
               p_creator_id: card.creator_id,
               p_amount: cost,
-              p_earnings: earnings
+              p_earnings: earnings,
+              p_card_title: card.title || 'Card',
+              p_buyer_name: user.name || 'Usuário'
             });
 
-            await supabase.from('sales_transactions').insert([{
-              seller_id: card.creator_id,
-              buyer_id: user.id,
-              buyer_name: user.name,
-              card_id: card.id,
-              card_title: card.title,
-              amount: earnings,
-              is_free: false
-            }]);
+            if (rpcError) {
+              console.warn("RPC process_card_purchase error, executing fallback:", rpcError);
+              await supabase.from('sales_transactions').insert([{
+                seller_id: card.creator_id,
+                buyer_id: user.id,
+                buyer_name: user.name || 'Usuário',
+                card_id: card.id,
+                card_title: card.title || 'Card',
+                amount: earnings,
+                is_free: false
+              }]);
+            }
           }
         } catch (e) {
           console.warn("Error processing backend sale:", e);
@@ -605,6 +665,21 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
                     </p>
                   </button>
 
+                  {/* Follow Button for this Creator */}
+                  {creator.id !== user.id && (
+                    <button
+                      onClick={(e) => handleToggleFollow(creator.id, creator.name, e)}
+                      title={followingIds.has(creator.id) ? `Deixar de seguir ${creator.name}` : `Seguir ${creator.name}`}
+                      className={`p-1 sm:p-1.5 rounded-lg sm:rounded-xl transition-all shadow-md active:scale-95 focus:outline-none shrink-0 border ${
+                        followingIds.has(creator.id)
+                          ? 'bg-purple-600 border-purple-500 text-white'
+                          : (isDark ? 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white' : 'bg-gray-100 border-gray-200 text-slate-700 hover:bg-gray-200')
+                      }`}
+                    >
+                      {followingIds.has(creator.id) ? <UserCheck size={12} /> : <UserPlus size={12} />}
+                    </button>
+                  )}
+
                   {/* Direct Chat Button for this Creator */}
                   <button
                     onClick={(e) => handleOpenCreatorChat(creator.id, creator.name, e)}
@@ -661,6 +736,20 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {selectedCreator.id !== user.id && (
+              <button
+                onClick={(e) => handleToggleFollow(selectedCreator.id, selectedCreator.name, e)}
+                className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl sm:rounded-2xl font-black text-[10px] sm:text-xs uppercase tracking-wider transition-all shadow-md active:scale-95 ${
+                  followingIds.has(selectedCreator.id)
+                    ? 'bg-purple-600 hover:bg-purple-500 text-white shadow-purple-600/30'
+                    : 'bg-purple-600/20 hover:bg-purple-600 text-purple-400 hover:text-white border border-purple-500/30'
+                }`}
+              >
+                {followingIds.has(selectedCreator.id) ? <UserCheck size={13} /> : <UserPlus size={13} />}
+                <span>{followingIds.has(selectedCreator.id) ? 'Seguindo' : 'Seguir Criador'}</span>
+              </button>
+            )}
+
             <button
               onClick={() => handleOpenCreatorChat(selectedCreator.id, selectedCreator.name)}
               className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl sm:rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-[10px] sm:text-xs uppercase tracking-wider transition-all shadow-md active:scale-95"
@@ -1041,11 +1130,27 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
                   />
                 </div>
               ) : activePreviewCard.type === CardType.IMAGE ? (
-                <img
-                  src={activePreviewCard.mediaUrl || activePreviewCard.thumbnail}
-                  alt={activePreviewCard.title}
-                  className="w-full max-h-[380px] object-contain"
-                />
+                <div 
+                  onClick={() => setZoomModal({
+                    isOpen: true,
+                    url: activePreviewCard.mediaUrl || activePreviewCard.thumbnail || null,
+                    title: activePreviewCard.title
+                  })}
+                  className="relative group cursor-zoom-in w-full flex items-center justify-center overflow-hidden"
+                  title="Clique para ver em tela cheia com Zoom In / Zoom Out"
+                >
+                  <img
+                    src={activePreviewCard.mediaUrl || activePreviewCard.thumbnail}
+                    alt={activePreviewCard.title}
+                    className="w-full max-h-[380px] object-contain transition-transform duration-200 group-hover:scale-[1.02]"
+                  />
+                  <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                    <div className="bg-slate-900/85 backdrop-blur-md px-3.5 py-2 rounded-2xl flex items-center gap-2 border border-white/20 text-white font-black text-xs shadow-2xl">
+                      <ZoomIn size={16} className="text-indigo-400" />
+                      <span>Clique para Tela Cheia & Zoom</span>
+                    </div>
+                  </div>
+                </div>
               ) : (
                 <div className="p-12 text-center space-y-4">
                   <div className="w-16 h-16 rounded-full bg-indigo-600/20 flex items-center justify-center text-indigo-400 mx-auto">
@@ -1159,6 +1264,14 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
         openAuth={() => {}}
         onShowToast={(msg, type) => onShowToast && onShowToast(msg, type)}
         theme={theme}
+      />
+
+      {/* FULLSCREEN IMAGE LIGHTBOX WITH ZOOM IN / ZOOM OUT */}
+      <ImageViewerModal
+        isOpen={zoomModal.isOpen}
+        imageUrl={zoomModal.url}
+        title={zoomModal.title}
+        onClose={() => setZoomModal({ isOpen: false, url: null })}
       />
     </div>
   );
