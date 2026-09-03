@@ -1,9 +1,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Lock, Play, Volume2, Camera, Phone, MessageSquare, Eye, Clock, Tag, MoreVertical, X, Check, Maximize2, DownloadCloud, Timer, ImageOff, Trash2, Edit, AlertTriangle, LogIn, Link as LinkIcon, DoorOpen, CalendarClock, ZoomIn } from 'lucide-react';
+import { Lock, Play, Volume2, Camera, Phone, MessageSquare, Eye, Clock, Tag, MoreVertical, X, Check, Maximize2, DownloadCloud, Timer, ImageOff, Trash2, Edit, AlertTriangle, LogIn, Link as LinkIcon, DoorOpen, CalendarClock, ZoomIn, Heart, UserPlus } from 'lucide-react';
 import { MediaCard, CardType } from '../types';
 import { ToastType, ToastOptions } from './Toast';
 import ImageViewerModal from './ImageViewerModal';
+import { fetchLikesForCards, toggleCardLike } from '../lib/likes';
+import { followUser, unfollowUser, getFollowing } from '../lib/followers';
 
 interface MediaCardItemProps {
   card: MediaCard;
@@ -36,9 +38,15 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
   const [timeLeft, setTimeLeft] = useState(card.duration);
   const [callStatus, setCallStatus] = useState<'none' | 'requesting' | 'accepted' | 'declined'>('none');
   const [imgError, setImgError] = useState(false);
+  const [avatarImgError, setAvatarImgError] = useState(false);
   const [expiresIn, setExpiresIn] = useState<number | null>(null);
   const [showControls, setShowControls] = useState(false);
   const [isZoomOpen, setIsZoomOpen] = useState(false);
+  
+  // Likes and Follow state
+  const [likesCount, setLikesCount] = useState(card.likesCount || 0);
+  const [isLiked, setIsLiked] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
 
   useEffect(() => {
     let timer: any;
@@ -81,6 +89,50 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
   useEffect(() => {
     if (canManage) setIsUnlocked(true);
   }, [canManage]);
+
+  // Carregar contagem e status de curtida + seguidor
+  useEffect(() => {
+    if (card.id && card.id !== 'preview') {
+      const currentUserId = localStorage.getItem('linkcard_user_id') || undefined;
+      fetchLikesForCards([card.id], currentUserId).then(({ counts, userLiked }) => {
+        setLikesCount(counts[card.id] || 0);
+        setIsLiked(userLiked.has(card.id));
+      }).catch(console.warn);
+
+      if (card.creator_id && currentUserId && card.creator_id !== currentUserId) {
+        getFollowing(currentUserId).then(list => {
+          setIsFollowing(list.some(f => f.id === card.creator_id));
+        }).catch(console.warn);
+      }
+    }
+  }, [card.id, card.creator_id]);
+
+  const handleLikeToggle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const currentUserId = localStorage.getItem('linkcard_user_id') || undefined;
+    const nextLiked = !isLiked;
+    setIsLiked(nextLiked);
+    setLikesCount(prev => nextLiked ? prev + 1 : Math.max(0, prev - 1));
+    await toggleCardLike(card.id, currentUserId);
+  };
+
+  const handleFollowToggle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const currentUserId = localStorage.getItem('linkcard_user_id') || undefined;
+    if (!currentUserId || !card.creator_id) {
+      if (onShowToast) onShowToast("Faça login para seguir o criador!", "info");
+      return;
+    }
+    if (isFollowing) {
+      await unfollowUser(currentUserId, card.creator_id);
+      setIsFollowing(false);
+      if (onShowToast) onShowToast(`Você deixou de seguir este criador.`, 'info');
+    } else {
+      await followUser(currentUserId, card.creator_id);
+      setIsFollowing(true);
+      if (onShowToast) onShowToast(`Agora você está seguindo este criador!`, 'success');
+    }
+  };
 
   const handleInteraction = async () => {
     if (expiresIn === 0) return;
@@ -248,6 +300,9 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
   };
 
   const creatorName = card.creatorName || (isHostMode ? 'Host' : 'Criador');
+  const currentUserId = typeof window !== 'undefined' ? (localStorage.getItem('linkcard_user_id') || undefined) : undefined;
+  const isSelf = !!(card.creator_id && currentUserId && card.creator_id === currentUserId);
+  const resolvedCreatorPhoto = card.creatorPhoto || (card.creator_id ? localStorage.getItem('linkcard_avatar_' + card.creator_id) : null) || localStorage.getItem('linkcard_user_photo');
 
   return (
     <>
@@ -307,30 +362,59 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
 
           {/* CREATOR PROFILE CHIP ON CARD */}
           <div className="absolute bottom-2.5 left-2.5 right-2.5 z-10 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-xl bg-black/75 backdrop-blur-md border border-white/15 text-slate-200">
-              {card.creatorPhoto ? (
+            <div className="flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-xl bg-black/80 backdrop-blur-md border border-white/20 text-slate-200 min-w-0 max-w-[62%]">
+              {resolvedCreatorPhoto && !avatarImgError ? (
                 <img
-                  src={card.creatorPhoto}
+                  src={resolvedCreatorPhoto}
                   alt={creatorName}
-                  className="w-5 h-5 rounded-full object-cover border border-white/30"
+                  onError={() => setAvatarImgError(true)}
+                  className="w-5 h-5 rounded-full object-cover border border-white/30 shrink-0"
                 />
               ) : (
-                <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-black text-[9px] border border-white/30">
+                <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-black text-[9px] border border-white/30 shrink-0 shadow-xs">
                   {creatorName.charAt(0).toUpperCase()}
                 </div>
               )}
-              <span className="text-[9px] font-black uppercase tracking-tight truncate max-w-[120px]">
+              <span className="text-[9px] font-black uppercase tracking-tight truncate">
                 {creatorName}
               </span>
             </div>
 
-            <button
-              onClick={handleCopyLink}
-              title="Copiar Link da Sala Exclusiva"
-              className="p-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-400/30 backdrop-blur-md transition-all shadow-lg active:scale-95 flex items-center justify-center"
-            >
-              <MessageSquare size={13} />
-            </button>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* BOTÃO SEGUIR CRIADOR */}
+              {card.creator_id && !isSelf && (
+                <button
+                  type="button"
+                  onClick={handleFollowToggle}
+                  title={isFollowing ? `Deixar de seguir ${creatorName}` : `Seguir ${creatorName}`}
+                  className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all flex items-center gap-1 backdrop-blur-md border shadow-sm active:scale-95 ${
+                    isFollowing
+                      ? 'bg-emerald-600/90 text-white border-emerald-400/40 hover:bg-emerald-700'
+                      : 'bg-white/95 text-slate-950 border-white/50 hover:bg-white font-bold'
+                  }`}
+                >
+                  {isFollowing ? (
+                    <>
+                      <Check size={10} className="stroke-[3]" />
+                      <span>Seguindo</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus size={10} />
+                      <span>Seguir</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              <button
+                onClick={handleCopyLink}
+                title="Copiar Link da Sala Exclusiva"
+                className="p-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-400/30 backdrop-blur-md transition-all shadow-lg active:scale-95 flex items-center justify-center"
+              >
+                <MessageSquare size={13} />
+              </button>
+            </div>
           </div>
 
           {/* BLUR OVERLAY IF LOCKED */}
@@ -355,13 +439,30 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
               }`}>
                 {card.category || 'PREMIUM'}
               </span>
-              {card.duration > 0 && (
-                <span className={`text-[8px] font-bold uppercase tracking-widest ${
-                  isDark ? 'text-slate-400' : 'text-slate-500'
-                }`}>
-                  {Math.floor(card.duration / 60)}:{(card.duration % 60).toString().padStart(2, '0')} MIN
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {/* BOTÃO CURTIR TOPO */}
+                <button
+                  type="button"
+                  onClick={handleLikeToggle}
+                  title={isLiked ? "Descurtir" : "Curtir este card"}
+                  className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md border transition-all active:scale-90 ${
+                    isLiked
+                      ? 'bg-red-500/15 border-red-500/40 text-red-500'
+                      : (isDark ? 'bg-white/5 border-white/10 text-slate-400 hover:text-red-400' : 'bg-gray-100 border-gray-200 text-slate-500 hover:text-red-500')
+                  }`}
+                >
+                  <Heart size={11} className={isLiked ? "fill-red-500 text-red-500" : ""} />
+                  <span className="text-[9px] font-bold">{likesCount}</span>
+                </button>
+
+                {card.duration > 0 && (
+                  <span className={`text-[8px] font-bold uppercase tracking-widest ${
+                    isDark ? 'text-slate-400' : 'text-slate-500'
+                  }`}>
+                    {Math.floor(card.duration / 60)}:{(card.duration % 60).toString().padStart(2, '0')} MIN
+                  </span>
+                )}
+              </div>
             </div>
 
             <h3 className={`text-sm font-black leading-snug uppercase tracking-tight line-clamp-1 mb-1 ${
@@ -393,13 +494,13 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
             )}
           </div>
 
-          {/* ACTION BUTTONS (VER / DESBLOQUEAR & CHAT) */}
-          <div className={`grid grid-cols-5 gap-2 pt-2 border-t ${
+          {/* ACTION BUTTONS (VER / DESBLOQUEAR & CURTIR & CHAT) */}
+          <div className={`flex items-center gap-2 pt-2 border-t w-full ${
             isDark ? 'border-white/5' : 'border-gray-100'
           }`}>
             <button
               onClick={handleInteraction}
-              className={`col-span-4 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 ${
+              className={`flex-1 min-w-0 py-2.5 px-2 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 truncate ${
                 card.type === CardType.CHAT
                   ? 'bg-blue-600 hover:bg-blue-500 text-white'
                   : isUnlocked
@@ -409,26 +510,43 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
             >
               {card.type === CardType.CHAT ? (
                 <>
-                  <LogIn size={13} />
-                  <span>ENTRAR NA SALA</span>
+                  <LogIn size={13} className="shrink-0" />
+                  <span className="truncate">ENTRAR NA SALA</span>
                 </>
               ) : isUnlocked ? (
                 <>
-                  <Eye size={13} />
-                  <span>VER MÍDIA</span>
+                  <Eye size={13} className="shrink-0" />
+                  <span className="truncate">VER MÍDIA</span>
                 </>
               ) : (
                 <>
-                  <Lock size={13} />
-                  <span>DESBLOQUEAR ({card.creditCost} CR)</span>
+                  <Lock size={13} className="shrink-0" />
+                  <span className="truncate">DESBLOQUEAR ({card.creditCost} CR)</span>
                 </>
               )}
+            </button>
+
+            {/* BOTÃO CURTIR RODAPÉ */}
+            <button
+              type="button"
+              onClick={handleLikeToggle}
+              title={isLiked ? "Descurtir" : "Curtir este card"}
+              className={`shrink-0 h-10 px-2.5 rounded-xl border transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 ${
+                isLiked
+                  ? 'bg-red-500/15 border-red-500/40 text-red-500'
+                  : (isDark 
+                      ? 'bg-slate-800/80 hover:bg-slate-800 text-slate-400 border-white/10 hover:text-red-400' 
+                      : 'bg-gray-100 hover:bg-gray-200 text-slate-500 border-gray-200 hover:text-red-500')
+              }`}
+            >
+              <Heart size={15} className={isLiked ? "fill-red-500 text-red-500" : ""} />
+              <span className="text-[10px] font-black">{likesCount}</span>
             </button>
 
             <button
               onClick={handleCopyLink}
               title="Copiar Link da Sala Exclusiva"
-              className={`col-span-1 py-2.5 rounded-xl border transition-all flex items-center justify-center shadow-md active:scale-95 ${
+              className={`shrink-0 w-10 h-10 rounded-xl border transition-all flex items-center justify-center shadow-md active:scale-95 ${
                 isDark 
                   ? 'bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white border-indigo-500/30' 
                   : 'bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white border-indigo-200'

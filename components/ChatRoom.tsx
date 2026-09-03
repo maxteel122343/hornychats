@@ -1761,9 +1761,6 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       }, (payload) => {
         const msg = payload.new;
         if (msg.sender_id !== user.id) {
-          if (onShowToast) {
-            onShowToast(`Mensagem de ${msg.sender_name || 'Usuário'}: "${(msg.text || '').slice(0, 35)}"`, 'info');
-          }
           setSessions(prev => {
             const next = [...prev];
             const sessionTitle = `Chat de: ${msg.sender_name || 'Usuário'}`;
@@ -1849,8 +1846,25 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(filePath);
     const publicUrlWithTimestamp = `${publicUrl}?t=${Date.now()}`; // Bust cache
 
-    // Update Supabase
-    await supabase.from('profiles').update({ profile_photo: publicUrlWithTimestamp }).eq('id', user.id);
+    // Update Supabase (supports profile_photo and avatar_url)
+    try {
+      await supabase.from('profiles').update({ 
+        profile_photo: publicUrlWithTimestamp,
+        avatar_url: publicUrlWithTimestamp 
+      }).eq('id', user.id);
+    } catch (err) {
+      try {
+        await supabase.from('profiles').update({ profile_photo: publicUrlWithTimestamp }).eq('id', user.id);
+      } catch {
+        try {
+          await supabase.from('profiles').update({ avatar_url: publicUrlWithTimestamp }).eq('id', user.id);
+        } catch {}
+      }
+    }
+
+    // Update local storage cache
+    localStorage.setItem(`linkcard_avatar_${user.id}`, publicUrlWithTimestamp);
+    localStorage.setItem('linkcard_user_photo', publicUrlWithTimestamp);
 
     // Update local state and force re-render
     user.profilePhoto = publicUrlWithTimestamp;

@@ -34,6 +34,8 @@ export interface MediaCard {
   defaultWidth?: number;
   layoutStyle?: 'classic' | 'minimal';
   cardColor?: string;
+  likesCount?: number;
+  isLiked?: boolean;
 }
 
 export interface CardDefaults {

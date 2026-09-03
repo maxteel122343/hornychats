@@ -177,12 +177,17 @@ const App: React.FC = () => {
       }, (payload) => {
         const updated = payload.new as any;
         if (updated) {
+          const newPhoto = updated.profile_photo || updated.avatar_url || updated.photo_url;
+          if (newPhoto) {
+            localStorage.setItem(`linkcard_avatar_${user.id}`, newPhoto);
+            localStorage.setItem('linkcard_user_photo', newPhoto);
+          }
           setUser(prev => ({
             ...prev,
             credits: updated.credits !== undefined ? updated.credits : prev.credits,
             free_credits: updated.free_credits !== undefined ? updated.free_credits : prev.free_credits,
             earnings: updated.earnings !== undefined ? updated.earnings : prev.earnings,
-            profilePhoto: updated.profile_photo !== undefined ? updated.profile_photo : prev.profilePhoto,
+            profilePhoto: newPhoto !== undefined ? newPhoto : prev.profilePhoto,
             pixKey: updated.pix_key !== undefined ? updated.pix_key : prev.pixKey,
             picpayEmail: updated.picpay_email !== undefined ? updated.picpay_email : prev.picpayEmail,
             paypalEmail: updated.paypal_email !== undefined ? updated.paypal_email : prev.paypalEmail,
@@ -207,6 +212,18 @@ const App: React.FC = () => {
         .single();
 
       if (profile && !error) {
+        const loadedPhoto = profile.profile_photo 
+          || profile.avatar_url 
+          || profile.photo_url 
+          || localStorage.getItem(`linkcard_avatar_${profile.id}`)
+          || localStorage.getItem('linkcard_user_photo') 
+          || undefined;
+
+        if (loadedPhoto) {
+          localStorage.setItem(`linkcard_avatar_${profile.id}`, loadedPhoto);
+          localStorage.setItem('linkcard_user_photo', loadedPhoto);
+        }
+
         setUser({
           id: profile.id,
           name: profile.username || sbUser.email?.split('@')[0],
@@ -215,7 +232,7 @@ const App: React.FC = () => {
           free_credits: profile.free_credits ?? 0,
           last_free_claim_at: profile.last_free_claim_at,
           isLoggedIn: true,
-          profilePhoto: profile.profile_photo,
+          profilePhoto: loadedPhoto,
           isHost: true // Authenticated users can be hosts
         });
       } else {

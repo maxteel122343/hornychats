@@ -5,7 +5,7 @@ import {
   Image as ImageIcon, MessageSquare, Loader2, X, Check, 
   Lock, Sparkles, User as UserIcon, ExternalLink, ShieldCheck,
   Volume2, Eye, Share2, Layers, QrCode, Zap, Copy, CheckCircle, RefreshCw,
-  Sun, Moon, Wallet, ZoomIn, Users, UserPlus, UserCheck
+  Sun, Moon, Wallet, ZoomIn, Users, UserPlus, UserCheck, Heart
 } from 'lucide-react';
 import { User, MediaCard, CardType } from '../types';
 import { supabase } from '../lib/supabase';
@@ -14,6 +14,7 @@ import { WalletModal } from './WalletModal';
 import { ImageViewerModal } from './ImageViewerModal';
 import { ToastType, ToastOptions } from './Toast';
 import { followUser, unfollowUser, getFollowing, getFollowers } from '../lib/followers';
+import { fetchLikesForCards, toggleCardLike } from '../lib/likes';
 
 interface GalleryProps {
   user: User;
@@ -43,6 +44,10 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
   // Followers state
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
   const [followersCounts, setFollowersCounts] = useState<Record<string, number>>({});
+
+  // Likes state
+  const [likesCounts, setLikesCounts] = useState<Record<string, number>>({});
+  const [likedCardIds, setLikedCardIds] = useState<Set<string>>(new Set());
 
   // Fullscreen Zoom Lightbox State
   const [zoomModal, setZoomModal] = useState<{ isOpen: boolean; url: string | null; title?: string }>({
@@ -84,13 +89,14 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
         try {
           const { data: profilesData } = await supabase
             .from('profiles')
-            .select('id, username, profile_photo');
+            .select('*');
 
           if (profilesData) {
             profilesData.forEach((p: any) => {
+              const photo = p.profile_photo || p.avatar_url || p.photo_url || p.image_url || localStorage.getItem(`linkcard_avatar_${p.id}`);
               profilesMap[p.id] = {
-                username: p.username || 'Criador',
-                profile_photo: p.profile_photo || undefined
+                username: p.username || p.name || p.full_name || 'Criador',
+                profile_photo: photo || undefined
               };
             });
           }
@@ -103,10 +109,23 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
             const creatorId = c.creator_id || 'creator_unknown';
             const profile = profilesMap[creatorId];
             
-            const creatorName = profile?.username 
-              || (creatorId === user.id ? (user.name || 'Você') : `Criador ${creatorId.substring(0, 5)}`);
-            const creatorPhoto = profile?.profile_photo 
-              || (creatorId === user.id ? user.profilePhoto : undefined);
+            const isCurrentUser = Boolean(
+              (user.id && creatorId === user.id) ||
+              (user.name && (c.creator_name === user.name || profile?.username === user.name))
+            );
+
+            const localUserAvatar = user.profilePhoto 
+              || (user.id ? localStorage.getItem(`linkcard_avatar_${user.id}`) : null) 
+              || localStorage.getItem('linkcard_user_photo') 
+              || undefined;
+
+            const creatorName = (isCurrentUser && user.name) 
+              ? user.name 
+              : (profile?.username || c.creator_name || `Criador ${creatorId.substring(0, 5)}`);
+
+            const creatorPhoto = (isCurrentUser && localUserAvatar) 
+              ? localUserAvatar 
+              : (profile?.profile_photo || c.creator_photo || localStorage.getItem(`linkcard_avatar_${creatorId}`) || undefined);
 
             return {
               id: c.id,
@@ -133,6 +152,15 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
           });
 
           setCards(parsedCards);
+
+          // Carregar contagens e status de curtidas para todos os cards
+          const cardIds = parsedCards.map(c => c.id);
+          fetchLikesForCards(cardIds, user.id).then(({ counts, userLiked }) => {
+            setLikesCounts(counts);
+            setLikedCardIds(userLiked);
+          }).catch(err => {
+            console.warn('Erro ao buscar curtidas:', err);
+          });
         } else {
           setCards([]);
         }
@@ -247,12 +275,33 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
     }
   };
 
+  const handleToggleLike = async (cardId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const isCurrentlyLiked = likedCardIds.has(cardId);
+    const currentCount = likesCounts[cardId] || 0;
+
+    // Optimistic UI update
+    setLikedCardIds(prev => {
+      const next = new Set(prev);
+      if (isCurrentlyLiked) {
+        next.delete(cardId);
+      } else {
+        next.add(cardId);
+      }
+      return next;
+    });
+
+    setLikesCounts(prev => ({
+      ...prev,
+      [cardId]: isCurrentlyLiked ? Math.max(0, currentCount - 1) : currentCount + 1
+    }));
+
+    // Server & LocalStorage sync
+    await toggleCardLike(cardId, user.id);
+  };
+
   const handleOpenCreatorChat = (creatorId: string, creatorName?: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    const name = creatorName || 'Criador';
-    if (onShowToast) {
-      onShowToast(`Entrando no chat de ${name}...`, 'info');
-    }
     navigate(`/chat/${creatorId}`);
   };
 
@@ -260,13 +309,8 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
     if (e) e.stopPropagation();
     if (selectedCreatorId === creatorId) {
       setSelectedCreatorId(null);
-      if (onShowToast) onShowToast('Mostrando cards de todos os criadores.', 'info');
     } else {
       setSelectedCreatorId(creatorId);
-      const creator = creators.find(c => c.id === creatorId);
-      if (onShowToast) {
-        onShowToast(`Filtrando apenas mídias de ${creator?.name || 'este criador'}.`, 'info');
-      }
     }
   };
 
@@ -904,41 +948,73 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
                       </div>
                     </div>
 
-                    {/* CREATOR PROFILE CHIP ON CARD */}
+                    {/* CREATOR PROFILE CHIP & ACTIONS ON CARD */}
                     <div className="absolute bottom-2 left-2 right-2 z-10 flex items-center justify-between gap-1.5">
                       <button
                         onClick={(e) => handleToggleCreatorFilter(creatorId, e)}
                         title={`Ver apenas mídias de ${creatorName}`}
-                        className={`flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-lg backdrop-blur-md border transition-all text-left group/creator min-w-0 ${
+                        className={`flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-xl backdrop-blur-md border transition-all text-left group/creator min-w-0 max-w-[58%] ${
                           isFilteredThisCreator
-                            ? 'bg-indigo-600/90 border-indigo-400 text-white shadow-lg'
-                            : 'bg-black/75 hover:bg-black/90 border-white/15 text-slate-200 hover:border-indigo-400/50'
+                            ? 'bg-indigo-600/95 border-indigo-400 text-white shadow-lg'
+                            : 'bg-black/80 hover:bg-black/95 border-white/20 text-slate-100 hover:border-indigo-400/50 shadow-md'
                         }`}
                       >
                         {card.creatorPhoto ? (
                           <img
                             src={card.creatorPhoto}
                             alt={creatorName}
-                            className="w-4 h-4 rounded-full object-cover border border-white/30 shrink-0"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLElement).style.display = 'none';
+                            }}
+                            className="w-5 h-5 rounded-full object-cover border border-white/30 shrink-0"
                           />
-                        ) : (
-                          <div className="w-4 h-4 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-black text-[8px] border border-white/30 shrink-0">
-                            {creatorName.charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-tight truncate max-w-[80px] sm:max-w-[100px]">
+                        ) : null}
+                        <div 
+                          style={{ display: card.creatorPhoto ? 'none' : 'flex' }}
+                          className="w-5 h-5 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 items-center justify-center text-white font-black text-[9px] border border-white/30 shrink-0 shadow-xs"
+                        >
+                          {creatorName.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-tight truncate">
                           {creatorName}
                         </span>
                       </button>
 
-                      {/* DIRECT CHAT BUTTON ON CARD */}
-                      <button
-                        onClick={(e) => handleOpenCreatorChat(creatorId, creatorName, e)}
-                        title={`Entrar no Chat de ${creatorName}`}
-                        className="p-1 sm:p-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-400/30 backdrop-blur-md transition-all shadow-md active:scale-95 flex items-center justify-center shrink-0"
-                      >
-                        <MessageSquare size={12} />
-                      </button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {/* BOTÃO SEGUIR CRIADOR NO CARD */}
+                        {creatorId !== user.id && (
+                          <button
+                            onClick={(e) => handleToggleFollow(creatorId, creatorName, e)}
+                            title={followingIds.has(creatorId) ? `Deixar de seguir ${creatorName}` : `Seguir ${creatorName}`}
+                            className={`px-2 py-1 rounded-lg text-[8px] sm:text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1 backdrop-blur-md border shadow-sm active:scale-95 ${
+                              followingIds.has(creatorId)
+                                ? 'bg-emerald-600/90 hover:bg-emerald-700 text-white border-emerald-400/40'
+                                : 'bg-white/90 hover:bg-white text-slate-950 border-white/40 font-bold'
+                            }`}
+                          >
+                            {followingIds.has(creatorId) ? (
+                              <>
+                                <Check size={10} className="stroke-[3]" />
+                                <span>Seguindo</span>
+                              </>
+                            ) : (
+                              <>
+                                <UserPlus size={10} />
+                                <span>Seguir</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+
+                        {/* DIRECT CHAT BUTTON ON CARD */}
+                        <button
+                          onClick={(e) => handleOpenCreatorChat(creatorId, creatorName, e)}
+                          title={`Entrar no Chat de ${creatorName}`}
+                          className="p-1 sm:p-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-400/30 backdrop-blur-md transition-all shadow-md active:scale-95 flex items-center justify-center shrink-0"
+                        >
+                          <MessageSquare size={12} />
+                        </button>
+                      </div>
                     </div>
 
                     {/* BLUR OVERLAY IF LOCKED */}
@@ -963,13 +1039,29 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
                         }`}>
                           {card.category || 'PREMIUM'}
                         </span>
-                        {card.duration > 0 && (
-                          <span className={`text-[8px] font-bold uppercase tracking-widest shrink-0 ${
-                            isDark ? 'text-slate-400' : 'text-slate-500'
-                          }`}>
-                            {Math.floor(card.duration / 60)}:{(card.duration % 60).toString().padStart(2, '0')} min
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {/* BOTÃO DE CURTIR COM CONTADOR */}
+                          <button
+                            onClick={(e) => handleToggleLike(card.id, e)}
+                            title={likedCardIds.has(card.id) ? "Descurtir" : "Curtir este card"}
+                            className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md border transition-all active:scale-90 ${
+                              likedCardIds.has(card.id)
+                                ? 'bg-red-500/15 border-red-500/40 text-red-500'
+                                : (isDark ? 'bg-white/5 border-white/10 text-slate-400 hover:text-red-400' : 'bg-gray-100 border-gray-200 text-slate-500 hover:text-red-500')
+                            }`}
+                          >
+                            <Heart size={11} className={likedCardIds.has(card.id) ? "fill-red-500 text-red-500" : ""} />
+                            <span className="text-[9px] font-bold">{likesCounts[card.id] || 0}</span>
+                          </button>
+
+                          {card.duration > 0 && (
+                            <span className={`text-[8px] font-bold uppercase tracking-widest ${
+                              isDark ? 'text-slate-400' : 'text-slate-500'
+                            }`}>
+                              {Math.floor(card.duration / 60)}:{(card.duration % 60).toString().padStart(2, '0')} min
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       <h3 className={`text-xs sm:text-sm font-black leading-snug uppercase tracking-tight line-clamp-1 mb-0.5 ${
@@ -1001,7 +1093,7 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
                       )}
                     </div>
 
-                    {/* ACTION BUTTONS (DESBLOQUEAR / VER & CHAT) */}
+                    {/* ACTION BUTTONS (DESBLOQUEAR / VER & CURTIR & CHAT) */}
                     <div className={`flex items-center gap-2 pt-2 border-t min-w-0 w-full ${
                       isDark ? 'border-white/5' : 'border-gray-100'
                     }`}>
@@ -1024,6 +1116,22 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
                             <span className="truncate">DESBLOQUEAR ({card.creditCost} CR)</span>
                           </>
                         )}
+                      </button>
+
+                      {/* BOTÃO DE CURTIDA NO RODAPÉ DO CARD */}
+                      <button
+                        onClick={(e) => handleToggleLike(card.id, e)}
+                        title={likedCardIds.has(card.id) ? "Descurtir" : "Curtir este card"}
+                        className={`shrink-0 h-9 sm:h-10 px-2.5 rounded-xl border transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 ${
+                          likedCardIds.has(card.id)
+                            ? 'bg-red-500/15 border-red-500/40 text-red-500'
+                            : (isDark 
+                                ? 'bg-slate-800/80 hover:bg-slate-800 text-slate-400 border-white/10 hover:text-red-400' 
+                                : 'bg-gray-100 hover:bg-gray-200 text-slate-500 border-gray-200 hover:text-red-500')
+                        }`}
+                      >
+                        <Heart size={15} className={likedCardIds.has(card.id) ? "fill-red-500 text-red-500" : ""} />
+                        <span className="text-[10px] font-black">{likesCounts[card.id] || 0}</span>
                       </button>
 
                       <button
@@ -1093,18 +1201,58 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
                 </div>
               </div>
 
-              {/* Chat with Creator Button Inside Modal */}
-              <button
-                onClick={() => {
-                  const cId = activePreviewCard.creator_id || 'creator_unknown';
-                  setActivePreviewCard(null);
-                  handleOpenCreatorChat(cId, activePreviewCard.creatorName);
-                }}
-                className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-2xl transition-all shadow-lg active:scale-95"
-              >
-                <MessageSquare size={15} />
-                <span className="hidden sm:inline">Chat do Criador</span>
-              </button>
+              <div className="flex items-center gap-2">
+                {/* LIKE BUTTON IN MODAL */}
+                <button
+                  onClick={(e) => handleToggleLike(activePreviewCard.id, e)}
+                  title={likedCardIds.has(activePreviewCard.id) ? "Descurtir" : "Curtir este card"}
+                  className={`flex items-center gap-1.5 px-3 py-2.5 rounded-2xl border transition-all active:scale-95 ${
+                    likedCardIds.has(activePreviewCard.id)
+                      ? 'bg-red-500/20 border-red-500/40 text-red-500 shadow-sm'
+                      : (isDark ? 'bg-white/5 border-white/10 text-slate-300 hover:text-red-400' : 'bg-gray-100 border-gray-200 text-slate-700 hover:text-red-500')
+                  }`}
+                >
+                  <Heart size={16} className={likedCardIds.has(activePreviewCard.id) ? "fill-red-500 text-red-500" : ""} />
+                  <span className="text-xs font-black">{likesCounts[activePreviewCard.id] || 0}</span>
+                </button>
+
+                {/* FOLLOW BUTTON IN MODAL */}
+                {(activePreviewCard.creator_id && activePreviewCard.creator_id !== user.id) && (
+                  <button
+                    onClick={(e) => handleToggleFollow(activePreviewCard.creator_id!, activePreviewCard.creatorName || 'Criador', e)}
+                    className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl font-black text-xs transition-all border shadow-sm active:scale-95 ${
+                      followingIds.has(activePreviewCard.creator_id!)
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500/40'
+                        : 'bg-white text-slate-950 hover:bg-slate-100 border-white/40'
+                    }`}
+                  >
+                    {followingIds.has(activePreviewCard.creator_id!) ? (
+                      <>
+                        <Check size={14} className="stroke-[3]" />
+                        <span>Seguindo</span>
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus size={14} />
+                        <span>Seguir</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {/* Chat with Creator Button Inside Modal */}
+                <button
+                  onClick={() => {
+                    const cId = activePreviewCard.creator_id || 'creator_unknown';
+                    setActivePreviewCard(null);
+                    handleOpenCreatorChat(cId, activePreviewCard.creatorName);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-2xl transition-all shadow-lg active:scale-95"
+                >
+                  <MessageSquare size={15} />
+                  <span className="hidden sm:inline">Chat do Criador</span>
+                </button>
+              </div>
             </div>
 
             {/* MEDIA PLAYER DISPLAY */}
