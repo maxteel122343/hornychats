@@ -88,6 +88,7 @@ export interface User {
 
 export interface PaymentTransaction {
   id: string;
+  mp_payment_id?: string;
   status: 'pending' | 'approved' | 'rejected';
   qr_code: string;
   qr_code_base64: string;

@@ -121,6 +121,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
 
       setActivePayment({
         id: data.payment_id_db || data.id,
+        mp_payment_id: data.mp_payment_id || data.id,
         qr_code: data.qr_code,
         qr_code_base64: data.qr_code_base64,
         status: 'pending',
@@ -145,6 +146,28 @@ export const WalletModal: React.FC<WalletModalProps> = ({
     }
   };
 
+  // Escuta atualização em tempo real do status do pagamento
+  React.useEffect(() => {
+    if (!activePayment || activePayment.id.startsWith('sim-')) return;
+    const channel = supabase.channel(`wallet_payment_${activePayment.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'payment_transactions',
+        filter: `id=eq.${activePayment.id}`
+      }, (payload) => {
+        const updated = payload.new as PaymentTransaction;
+        if (updated && updated.status === 'approved') {
+          handleApprovedPayment(updated);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activePayment?.id]);
+
   const handleCheckStatus = async () => {
     if (!activePayment) return;
     setIsCheckingStatus(true);
@@ -154,11 +177,26 @@ export const WalletModal: React.FC<WalletModalProps> = ({
         handleApprovedPayment(activePayment);
         return;
       }
-      const { data } = await supabase.from('payment_transactions').select('*').eq('id', activePayment.id).single();
+      let { data } = await supabase.from('payment_transactions').select('*').eq('id', activePayment.id).single();
+
+      // Se ainda pendente, força a verificação no Mercado Pago via Edge Function
+      const mpId = data?.mp_payment_id || activePayment.mp_payment_id;
+      if (data && data.status !== 'approved' && mpId) {
+        try {
+          await supabase.functions.invoke('mercadopago-webhook', {
+            body: { type: 'payment', data: { id: mpId } }
+          });
+          const refetch = await supabase.from('payment_transactions').select('*').eq('id', activePayment.id).single();
+          if (refetch.data) data = refetch.data;
+        } catch (webhookErr) {
+          console.warn('Sync webhook check error:', webhookErr);
+        }
+      }
+
       if (data && data.status === 'approved') {
         handleApprovedPayment(data as PaymentTransaction);
       } else {
-        showToast("Pagamento ainda em processamento...", 'info');
+        showToast("Pagamento ainda em processamento pelo Mercado Pago...", 'info');
       }
     } catch (err) {
       showToast("Não foi possível confirmar o status no momento.", 'info');

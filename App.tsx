@@ -124,6 +124,40 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Sincronização em Tempo Real do Perfil (Créditos, Ganhos, etc.)
+  useEffect(() => {
+    if (!user.isLoggedIn || !user.id || user.id.startsWith('guest_')) return;
+
+    const channel = supabase.channel(`profile_realtime_${user.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'profiles',
+        filter: `id=eq.${user.id}`
+      }, (payload) => {
+        const updated = payload.new as any;
+        if (updated) {
+          setUser(prev => ({
+            ...prev,
+            credits: updated.credits !== undefined ? updated.credits : prev.credits,
+            free_credits: updated.free_credits !== undefined ? updated.free_credits : prev.free_credits,
+            earnings: updated.earnings !== undefined ? updated.earnings : prev.earnings,
+            profilePhoto: updated.profile_photo !== undefined ? updated.profile_photo : prev.profilePhoto,
+            pixKey: updated.pix_key !== undefined ? updated.pix_key : prev.pixKey,
+            picpayEmail: updated.picpay_email !== undefined ? updated.picpay_email : prev.picpayEmail,
+            paypalEmail: updated.paypal_email !== undefined ? updated.paypal_email : prev.paypalEmail,
+            stripeEmail: updated.stripe_email !== undefined ? updated.stripe_email : prev.stripeEmail,
+            last_free_claim_at: updated.last_free_claim_at !== undefined ? updated.last_free_claim_at : prev.last_free_claim_at
+          }));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user.isLoggedIn, user.id]);
+
   const syncUser = async (sbUser: any) => {
     try {
       const { data: profile, error } = await supabase

@@ -163,3 +163,23 @@ ORDER BY c.created_at DESC;
 --   ) t
 --   WHERE t.rn > 1
 -- );
+
+-- ==========================================================
+-- 11. VERIFICAR E AJUSTAR CRÉDITOS DO USUÁRIO EXMAN9007
+-- ==========================================================
+-- Ver saldo atual do usuário exman9007
+SELECT id, username, credits, earnings, free_credits, updated_at
+FROM public.profiles
+WHERE username = 'exman9007';
+
+-- Ver histórico de transações de pagamento PIX do usuário
+SELECT id, user_id, mp_payment_id, amount, credits_amount, status, created_at, updated_at
+FROM public.payment_transactions
+WHERE user_id = (SELECT id FROM public.profiles WHERE username = 'exman9007')
+ORDER BY created_at DESC;
+
+-- Atualizar saldo para 70 créditos (20 anteriores + 50 da recarga)
+UPDATE public.profiles
+SET credits = 70
+WHERE username = 'exman9007';
+

@@ -2494,17 +2494,27 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       const credits = creditsMap[amountToUse] || amountToUse * 10;
       const { data, error } = await supabase.functions.invoke('mercadopago-create-payment', { body: JSON.stringify({ amount: amountToUse, description: `${credits} Créditos`, user_id: user.id, credits: credits, email: authUser.email }), headers: { 'Content-Type': 'application/json' } });
       if (error || !data) throw new Error(error?.message || "Erro backend.");
-      setActivePayment({ id: data.payment_id_db, qr_code: data.qr_code, qr_code_base64: data.qr_code_base64, status: 'pending', amount: amountToUse, credits_amount: credits });
+      setActivePayment({ id: data.payment_id_db || data.id, mp_payment_id: data.mp_payment_id || data.id, qr_code: data.qr_code, qr_code_base64: data.qr_code_base64, status: 'pending', amount: amountToUse, credits_amount: credits });
     } catch (err: any) { alert(`Falha PIX: ${err.message}`); } finally { setIsGeneratingPix(false); }
   };
 
-  const handleCheckStatus = async () => { /* ... reuse existing ... */
+  const handleCheckStatus = async () => {
     if (!activePayment) return;
     setIsCheckingStatus(true);
     try {
-      const { data } = await supabase.from('payment_transactions').select('*').eq('id', activePayment.id).single();
+      let { data } = await supabase.from('payment_transactions').select('*').eq('id', activePayment.id).single();
+      const mpId = data?.mp_payment_id || activePayment.mp_payment_id;
+      if (data && data.status !== 'approved' && mpId) {
+        try {
+          await supabase.functions.invoke('mercadopago-webhook', { body: { type: 'payment', data: { id: mpId } } });
+          const refetch = await supabase.from('payment_transactions').select('*').eq('id', activePayment.id).single();
+          if (refetch.data) data = refetch.data;
+        } catch (e) {
+          console.warn('Webhook sync check error:', e);
+        }
+      }
       if (data && data.status === 'approved') handleApprovedPayment(data as PaymentTransaction);
-      else alert("Pendente...");
+      else alert("Pagamento ainda em processamento pelo Mercado Pago...");
     } finally { setIsCheckingStatus(false); }
   };
 

@@ -19,6 +19,7 @@ interface GalleryProps {
   updateCredits?: (amount: number) => Promise<void> | void;
   theme?: 'dark' | 'light';
   toggleTheme?: () => void;
+  isEmbedded?: boolean;
 }
 
 interface CreatorInfo {
@@ -28,7 +29,7 @@ interface CreatorInfo {
   cardCount: number;
 }
 
-const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, theme = 'dark', toggleTheme }) => {
+const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, theme = 'dark', toggleTheme, isEmbedded = false }) => {
   const isDark = theme === 'dark';
   const navigate = useNavigate();
   const [cards, setCards] = useState<MediaCard[]>([]);
@@ -389,84 +390,90 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
   };
 
   return (
-    <div className={`min-h-screen p-4 md:p-6 animate-in fade-in duration-500 pb-28 ${
-      isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
+    <div className={`w-full min-w-0 max-w-full animate-in fade-in duration-300 ${
+      isEmbedded 
+        ? 'p-1 sm:p-2 md:p-4 pb-20' 
+        : `min-h-screen p-3 sm:p-4 md:p-6 pb-28 ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`
     }`}>
       {/* HEADER */}
-      <header className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-5 mb-6 md:mb-8">
-        <div className="flex items-center justify-between md:justify-start gap-3 w-full md:w-auto">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <button
-              onClick={() => navigate('/')}
-              title="Voltar ao início"
-              className={`p-2.5 sm:p-3 md:p-4 rounded-2xl md:rounded-3xl transition-all border shadow-sm sm:shadow-xl flex-shrink-0 active:scale-95 ${
-                isDark 
-                  ? 'bg-white/5 hover:bg-white/10 hover:border-indigo-500/30 border-white/10 text-white' 
-                  : 'bg-white hover:bg-gray-100 hover:border-indigo-300 border-gray-200 text-slate-700'
-              }`}
-            >
-              <ArrowLeft size={18} className="sm:w-5 sm:h-5" />
-            </button>
-            <div>
+      <header className={`max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6 ${isEmbedded ? 'pt-1' : ''}`}>
+        <div className="flex items-center justify-between md:justify-start gap-2.5 sm:gap-3 w-full md:w-auto min-w-0">
+          <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
+            {!isEmbedded && (
+              <button
+                onClick={() => navigate('/')}
+                title="Voltar ao início"
+                className={`p-2.5 sm:p-3 md:p-4 rounded-2xl md:rounded-3xl transition-all border shadow-sm sm:shadow-xl flex-shrink-0 active:scale-95 ${
+                  isDark 
+                    ? 'bg-white/5 hover:bg-white/10 hover:border-indigo-500/30 border-white/10 text-white' 
+                    : 'bg-white hover:bg-gray-100 hover:border-indigo-300 border-gray-200 text-slate-700'
+                }`}
+              >
+                <ArrowLeft size={18} className="sm:w-5 sm:h-5" />
+              </button>
+            )}
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className={`text-xl sm:text-2xl md:text-3xl font-black italic tracking-tighter uppercase leading-none flex items-center gap-2 ${
+                <h1 className={`text-base sm:text-2xl md:text-3xl font-black italic tracking-tighter uppercase leading-none flex items-center gap-1.5 sm:gap-2 truncate ${
                   isDark ? 'text-white' : 'text-slate-900'
                 }`}>
                   Vitrine de Criadores
                 </h1>
-                <span className={`px-2 sm:px-2.5 py-0.5 rounded-full border text-[9px] sm:text-[10px] font-black tracking-wider uppercase ${
+                <span className={`px-2 sm:px-2.5 py-0.5 rounded-full border text-[8px] sm:text-[10px] font-black tracking-wider uppercase shrink-0 ${
                   isDark 
                     ? 'bg-indigo-500/20 border-indigo-500/30 text-indigo-300' 
                     : 'bg-indigo-50 border-indigo-200 text-indigo-700'
                 }`}>
-                  {cards.length} Mídias
+                  {cards.length}
                 </span>
               </div>
-              <p className={`text-[8px] sm:text-[9px] md:text-[10px] font-bold uppercase tracking-[0.15em] sm:tracking-[0.2em] mt-1 flex items-center gap-1.5 ${
+              <p className={`text-[8px] sm:text-[9px] font-bold uppercase tracking-wider mt-0.5 sm:mt-1 flex items-center gap-1 truncate ${
                 isDark ? 'text-indigo-400' : 'text-indigo-600'
               }`}>
-                <Sparkles size={11} className="text-amber-400 shrink-0" />
-                <span className="truncate max-w-[210px] sm:max-w-none">Toque para ver mídias ou conversar com criadores</span>
+                <Sparkles size={10} className="text-amber-400 shrink-0" />
+                <span className="truncate">Toque para ver mídias ou conversar</span>
               </p>
             </div>
           </div>
 
-          {/* MOBILE TOP CONTROLS: WALLET + THEME */}
-          <div className="flex items-center gap-2 md:hidden">
-            {toggleTheme && (
+          {/* MOBILE TOP CONTROLS: WALLET + THEME (Only if NOT embedded, because ChatRoom already has them) */}
+          {!isEmbedded && (
+            <div className="flex items-center gap-1.5 sm:gap-2 md:hidden shrink-0">
+              {toggleTheme && (
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  title={isDark ? "Ativar Modo Claro" : "Ativar Modo Escuro"}
+                  className={`p-2 rounded-xl border transition-all active:scale-95 ${
+                    isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-200 text-slate-700 shadow-sm'
+                  }`}
+                >
+                  {isDark ? <Sun size={15} /> : <Moon size={15} />}
+                </button>
+              )}
+
               <button
                 type="button"
-                onClick={toggleTheme}
-                title={isDark ? "Ativar Modo Claro" : "Ativar Modo Escuro"}
-                className={`p-2.5 rounded-xl border transition-all active:scale-95 ${
-                  isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-200 text-slate-700 shadow-sm'
-                }`}
+                onClick={() => setShowQrCode(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-xs font-black transition-all active:scale-95 shadow-sm"
+                title="Carteira & Depositar Créditos"
               >
-                {isDark ? <Sun size={16} /> : <Moon size={16} />}
+                <Wallet size={14} />
+                <span className="font-black text-xs">{user.credits}c</span>
               </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setShowQrCode(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-xs font-black transition-all active:scale-95 shadow-sm"
-              title="Carteira & Depositar Créditos"
-            >
-              <Wallet size={15} />
-              <span className="font-black text-xs">{user.credits}c</span>
-            </button>
-          </div>
+            </div>
+          )}
         </div>
 
         {/* SEARCH BAR & DESKTOP CONTROLS */}
-        <div className="flex items-center gap-2.5 sm:gap-3 w-full md:w-auto">
-          <div className="relative flex-1 md:w-80">
-            <Search className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} size={16} />
+        <div className="flex items-center gap-2 sm:gap-3 w-full md:w-auto min-w-0">
+          <div className="relative flex-1 md:w-80 min-w-0">
+            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} size={14} />
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Buscar título, criador ou tag..."
-              className={`w-full pl-10 pr-9 py-2.5 sm:py-3 border rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-medium shadow-sm ${
+              className={`w-full pl-8 sm:pl-9 pr-7 py-2 sm:py-2.5 border rounded-xl sm:rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-medium shadow-sm ${
                 isDark 
                   ? 'bg-white/5 border-white/10 text-white placeholder-slate-500' 
                   : 'bg-white border-gray-200 text-slate-900 placeholder-slate-400'
@@ -475,49 +482,51 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-slate-700'}`}
+                className={`absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-slate-700'}`}
               >
-                <X size={14} />
+                <X size={13} />
               </button>
             )}
           </div>
 
-          {/* DESKTOP CONTROLS: THEME + WALLET DEPOSIT */}
-          <div className="hidden md:flex items-center gap-2.5">
-            {toggleTheme && (
+          {/* DESKTOP CONTROLS: THEME + WALLET DEPOSIT (Only if NOT embedded) */}
+          {!isEmbedded && (
+            <div className="hidden md:flex items-center gap-2">
+              {toggleTheme && (
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  title={isDark ? "Ativar Modo Claro" : "Ativar Modo Escuro"}
+                  className={`p-2.5 rounded-2xl border transition-all active:scale-95 ${
+                    isDark ? 'bg-white/5 hover:bg-white/10 border-white/10 text-white' : 'bg-white hover:bg-gray-100 border-gray-200 text-slate-700 shadow-sm'
+                  }`}
+                >
+                  {isDark ? <Sun size={16} /> : <Moon size={16} />}
+                </button>
+              )}
+
               <button
                 type="button"
-                onClick={toggleTheme}
-                title={isDark ? "Ativar Modo Claro" : "Ativar Modo Escuro"}
-                className={`p-3 rounded-2xl border transition-all active:scale-95 ${
-                  isDark ? 'bg-white/5 hover:bg-white/10 border-white/10 text-white' : 'bg-white hover:bg-gray-100 border-gray-200 text-slate-700 shadow-sm'
-                }`}
+                onClick={() => setShowQrCode(true)}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-xs font-black cursor-pointer transition-all active:scale-95 shadow-sm"
+                title="Carteira & Depositar Créditos"
               >
-                {isDark ? <Sun size={17} /> : <Moon size={17} />}
+                <Wallet size={15} />
+                <span className="font-black">{user.credits}c</span>
+                <span className="text-[9px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-lg">Depositar</span>
               </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setShowQrCode(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-xs font-black cursor-pointer transition-all active:scale-95 shadow-sm"
-              title="Carteira & Depositar Créditos"
-            >
-              <Wallet size={16} />
-              <span className="font-black">{user.credits}c</span>
-              <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-lg">Depositar</span>
-            </button>
-          </div>
+            </div>
+          )}
         </div>
       </header>
 
       {/* CREATORS BAR (CARROSSEL DE CRIADORES - apenas se houver criadores reais com mídias) */}
       {creators.length > 0 && (
-        <section className={`max-w-6xl mx-auto mb-6 border rounded-3xl p-4 backdrop-blur-md shadow-sm ${
+        <section className={`max-w-6xl mx-auto mb-4 sm:mb-6 border rounded-2xl sm:rounded-3xl p-3 sm:p-4 backdrop-blur-md shadow-sm min-w-0 max-w-full overflow-hidden ${
           isDark ? 'bg-slate-900/60 border-slate-800/80' : 'bg-white border-gray-200'
         }`}>
-          <div className="flex items-center justify-between mb-3 px-1">
-            <span className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 ${
+          <div className="flex items-center justify-between mb-2.5 px-0.5">
+            <span className={`text-[9px] sm:text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 ${
               isDark ? 'text-slate-400' : 'text-slate-600'
             }`}>
               <UserIcon size={12} className={isDark ? "text-indigo-400" : "text-indigo-600"} /> Criadores em Destaque
@@ -525,26 +534,26 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
             {selectedCreatorId && (
               <button
                 onClick={() => setSelectedCreatorId(null)}
-                className={`text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 ${
+                className={`text-[8px] sm:text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 ${
                   isDark ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-700'
                 }`}
               >
-                <X size={12} /> Mostrar Todos
+                <X size={11} /> Mostrar Todos
               </button>
             )}
           </div>
 
-          <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-hide no-scrollbar -mx-2 px-2">
+          <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-1.5 scrollbar-hide no-scrollbar w-full min-w-0">
             {/* "Todos" button */}
             <button
               onClick={() => setSelectedCreatorId(null)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex-shrink-0 border ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl sm:rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-wider transition-all flex-shrink-0 border ${
                 selectedCreatorId === null
                   ? 'bg-indigo-600 text-white border-indigo-500 shadow-lg shadow-indigo-600/30'
                   : (isDark ? 'bg-white/5 text-slate-300 border-white/5 hover:bg-white/10' : 'bg-gray-100 text-slate-700 border-gray-200 hover:bg-gray-200')
               }`}
             >
-              <Layers size={14} />
+              <Layers size={13} />
               <span>Todos ({cards.length})</span>
             </button>
 
@@ -554,7 +563,7 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
               return (
                 <div
                   key={creator.id}
-                  className={`flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-2xl transition-all flex-shrink-0 border select-none group ${
+                  className={`flex items-center gap-2 pl-1.5 pr-2.5 py-1 sm:py-1.5 rounded-xl sm:rounded-2xl transition-all flex-shrink-0 border select-none group ${
                     isSelected
                       ? (isDark ? 'bg-indigo-950/80 border-indigo-500 text-white ring-2 ring-indigo-500/40 shadow-lg' : 'bg-indigo-50 border-indigo-500 text-indigo-950 ring-2 ring-indigo-400 shadow-md')
                       : (isDark ? 'bg-slate-800/60 border-slate-700/60 text-slate-300 hover:bg-slate-800' : 'bg-gray-50 border-gray-200 text-slate-700 hover:bg-gray-100')
@@ -564,34 +573,34 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
                   <button
                     onClick={(e) => handleToggleCreatorFilter(creator.id, e)}
                     title={`Filtrar apenas mídias de ${creator.name}`}
-                    className="relative cursor-pointer focus:outline-none"
+                    className="relative cursor-pointer focus:outline-none shrink-0"
                   >
                     {creator.photo ? (
                       <img
                         src={creator.photo}
                         alt={creator.name}
-                        className="w-8 h-8 rounded-full object-cover border-2 border-indigo-400/50 group-hover:scale-105 transition-transform"
+                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border-2 border-indigo-400/50 group-hover:scale-105 transition-transform"
                       />
                     ) : (
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white font-black text-xs border border-white/20">
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white font-black text-xs border border-white/20">
                         {creator.name.charAt(0).toUpperCase()}
                       </div>
                     )}
                     {isSelected && (
-                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-slate-900" />
+                      <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-slate-900" />
                     )}
                   </button>
 
                   {/* Creator Name & Card count */}
                   <button
                     onClick={(e) => handleToggleCreatorFilter(creator.id, e)}
-                    className="text-left focus:outline-none"
+                    className="text-left focus:outline-none min-w-0"
                     title={`Filtrar apenas mídias de ${creator.name}`}
                   >
-                    <p className={`text-[11px] font-black truncate max-w-[100px] leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                    <p className={`text-[10px] sm:text-[11px] font-black truncate max-w-[80px] sm:max-w-[100px] leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                       {creator.name}
                     </p>
-                    <p className={`text-[8px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <p className={`text-[7px] sm:text-[8px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                       {creator.cardCount} {creator.cardCount === 1 ? 'mídia' : 'mídias'}
                     </p>
                   </button>
@@ -600,9 +609,9 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
                   <button
                     onClick={(e) => handleOpenCreatorChat(creator.id, creator.name, e)}
                     title={`Entrar no Chat de ${creator.name}`}
-                    className="p-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md hover:scale-110 active:scale-95 focus:outline-none"
+                    className="p-1 sm:p-1.5 rounded-lg sm:rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md active:scale-95 focus:outline-none shrink-0"
                   >
-                    <MessageSquare size={13} />
+                    <MessageSquare size={12} />
                   </button>
                 </div>
               );
@@ -613,62 +622,60 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
 
       {/* ACTIVE CREATOR FILTER BANNER */}
       {selectedCreator && (
-        <section className={`max-w-6xl mx-auto mb-6 p-4 md:p-5 rounded-3xl border shadow-2xl backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in slide-in-from-top-2 duration-300 ${
+        <section className={`max-w-6xl mx-auto mb-4 sm:mb-6 p-3 sm:p-4 md:p-5 rounded-2xl sm:rounded-3xl border shadow-xl backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 animate-in slide-in-from-top-2 duration-300 min-w-0 max-w-full ${
           isDark 
             ? 'bg-gradient-to-r from-indigo-950/80 via-slate-900/90 to-purple-950/80 border-indigo-500/40 text-white' 
             : 'bg-indigo-50/90 border-indigo-200 text-slate-900'
         }`}>
-          <div className="flex items-center gap-4">
-            <div className="relative">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+            <div className="relative shrink-0">
               {selectedCreator.photo ? (
                 <img
                   src={selectedCreator.photo}
                   alt={selectedCreator.name}
-                  className="w-14 h-14 rounded-2xl object-cover border-2 border-indigo-400 shadow-xl"
+                  className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl object-cover border-2 border-indigo-400 shadow-md"
                 />
               ) : (
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white font-black text-xl border-2 border-indigo-400 shadow-xl">
+                <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white font-black text-base sm:text-xl border-2 border-indigo-400 shadow-md">
                   {selectedCreator.name.charAt(0).toUpperCase()}
                 </div>
               )}
-              <div className="absolute -bottom-1 -right-1 bg-emerald-500 p-1 rounded-full text-white border-2 border-white">
-                <Check size={10} />
+              <div className="absolute -bottom-1 -right-1 bg-emerald-500 p-0.5 sm:p-1 rounded-full text-white border-2 border-white">
+                <Check size={8} className="sm:w-2.5 sm:h-2.5" />
               </div>
             </div>
 
-            <div>
-              <div className="flex items-center gap-2">
-                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border ${
-                  isDark ? 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20' : 'text-indigo-700 bg-indigo-100 border-indigo-200'
-                }`}>
-                  Filtro de Criador Ativo
-                </span>
-              </div>
-              <h2 className={`text-lg md:text-xl font-black uppercase tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                Mídias de {selectedCreator.name}
+            <div className="min-w-0">
+              <span className={`text-[8px] sm:text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md border inline-block mb-0.5 ${
+                isDark ? 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20' : 'text-indigo-700 bg-indigo-100 border-indigo-200'
+              }`}>
+                Filtro Ativo
+              </span>
+              <h2 className={`text-sm sm:text-lg md:text-xl font-black uppercase tracking-tight truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                {selectedCreator.name}
               </h2>
-              <p className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                Exibindo apenas os {filteredCards.length} cards exclusivos deste criador
+              <p className={`text-[10px] sm:text-xs font-medium truncate ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                {filteredCards.length} {filteredCards.length === 1 ? 'card exclusivo' : 'cards exclusivos'}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => handleOpenCreatorChat(selectedCreator.id, selectedCreator.name)}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs uppercase tracking-wider transition-all shadow-lg hover:shadow-indigo-600/30 active:scale-95"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl sm:rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-[10px] sm:text-xs uppercase tracking-wider transition-all shadow-md active:scale-95"
             >
-              <MessageSquare size={16} />
-              <span>Abrir Chat da Sala</span>
+              <MessageSquare size={13} />
+              <span>Abrir Chat</span>
             </button>
 
             <button
               onClick={() => setSelectedCreatorId(null)}
-              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all border active:scale-95 ${
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl sm:rounded-2xl font-bold text-[10px] sm:text-xs uppercase tracking-wider transition-all border active:scale-95 ${
                 isDark ? 'bg-white/10 hover:bg-white/20 text-slate-200 border-white/10' : 'bg-white hover:bg-gray-100 text-slate-700 border-gray-200 shadow-sm'
               }`}
             >
-              <X size={15} />
+              <X size={13} />
               <span>Ver Todos</span>
             </button>
           </div>
@@ -676,15 +683,15 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
       )}
 
       {/* CATEGORY TABS */}
-      <nav className="max-w-6xl mx-auto mb-8 flex items-center justify-between overflow-x-auto pb-2 scrollbar-hide no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
-        <div className="flex gap-2 flex-nowrap">
+      <nav className="max-w-6xl mx-auto mb-4 sm:mb-6 flex items-center justify-between overflow-x-auto pb-1.5 scrollbar-hide no-scrollbar w-full min-w-0">
+        <div className="flex gap-1.5 sm:gap-2 flex-nowrap">
           {categories.map(cat => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-5 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-[0.15em] transition-all flex-shrink-0 border ${
+              className={`px-3.5 py-1.5 sm:px-5 sm:py-2 rounded-xl sm:rounded-2xl text-[8px] sm:text-[9px] font-black uppercase tracking-wider transition-all flex-shrink-0 border ${
                 selectedCategory === cat
-                  ? (isDark ? 'bg-white text-slate-950 border-white shadow-xl' : 'bg-indigo-600 text-white border-indigo-600 shadow-md')
+                  ? (isDark ? 'bg-white text-slate-950 border-white shadow-lg' : 'bg-indigo-600 text-white border-indigo-600 shadow-md')
                   : (isDark ? 'bg-white/5 text-slate-400 border-white/5 hover:text-white hover:bg-white/10' : 'bg-white text-slate-600 border-gray-200 hover:bg-gray-100')
               }`}
             >
@@ -693,34 +700,34 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
           ))}
         </div>
 
-        <div className={`text-xs font-bold uppercase tracking-wider hidden sm:block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-          {filteredCards.length} {filteredCards.length === 1 ? 'card encontrado' : 'cards encontrados'}
+        <div className={`text-[10px] font-bold uppercase tracking-wider hidden sm:block shrink-0 pl-3 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+          {filteredCards.length} {filteredCards.length === 1 ? 'card' : 'cards'}
         </div>
       </nav>
 
       {/* CARDS GRID */}
-      <main className="max-w-6xl mx-auto">
+      <main className="max-w-6xl mx-auto w-full min-w-0">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-28 text-center space-y-4">
-            <Loader2 className="animate-spin text-indigo-500" size={36} />
-            <span className={`text-xs font-black uppercase tracking-[0.3em] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+          <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
+            <Loader2 className="animate-spin text-indigo-500" size={32} />
+            <span className={`text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               Carregando vitrine e criadores...
             </span>
           </div>
         ) : filteredCards.length === 0 ? (
-          <div className={`flex flex-col items-center justify-center py-20 border-2 border-dashed rounded-[2.5rem] text-center space-y-5 px-6 backdrop-blur-sm ${
+          <div className={`flex flex-col items-center justify-center py-12 border-2 border-dashed rounded-2xl sm:rounded-3xl text-center space-y-4 px-4 backdrop-blur-sm ${
             isDark ? 'border-white/10 bg-slate-900/40' : 'border-gray-300 bg-white/80 shadow-sm'
           }`}>
-            <div className={`p-5 rounded-3xl border ${
+            <div className={`p-4 rounded-2xl border ${
               isDark ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' : 'bg-indigo-50 border-indigo-200 text-indigo-600'
             }`}>
-              <Grid size={36} />
+              <Grid size={30} />
             </div>
             <div>
-              <p className={`text-xl font-black uppercase tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <p className={`text-base sm:text-lg font-black uppercase tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 {cards.length === 0 ? 'Nenhum Card Publicado na Vitrine' : 'Nenhum Card Encontrado'}
               </p>
-              <p className={`text-xs font-medium mt-1.5 max-w-md mx-auto ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+              <p className={`text-[11px] font-medium mt-1 max-w-md mx-auto ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                 {cards.length === 0
                   ? 'A vitrine exibe apenas cards e mídias reais publicados pelos criadores. Crie seus cards na sua sala de chat e marque "Salvar na Vitrine" para exibi-los aqui!'
                   : selectedCreatorId
@@ -728,13 +735,13 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
                   : 'Nenhuma mídia corresponde aos filtros atuais. Tente buscar por outro termo ou categoria.'}
               </p>
             </div>
-            <div className="flex flex-wrap items-center justify-center gap-3">
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
               {cards.length === 0 ? (
                 <button
                   onClick={() => navigate(`/chat/${user.id}`)}
-                  className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black uppercase tracking-wider transition-all shadow-xl active:scale-95"
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] sm:text-xs font-black uppercase tracking-wider transition-all shadow-lg active:scale-95"
                 >
-                  <Sparkles size={16} />
+                  <Sparkles size={14} />
                   <span>Ir para Minha Sala & Criar Card</span>
                 </button>
               ) : (
@@ -742,7 +749,7 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
                   {selectedCreatorId && (
                     <button
                       onClick={() => setSelectedCreatorId(null)}
-                      className="px-5 py-2.5 rounded-2xl bg-indigo-600 text-white text-xs font-black uppercase tracking-wider hover:bg-indigo-500 transition-all shadow-lg"
+                      className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-[10px] sm:text-xs font-black uppercase tracking-wider hover:bg-indigo-500 transition-all shadow-md"
                     >
                       Limpar Filtro de Criador
                     </button>
@@ -753,7 +760,7 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
                         setSelectedCategory('Global');
                         setSearchQuery('');
                       }}
-                      className={`px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all border ${
+                      className={`px-4 py-2 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wider transition-all border ${
                         isDark ? 'bg-white/10 text-slate-200 hover:bg-white/20 border-white/10' : 'bg-gray-100 text-slate-700 hover:bg-gray-200 border-gray-200 shadow-sm'
                       }`}
                     >
@@ -765,7 +772,7 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 md:gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5 md:gap-6 w-full min-w-0">
             {filteredCards.map((card) => {
               const isUnlocked = card.creator_id === user.id || unlockedCardIds.has(card.id) || card.creditCost === 0;
               const creatorId = card.creator_id || 'creator_unknown';
@@ -775,31 +782,31 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
               return (
                 <div
                   key={card.id}
-                  className={`group relative rounded-3xl sm:rounded-[2rem] overflow-hidden border transition-all duration-300 shadow-lg flex flex-col justify-between ${
+                  className={`group relative rounded-2xl sm:rounded-3xl overflow-hidden border transition-all duration-300 shadow-sm sm:shadow-lg flex flex-col justify-between w-full min-w-0 max-w-full ${
                     isDark 
-                      ? 'bg-slate-900/80 border-white/10 hover:border-indigo-500/60 shadow-2xl' 
-                      : 'bg-white border-gray-200 hover:border-indigo-400 hover:shadow-2xl shadow-gray-200/80'
+                      ? 'bg-slate-900/80 border-white/10 hover:border-indigo-500/60 shadow-xl' 
+                      : 'bg-white border-gray-200 hover:border-indigo-400 hover:shadow-xl shadow-gray-200/80'
                   }`}
                 >
                   {/* TOP THUMBNAIL AREA */}
-                  <div className="aspect-[16/10] sm:aspect-[4/3] w-full overflow-hidden relative bg-black/60">
+                  <div className="aspect-[16/9] sm:aspect-[4/3] max-h-48 sm:max-h-none w-full overflow-hidden relative bg-black/60 shrink-0">
                     <img
                       src={card.thumbnail || card.mediaUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80'}
                       alt={card.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 brightness-[0.85]"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 brightness-[0.88]"
                       loading="lazy"
                     />
 
                     {/* TOP BADGES & CONTROLS */}
-                    <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 z-10">
+                    <div className="absolute top-2 left-2 right-2 flex items-center justify-between gap-1.5 z-10">
                       {/* Media Type Badge */}
-                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-black/75 backdrop-blur-md text-white border border-white/10 text-[9px] font-black uppercase tracking-wider">
+                      <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-black/75 backdrop-blur-md text-white border border-white/10 text-[8px] sm:text-[9px] font-black uppercase tracking-wider">
                         {getIcon(card.type)}
                         <span>{card.type}</span>
                       </div>
 
                       {/* Credit Cost Badge */}
-                      <div className={`px-2.5 py-1 rounded-xl backdrop-blur-md text-[9px] font-black uppercase tracking-wider border shadow-md ${
+                      <div className={`px-2 py-0.5 rounded-lg backdrop-blur-md text-[8px] sm:text-[9px] font-black uppercase tracking-wider border shadow-md ${
                         isUnlocked
                           ? 'bg-emerald-500/85 text-white border-emerald-400/40'
                           : 'bg-amber-500/90 text-slate-950 border-amber-300/60'
@@ -809,11 +816,11 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
                     </div>
 
                     {/* CREATOR PROFILE CHIP ON CARD */}
-                    <div className="absolute bottom-3 left-3 right-3 z-10 flex items-center justify-between gap-2">
+                    <div className="absolute bottom-2 left-2 right-2 z-10 flex items-center justify-between gap-1.5">
                       <button
                         onClick={(e) => handleToggleCreatorFilter(creatorId, e)}
                         title={`Ver apenas mídias de ${creatorName}`}
-                        className={`flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-xl backdrop-blur-md border transition-all text-left group/creator ${
+                        className={`flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-lg backdrop-blur-md border transition-all text-left group/creator min-w-0 ${
                           isFilteredThisCreator
                             ? 'bg-indigo-600/90 border-indigo-400 text-white shadow-lg'
                             : 'bg-black/75 hover:bg-black/90 border-white/15 text-slate-200 hover:border-indigo-400/50'
@@ -823,14 +830,14 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
                           <img
                             src={card.creatorPhoto}
                             alt={creatorName}
-                            className="w-5 h-5 rounded-full object-cover border border-white/30 group-hover/creator:scale-110 transition-transform"
+                            className="w-4 h-4 rounded-full object-cover border border-white/30 shrink-0"
                           />
                         ) : (
-                          <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-black text-[9px] border border-white/30">
+                          <div className="w-4 h-4 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-black text-[8px] border border-white/30 shrink-0">
                             {creatorName.charAt(0).toUpperCase()}
                           </div>
                         )}
-                        <span className="text-[9px] font-black uppercase tracking-tight truncate max-w-[85px]">
+                        <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-tight truncate max-w-[80px] sm:max-w-[100px]">
                           {creatorName}
                         </span>
                       </button>
@@ -839,16 +846,16 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
                       <button
                         onClick={(e) => handleOpenCreatorChat(creatorId, creatorName, e)}
                         title={`Entrar no Chat de ${creatorName}`}
-                        className="p-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-400/30 backdrop-blur-md transition-all shadow-lg hover:scale-110 active:scale-95 flex items-center justify-center"
+                        className="p-1 sm:p-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-400/30 backdrop-blur-md transition-all shadow-md active:scale-95 flex items-center justify-center shrink-0"
                       >
-                        <MessageSquare size={13} />
+                        <MessageSquare size={12} />
                       </button>
                     </div>
 
                     {/* BLUR OVERLAY IF LOCKED */}
                     {!isUnlocked && card.isBlur && (
-                      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[6px] flex flex-col items-center justify-center p-4 text-center z-[5]">
-                        <Lock size={24} className="text-amber-400 mb-1 drop-shadow-md" />
+                      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[6px] flex flex-col items-center justify-center p-3 text-center z-[5]">
+                        <Lock size={20} className="text-amber-400 mb-1 drop-shadow-md" />
                         <span className="text-[8px] font-black uppercase tracking-widest text-white drop-shadow">
                           Conteúdo Exclusivo
                         </span>
@@ -857,18 +864,18 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
                   </div>
 
                   {/* BOTTOM INFO AREA */}
-                  <div className={`p-4 sm:p-5 flex flex-col flex-1 justify-between border-t space-y-3 ${
+                  <div className={`p-3 sm:p-4 flex flex-col flex-1 justify-between border-t space-y-2 min-w-0 ${
                     isDark ? 'bg-slate-900/90 border-white/5' : 'bg-white border-gray-100'
                   }`}>
-                    <div>
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <span className={`text-[8px] font-black uppercase tracking-[0.2em] ${
+                    <div className="min-w-0">
+                      <div className="flex items-center justify-between gap-1.5 mb-0.5">
+                        <span className={`text-[8px] font-black uppercase tracking-wider truncate ${
                           isDark ? 'text-indigo-400' : 'text-indigo-600'
                         }`}>
-                          {card.category}
+                          {card.category || 'PREMIUM'}
                         </span>
                         {card.duration > 0 && (
-                          <span className={`text-[8px] font-bold uppercase tracking-widest ${
+                          <span className={`text-[8px] font-bold uppercase tracking-widest shrink-0 ${
                             isDark ? 'text-slate-400' : 'text-slate-500'
                           }`}>
                             {Math.floor(card.duration / 60)}:{(card.duration % 60).toString().padStart(2, '0')} min
@@ -876,13 +883,13 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
                         )}
                       </div>
 
-                      <h3 className={`text-sm sm:text-base font-black leading-snug uppercase tracking-tight line-clamp-1 mb-1 ${
+                      <h3 className={`text-xs sm:text-sm font-black leading-snug uppercase tracking-tight line-clamp-1 mb-0.5 ${
                         isDark ? 'text-white' : 'text-slate-900'
                       }`} title={card.title}>
                         {card.title}
                       </h3>
 
-                      <p className={`text-[10px] line-clamp-2 leading-relaxed font-medium ${
+                      <p className={`text-[9px] sm:text-[10px] line-clamp-2 leading-relaxed font-medium ${
                         isDark ? 'text-slate-400' : 'text-slate-600'
                       }`}>
                         {card.description || 'Sem descrição.'}
@@ -890,11 +897,11 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
 
                       {/* TAGS */}
                       {card.tags && card.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
+                        <div className="flex flex-wrap gap-1 mt-1.5">
                           {card.tags.slice(0, 3).map((tag, idx) => (
                             <span
                               key={idx}
-                              className={`px-2 py-0.5 rounded-lg border text-[8px] font-bold uppercase tracking-wider ${
+                              className={`px-1.5 py-0.5 rounded-md border text-[7px] sm:text-[8px] font-bold uppercase tracking-wider ${
                                 isDark ? 'bg-white/5 border-white/5 text-slate-400' : 'bg-gray-100 border-gray-200 text-slate-600'
                               }`}
                             >
@@ -906,12 +913,12 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
                     </div>
 
                     {/* ACTION BUTTONS (DESBLOQUEAR / VER & CHAT) */}
-                    <div className={`grid grid-cols-5 gap-2 pt-2 border-t ${
+                    <div className={`flex items-center gap-2 pt-2 border-t min-w-0 w-full ${
                       isDark ? 'border-white/5' : 'border-gray-100'
                     }`}>
                       <button
                         onClick={() => handleUnlockCard(card)}
-                        className={`col-span-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-[9px] sm:text-[10px] font-black uppercase tracking-[0.15em] transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2 ${
+                        className={`flex-1 min-w-0 py-2 sm:py-2.5 px-2.5 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 truncate ${
                           isUnlocked
                             ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
                             : (isDark ? 'bg-white text-slate-950 hover:bg-indigo-600 hover:text-white' : 'bg-indigo-600 hover:bg-indigo-500 text-white')
@@ -919,13 +926,13 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
                       >
                         {isUnlocked ? (
                           <>
-                            <Eye size={13} />
-                            <span>VER MÍDIA</span>
+                            <Eye size={13} className="shrink-0" />
+                            <span className="truncate">VER MÍDIA</span>
                           </>
                         ) : (
                           <>
-                            <Lock size={13} />
-                            <span>DESBLOQUEAR ({card.creditCost} CR)</span>
+                            <Lock size={13} className="shrink-0" />
+                            <span className="truncate">DESBLOQUEAR ({card.creditCost} CR)</span>
                           </>
                         )}
                       </button>
@@ -933,13 +940,13 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
                       <button
                         onClick={(e) => handleOpenCreatorChat(creatorId, creatorName, e)}
                         title={`Entrar no Chat de ${creatorName}`}
-                        className={`col-span-1 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl border transition-all flex items-center justify-center shadow-lg active:scale-95 ${
+                        className={`shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-xl border transition-all flex items-center justify-center shadow-sm active:scale-95 ${
                           isDark 
                             ? 'bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white border-indigo-500/30' 
                             : 'bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white border-indigo-200'
                         }`}
                       >
-                        <MessageSquare size={15} />
+                        <MessageSquare size={14} />
                       </button>
                     </div>
                   </div>
