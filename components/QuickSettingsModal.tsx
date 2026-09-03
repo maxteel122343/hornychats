@@ -14,6 +14,7 @@ interface QuickSettingsModalProps {
   quickPhrasesConfig?: QuickPhrasesConfig;
   initialTab?: 'general' | 'advanced' | 'paid_chat' | 'phrases';
   isRoomCreator?: boolean;
+  roomTitle?: string;
 }
 
 const CARD_COLORS = [
@@ -52,7 +53,8 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({
   paidChatConfig: initialPaidChat,
   quickPhrasesConfig: initialPhrases,
   initialTab = 'general',
-  isRoomCreator = true
+  isRoomCreator = true,
+  roomTitle
 }) => {
   const isDark = theme === 'dark';
   const [data, setData] = useState<CardDefaults>(initialDefaults);
@@ -155,11 +157,11 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({
               <Settings size={22} className="sm:w-6 sm:h-6" />
             </div>
             <div>
-              <h3 className={`text-base sm:text-xl font-black uppercase tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                AJUSTES & CONFIGURAÇÕES
+              <h3 className={`text-base sm:text-xl font-black uppercase tracking-tight ${isDark ? 'text-white' : 'text-slate-900'} truncate max-w-[200px] sm:max-w-md`}>
+                {roomTitle ? `Ajustes: ${roomTitle}` : 'AJUSTES & CONFIGURAÇÕES'}
               </h3>
               <p className={`text-[9px] sm:text-xs font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                TEMPO DE CHAT • BALÕES DE FRASES • CARDS
+                {roomTitle ? 'CONFIGURAÇÃO PERSONALIZADA DESTA SALA' : 'TEMPO DE CHAT • BALÕES DE FRASES • CARDS'}
               </p>
             </div>
           </div>
@@ -408,27 +410,41 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({
                       AVISO DE CRONÔMETRO REGRESSIVO EM VERMELHO
                     </label>
                     <p className={`text-[10px] mt-0.5 font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                      Tempo de contagem regressiva em destaque vermelho exibido para o usuário antes do chat fechar.
+                      Tempo de contagem regressiva em destaque vermelho exibido para o usuário antes do chat fechar (de 1 até 5 minutos).
                     </p>
                   </div>
-                  <span className="text-xs font-black text-red-400 font-mono px-2 py-1 rounded-lg bg-red-500/10 border border-red-500/30">
-                    {paidChat.warningSeconds || 60}s
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="15"
+                      max="600"
+                      value={paidChat.warningSeconds || 60}
+                      onChange={(e) => handlePaidChatChange('warningSeconds', Math.max(10, parseInt(e.target.value) || 60))}
+                      className={`w-20 border rounded-xl p-2 text-center text-sm font-black outline-none font-mono ${
+                        isDark 
+                          ? 'bg-slate-900 border-slate-700 text-red-400 focus:border-red-500' 
+                          : 'bg-white border-gray-200 text-red-600 focus:border-red-500'
+                      }`}
+                    />
+                    <span className="text-xs font-bold text-red-400 font-mono">
+                      segundos ({Math.round((paidChat.warningSeconds || 60) / 60 * 10) / 10} min)
+                    </span>
+                  </div>
                 </div>
 
-                <div className="flex gap-2 pt-1">
-                  {[30, 60, 90, 120].map(sec => (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {[60, 120, 180, 240, 300].map(sec => (
                     <button
                       key={sec}
                       type="button"
                       onClick={() => handlePaidChatChange('warningSeconds', sec)}
                       className={`text-[10px] font-bold px-3 py-1.5 rounded-xl border transition-all ${
                         (paidChat.warningSeconds || 60) === sec
-                          ? 'bg-red-600 text-white border-red-500 shadow-md'
-                          : (isDark ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-white text-slate-600 border-gray-200')
+                          ? 'bg-red-600 text-white border-red-500 shadow-md scale-105'
+                          : (isDark ? 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white' : 'bg-white text-slate-600 border-gray-200 hover:bg-gray-100')
                       }`}
                     >
-                      {sec >= 60 ? `${sec / 60} min (${sec}s)` : `${sec}s`}
+                      {sec / 60} min ({sec}s)
                     </button>
                   ))}
                 </div>

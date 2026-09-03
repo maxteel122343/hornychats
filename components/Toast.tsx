@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle2, AlertCircle, X, Link2, Share2, Copy, Check, MessageCircle, ExternalLink } from 'lucide-react';
 
-export type ToastType = 'success' | 'error' | 'info';
+export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
 export interface ToastOptions {
     subMessage?: string;
@@ -50,19 +50,22 @@ export const Toast: React.FC<ToastProps> = ({
     const bgColors = {
         success: 'bg-slate-900 border-emerald-500/50 shadow-emerald-950/50',
         error: 'bg-slate-900 border-red-500/50 shadow-red-950/50',
-        info: 'bg-slate-900 border-indigo-500/50 shadow-indigo-950/50'
+        info: 'bg-slate-900 border-indigo-500/50 shadow-indigo-950/50',
+        warning: 'bg-slate-900 border-amber-500/50 shadow-amber-950/50'
     };
 
     const headerIconColors = {
         success: 'text-emerald-400 bg-emerald-500/20 border-emerald-500/30',
         error: 'text-red-400 bg-red-500/20 border-red-500/30',
-        info: 'text-indigo-400 bg-indigo-500/20 border-indigo-500/30'
+        info: 'text-indigo-400 bg-indigo-500/20 border-indigo-500/30',
+        warning: 'text-amber-400 bg-amber-500/20 border-amber-500/30'
     };
 
     const icons = {
         success: <CheckCircle2 size={18} className="text-emerald-400" />,
         error: <AlertCircle size={18} className="text-red-400" />,
-        info: <AlertCircle size={18} className="text-indigo-400" />
+        info: <AlertCircle size={18} className="text-indigo-400" />,
+        warning: <AlertCircle size={18} className="text-amber-400" />
     };
 
     const handleCopyAgain = (e: React.MouseEvent) => {

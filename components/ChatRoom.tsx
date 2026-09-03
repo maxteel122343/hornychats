@@ -1,13 +1,14 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Plus, Home, Wallet, Share2, MessageSquare, LayoutGrid, QrCode, X, User as UserIcon, LogIn, Camera, Settings, Sun, Moon, Menu, ChevronLeft, ChevronRight, ChevronDown, Copy, CheckCircle, Loader2, RefreshCw, DollarSign, ArrowUpRight, Mic, Video, Upload, StopCircle, Trash2, Aperture, Lock, Zap, History, CreditCard, Mail, ShoppingCart, LogOut, FolderOpen, Edit, Tv, Image as ImageIcon, Cloud, MoreVertical, Minimize2, Maximize2, Power, Sliders, ArrowLeft, Users } from 'lucide-react';
-import { User, Message, MediaCard, ChatSession, CardType, PaymentTransaction, CardDefaults } from '../types';
+import { Send, Plus, Home, Wallet, Share2, MessageSquare, LayoutGrid, QrCode, X, User as UserIcon, LogIn, Camera, Settings, Sun, Moon, Menu, ChevronLeft, ChevronRight, ChevronDown, Copy, CheckCircle, Loader2, RefreshCw, DollarSign, ArrowUpRight, Mic, Video, Upload, StopCircle, Trash2, Aperture, Lock, Zap, History, CreditCard, Mail, ShoppingCart, LogOut, FolderOpen, Edit, Tv, Image as ImageIcon, Cloud, MoreVertical, Minimize2, Maximize2, Power, Sliders, ArrowLeft, Users, Clock, Sparkles } from 'lucide-react';
+import { User, Message, MediaCard, ChatSession, CardType, PaymentTransaction, CardDefaults, PaidChatConfig, QuickPhrasesConfig } from '../types';
 import { supabase } from '../lib/supabase';
 import CardModal from './CardModal';
 import MediaCardItem from './MediaCardItem';
 import Gallery from './Gallery';
-import { QuickSettingsModal } from './QuickSettingsModal';
+import { QuickSettingsModal, DEFAULT_CREATOR_PHRASES, DEFAULT_VISITOR_PHRASES } from './QuickSettingsModal';
+import { ChatRenewalModal } from './ChatRenewalModal';
 import { WalletModal } from './WalletModal';
 import { ToastType, ToastOptions } from './Toast';
 import { getFollowers, getFollowing } from '../lib/followers';
@@ -234,6 +235,230 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     if (onShowToast) onShowToast(message, type, options);
   };
 
+  // Paid Chat & Quick Phrases State
+  const [quickSettingsTab, setQuickSettingsTab] = useState<'general' | 'advanced' | 'paid_chat' | 'phrases'>('paid_chat');
+  const [paidChatConfig, setPaidChatConfig] = useState<PaidChatConfig>(() => {
+    if (typeof window !== 'undefined' && roomId) {
+      const saved = localStorage.getItem(`paid_chat_config_${roomId}`);
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) {}
+      }
+    }
+    return {
+      enabled: false,
+      intervalMinutes: 5,
+      costCredits: 10,
+      warningSeconds: 60,
+      autoDebitDefault: false
+    };
+  });
+
+  const [quickPhrasesConfig, setQuickPhrasesConfig] = useState<QuickPhrasesConfig>(() => {
+    if (typeof window !== 'undefined' && roomId) {
+      const saved = localStorage.getItem(`quick_phrases_${roomId}`);
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) {}
+      }
+    }
+    return {
+      creatorPhrases: [...DEFAULT_CREATOR_PHRASES],
+      visitorPhrases: [...DEFAULT_VISITOR_PHRASES]
+    };
+  });
+
+  // State to track which session is being configured (null means active roomId)
+  const [targetSessionConfig, setTargetSessionConfig] = useState<{
+    sessionId: string;
+    sessionName: string;
+    paidChat: PaidChatConfig;
+    phrases: QuickPhrasesConfig;
+    defaults: CardDefaults;
+  } | null>(null);
+
+  const handleOpenSessionSettings = (sessionId: string, sessionName: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+
+    // Check custom paid chat config
+    let pChat: PaidChatConfig = {
+      enabled: false,
+      intervalMinutes: 5,
+      costCredits: 10,
+      warningSeconds: 60,
+      autoDebitDefault: false
+    };
+    if (sessionId === roomId) {
+      pChat = { ...paidChatConfig };
+    } else {
+      const savedPaid = localStorage.getItem(`paid_chat_config_${sessionId}`);
+      if (savedPaid) {
+        try { pChat = JSON.parse(savedPaid); } catch (err) {}
+      }
+    }
+
+    // Check custom phrases config
+    let qPhrases: QuickPhrasesConfig = {
+      creatorPhrases: [...DEFAULT_CREATOR_PHRASES],
+      visitorPhrases: [...DEFAULT_VISITOR_PHRASES]
+    };
+    if (sessionId === roomId) {
+      qPhrases = { ...quickPhrasesConfig };
+    } else {
+      const savedPhrases = localStorage.getItem(`quick_phrases_${sessionId}`);
+      if (savedPhrases) {
+        try { qPhrases = JSON.parse(savedPhrases); } catch (err) {}
+      }
+    }
+
+    // Card defaults
+    let cDefaults: CardDefaults = { ...quickDefaults };
+    const savedDefaults = localStorage.getItem(`card_defaults_${sessionId}`);
+    if (savedDefaults) {
+      try { cDefaults = JSON.parse(savedDefaults); } catch (err) {}
+    }
+
+    setTargetSessionConfig({
+      sessionId,
+      sessionName,
+      paidChat: pChat,
+      phrases: qPhrases,
+      defaults: cDefaults
+    });
+    setQuickSettingsTab('paid_chat');
+    setIsQuickSettingsOpen(true);
+  };
+
+  // Chat Renewal States (Cronômetro regressivo em vermelho e Débito Automático)
+  const [isRenewalModalOpen, setIsRenewalModalOpen] = useState(false);
+  const [renewalSecondsRemaining, setRenewalSecondsRemaining] = useState(60);
+  const [isChatPausedDueToRenewal, setIsChatPausedDueToRenewal] = useState(false);
+  const [sessionStartTime, setSessionStartTime] = useState<number>(() => {
+    if (typeof window !== 'undefined' && roomId) {
+      const saved = localStorage.getItem(`session_start_${roomId}_${user.id}`);
+      if (saved) {
+        const num = parseInt(saved, 10);
+        if (!isNaN(num) && num > 0) return num;
+      }
+    }
+    return Date.now();
+  });
+
+  const [autoDebit, setAutoDebit] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && roomId) {
+      const saved = localStorage.getItem(`auto_debit_${roomId}_${user.id}`);
+      if (saved !== null) return saved === 'true';
+    }
+    return paidChatConfig?.autoDebitDefault ?? false;
+  });
+
+  const handleToggleAutoDebit = (enabled: boolean) => {
+    setAutoDebit(enabled);
+    if (roomId) {
+      localStorage.setItem(`auto_debit_${roomId}_${user.id}`, enabled.toString());
+    }
+    showToast(
+      enabled ? 'Débito automático ativado!' : 'Débito automático desligado.',
+      enabled ? 'success' : 'info'
+    );
+  };
+
+  const handleRenewChat = async () => {
+    if (user.credits < paidChatConfig.costCredits) {
+      openWallet('recharge');
+      showToast('Saldo insuficiente. Recarregue seus créditos para renovar.', 'warning');
+      return;
+    }
+
+    const cost = paidChatConfig.costCredits;
+    updateCredits(user.credits - cost);
+    const now = Date.now();
+    setSessionStartTime(now);
+    if (roomId) {
+      localStorage.setItem(`session_start_${roomId}_${user.id}`, now.toString());
+    }
+    setIsRenewalModalOpen(false);
+    setIsChatPausedDueToRenewal(false);
+    showToast(`Chat renovado com sucesso! (-${cost} créditos)`, 'success');
+
+    // Transfer or log transaction in Supabase
+    if (user.isLoggedIn && roomDetails?.creator_id && roomDetails.creator_id !== user.id) {
+      try {
+        await supabase.from('credit_transactions').insert([{
+          sender_id: user.id,
+          receiver_id: roomDetails.creator_id,
+          amount: cost,
+          type: 'chat_renewal',
+          card_id: null
+        }]);
+      } catch (e) {
+        console.warn('Could not log credit transaction:', e);
+      }
+    }
+  };
+
+  const handleSaveQuickSettings = async (
+    newDefaults: CardDefaults, 
+    newPaidChat?: PaidChatConfig, 
+    newPhrases?: QuickPhrasesConfig
+  ) => {
+    const targetId = targetSessionConfig?.sessionId || roomId;
+    const targetName = targetSessionConfig?.sessionName || (roomDetails?.name || 'Sala');
+
+    if (newDefaults && targetId) {
+      localStorage.setItem(`card_defaults_${targetId}`, JSON.stringify(newDefaults));
+      if (targetId === roomId) {
+        setQuickDefaults(newDefaults);
+      }
+    }
+
+    if (newPaidChat && targetId) {
+      localStorage.setItem(`paid_chat_config_${targetId}`, JSON.stringify(newPaidChat));
+      if (targetId === roomId) {
+        setPaidChatConfig(newPaidChat);
+        // Broadcast to room peers via roomChannel
+        const activeChannel = roomChannel || roomChannelRef.current;
+        if (activeChannel) {
+          activeChannel.send({
+            type: 'broadcast',
+            event: 'paid-chat-update',
+            payload: { config: newPaidChat }
+          });
+        }
+      }
+    }
+
+    if (newPhrases && targetId) {
+      localStorage.setItem(`quick_phrases_${targetId}`, JSON.stringify(newPhrases));
+      if (targetId === roomId) {
+        setQuickPhrasesConfig(newPhrases);
+        // Broadcast to room peers via roomChannel
+        const activeChannel = roomChannel || roomChannelRef.current;
+        if (activeChannel) {
+          activeChannel.send({
+            type: 'broadcast',
+            event: 'quick-phrases-update',
+            payload: { phrases: newPhrases }
+          });
+        }
+      }
+    }
+
+    setIsQuickSettingsOpen(false);
+    setTargetSessionConfig(null);
+    showToast(`Configurações de "${targetName}" salvas com sucesso!`, 'success');
+
+    // Persist to Supabase if logged in
+    if (targetId && user.isLoggedIn) {
+      try {
+        await supabase.from('rooms').update({
+          paid_chat_config: newPaidChat,
+          quick_phrases: newPhrases
+        }).eq('id', targetId);
+      } catch (err) {
+        console.warn('Could not update room metadata in Supabase:', err);
+      }
+    }
+  };
+
   // Private Room Logic
   const [isPrivateLocked, setIsPrivateLocked] = useState(false);
   const [privateRoomCard, setPrivateRoomCard] = useState<MediaCard | null>(null);
@@ -415,6 +640,67 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const isWatchPartyHost = watchPartyHostId ? watchPartyHostId === user.id : !!(localVideoUrl || isHost);
   const isAdmin = isHost || (user.isLoggedIn && roomAdmins.has(user.id)) || roomId?.startsWith('guest_');
   const canControlVideo = true; // Everyone can insert and control video
+
+  // Paid Chat Rotation Timer Effect (Cobrança Rotativa a cada X minutos)
+  useEffect(() => {
+    // If not enabled or if the user is the room creator/host, host does not pay
+    if (!paidChatConfig.enabled || isHost || !roomId) {
+      setIsRenewalModalOpen(false);
+      setIsChatPausedDueToRenewal(false);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const cycleDurationSeconds = Math.max(30, (paidChatConfig.intervalMinutes || 5) * 60);
+      const warningDuration = Math.min(paidChatConfig.warningSeconds || 60, cycleDurationSeconds);
+      const elapsedSeconds = Math.max(0, Math.floor((Date.now() - sessionStartTime) / 1000));
+      const secondsLeftInCycle = cycleDurationSeconds - (elapsedSeconds % cycleDurationSeconds);
+
+      setRenewalSecondsRemaining(secondsLeftInCycle);
+
+      // Warning window reached (e.g. within 60s / 300s before expiring)
+      if (secondsLeftInCycle <= warningDuration && secondsLeftInCycle > 1) {
+        if (autoDebit) {
+          // If auto debit is enabled and user has enough credits, automatically renew without interruption
+          if (user.credits >= paidChatConfig.costCredits) {
+            updateCredits(user.credits - paidChatConfig.costCredits);
+            const now = Date.now();
+            setSessionStartTime(now);
+            localStorage.setItem(`session_start_${roomId}_${user.id}`, now.toString());
+            setIsRenewalModalOpen(false);
+            setIsChatPausedDueToRenewal(false);
+            showToast(`Chat renovado automaticamente (-${paidChatConfig.costCredits} créditos)`, 'success');
+            return;
+          } else {
+            // Auto-debit failed due to insufficient credits: alert user with red countdown
+            setIsRenewalModalOpen(true);
+          }
+        } else {
+          // Manual renewal: show modal with red countdown timer
+          setIsRenewalModalOpen(true);
+        }
+      }
+
+      // Time ran out (Cycle ended and not renewed)
+      if (secondsLeftInCycle <= 1 || elapsedSeconds >= cycleDurationSeconds) {
+        if (autoDebit && user.credits >= paidChatConfig.costCredits) {
+          updateCredits(user.credits - paidChatConfig.costCredits);
+          const now = Date.now();
+          setSessionStartTime(now);
+          localStorage.setItem(`session_start_${roomId}_${user.id}`, now.toString());
+          setIsRenewalModalOpen(false);
+          setIsChatPausedDueToRenewal(false);
+          showToast(`Chat renovado automaticamente (-${paidChatConfig.costCredits} créditos)`, 'success');
+        } else {
+          setIsChatPausedDueToRenewal(true);
+          setIsRenewalModalOpen(true);
+          setRenewalSecondsRemaining(0);
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [paidChatConfig, isHost, roomId, sessionStartTime, autoDebit, user.credits]);
 
   const toggleVideoController = (userId: string) => {
     if (!isHost) return;
@@ -913,7 +1199,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     const fetchRoomDetails = async () => {
       if (!roomId) return;
       setIsRoomDetailsLoading(true);
-      const { data } = await supabase.from('rooms').select('name, image_url, background_url, watch_party_data, admins, creator_id').eq('id', roomId).single();
+      const { data } = await supabase.from('rooms').select('name, image_url, background_url, watch_party_data, admins, creator_id, paid_chat_config, quick_phrases').eq('id', roomId).single();
       
       let watchPartyData = data?.watch_party_data || null;
 
@@ -924,6 +1210,40 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           try {
             watchPartyData = JSON.parse(saved);
           } catch (e) {}
+        }
+      }
+
+      // Sync Paid Chat and Quick Phrases from Room if present
+      if (data?.paid_chat_config) {
+        setPaidChatConfig(data.paid_chat_config);
+        localStorage.setItem(`paid_chat_config_${roomId}`, JSON.stringify(data.paid_chat_config));
+      } else {
+        const localPaid = localStorage.getItem(`paid_chat_config_${roomId}`);
+        if (localPaid) {
+          try { setPaidChatConfig(JSON.parse(localPaid)); } catch (e) {}
+        } else {
+          setPaidChatConfig({
+            enabled: false,
+            intervalMinutes: 5,
+            costCredits: 10,
+            warningSeconds: 60,
+            autoDebitDefault: false
+          });
+        }
+      }
+
+      if (data?.quick_phrases) {
+        setQuickPhrasesConfig(data.quick_phrases);
+        localStorage.setItem(`quick_phrases_${roomId}`, JSON.stringify(data.quick_phrases));
+      } else {
+        const localPhrases = localStorage.getItem(`quick_phrases_${roomId}`);
+        if (localPhrases) {
+          try { setQuickPhrasesConfig(JSON.parse(localPhrases)); } catch (e) {}
+        } else {
+          setQuickPhrasesConfig({
+            creatorPhrases: [...DEFAULT_CREATOR_PHRASES],
+            visitorPhrases: [...DEFAULT_VISITOR_PHRASES]
+          });
         }
       }
 
@@ -1063,10 +1383,32 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         setMessages([]);
         showToast('A conversa e as mídias da sala foram limpas.', 'info');
       })
+      .on('broadcast', { event: 'paid-chat-update' }, (payload) => {
+        if (payload?.payload?.config) {
+          setPaidChatConfig(payload.payload.config);
+          if (roomId) {
+            localStorage.setItem(`paid_chat_config_${roomId}`, JSON.stringify(payload.payload.config));
+          }
+        }
+      })
+      .on('broadcast', { event: 'quick-phrases-update' }, (payload) => {
+        if (payload?.payload?.phrases) {
+          setQuickPhrasesConfig(payload.payload.phrases);
+          if (roomId) {
+            localStorage.setItem(`quick_phrases_${roomId}`, JSON.stringify(payload.payload.phrases));
+          }
+        }
+      })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` },
         (payload) => {
           const updated = payload.new;
           if (updated.admins) setRoomAdmins(new Set(updated.admins));
+          if (updated.paid_chat_config) {
+            setPaidChatConfig(updated.paid_chat_config);
+          }
+          if (updated.quick_phrases) {
+            setQuickPhrasesConfig(updated.quick_phrases);
+          }
 
           if (updated.watch_party_data) {
             setWatchPartySource(updated.watch_party_data.source);
@@ -2301,11 +2643,54 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     }
   };
 
-  const handleSendMessage = async () => {
-    if (!inputText.trim() || !roomId) return;
-    const { error } = await supabase.from('messages').insert([{ room_id: roomId, sender_id: user.id, sender_name: user.name, text: inputText }]);
-    if (error) alert('Erro ao enviar');
-    setInputText('');
+  const handleSendMessage = async (textToSend?: string) => {
+    const text = (textToSend !== undefined ? textToSend : inputText).trim();
+    if (!text || !roomId) return;
+
+    if (isChatPausedDueToRenewal && !isHost) {
+      setIsRenewalModalOpen(true);
+      showToast('O tempo do chat expirou. Renove para continuar enviando mensagens.', 'warning');
+      return;
+    }
+
+    if (textToSend === undefined) {
+      setInputText('');
+    }
+
+    try {
+      const { error } = await supabase.from('messages').insert([{ 
+        room_id: roomId, 
+        sender_id: user.id, 
+        sender_name: user.name, 
+        text: text 
+      }]);
+      if (error) {
+        console.warn('Supabase insert message error (fallback to local):', error);
+        // Fallback optimistic message
+        const optimisticMsg: Message = {
+          id: 'msg_' + Math.random().toString(36).substring(2, 10),
+          senderId: user.id,
+          senderName: user.name,
+          text: text,
+          timestamp: Date.now()
+        };
+        setMessages(prev => [...prev, optimisticMsg]);
+      }
+    } catch (e) {
+      console.warn('Network error sending message, adding locally:', e);
+      const optimisticMsg: Message = {
+        id: 'msg_' + Math.random().toString(36).substring(2, 10),
+        senderId: user.id,
+        senderName: user.name,
+        text: text,
+        timestamp: Date.now()
+      };
+      setMessages(prev => [...prev, optimisticMsg]);
+    }
+  };
+
+  const handleSendQuickPhrase = (phrase: string) => {
+    handleSendMessage(phrase);
   };
 
   // Quick Action functions
@@ -2730,6 +3115,25 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               <span className="text-[9px] font-black">{user.earnings}</span>
             </button>
           )}
+          {/* Highlighted Settings/Config Icon in Sidebar Header */}
+          <button 
+            type="button"
+            onClick={() => { 
+              setQuickSettingsTab('paid_chat');
+              setIsQuickSettingsOpen(true); 
+            }} 
+            className={`w-12 h-12 rounded-2xl border flex flex-col items-center justify-center transition-all cursor-pointer relative shadow-sm ${
+              paidChatConfig.enabled 
+                ? 'bg-blue-500/20 text-blue-400 border-blue-500/40 hover:bg-blue-500/30 ring-2 ring-blue-500/20' 
+                : (isDark ? 'bg-slate-800 text-slate-400 border-slate-700/50 hover:bg-slate-700 hover:text-white' : 'bg-gray-100 text-slate-600 border-gray-200 hover:bg-gray-200')
+            }`}
+            title="Ajustes da Sala: Tempo de Chat, Frases e Cards"
+          >
+            <Settings size={20} />
+            {paidChatConfig.enabled && (
+              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-slate-900 animate-pulse" />
+            )}
+          </button>
         </div>
         {!isSidebarCollapsed && (
           <div className="w-full text-center animate-in fade-in space-y-3">
@@ -2793,6 +3197,18 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           const displayImage = currentRoomDetails?.image_url || null;
           const isOtherUserRoom = session.id !== user.id && !session.id.startsWith('priv-') && !session.id.startsWith('room-');
 
+          // Check if this specific session has paid chat enabled
+          let sessionPaidConfig: PaidChatConfig | null = null;
+          if (session.id === roomId) {
+            sessionPaidConfig = paidChatConfig;
+          } else {
+            try {
+              const saved = localStorage.getItem(`paid_chat_config_${session.id}`);
+              if (saved) sessionPaidConfig = JSON.parse(saved);
+            } catch (e) {}
+          }
+          const isSessionPaidActive = Boolean(sessionPaidConfig?.enabled);
+
           return (
             <div 
               key={session.id} 
@@ -2820,8 +3236,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               </div>
               {!isSidebarCollapsed && (
                 <div className="flex-1 min-w-0 animate-in fade-in">
-                  <div className="flex justify-between items-start">
-                    <div className="flex flex-col min-w-0">
+                  <div className="flex justify-between items-start gap-1.5">
+                    <div className="flex flex-col min-w-0 flex-1">
                       <h3 className={`text-sm font-bold truncate ${
                         isOtherUserRoom 
                           ? 'text-blue-400' 
@@ -2835,13 +3251,40 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         </span>
                       )}
                     </div>
-                    <button
-                      onClick={(e) => handleCloseSession(e, session.id)}
-                      title="Fechar sala"
-                      className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-red-600 hover:bg-red-500 rounded-full text-white shadow-md transition-all z-10"
-                    >
-                      <X size={12} strokeWidth={3} />
-                    </button>
+
+                    {/* Action buttons: Per-chat customized Tempo & Frases + Close */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => handleOpenSessionSettings(
+                          session.id, 
+                          isActive && roomDetails?.name ? roomDetails.name : session.name, 
+                          e
+                        )}
+                        title={`Ajustes de Tempo & Frases de "${session.name}"`}
+                        className={`flex items-center gap-1 px-2 py-0.5 sm:py-1 rounded-xl border text-[9px] font-black uppercase tracking-wider transition-all duration-150 active:scale-95 shadow-xs cursor-pointer ${
+                          isSessionPaidActive
+                            ? 'bg-blue-600/25 text-blue-400 border-blue-500/50 hover:bg-blue-600/35 ring-1 ring-blue-500/30'
+                            : (isDark 
+                                ? 'bg-slate-800/90 text-slate-300 hover:text-white border-slate-700/80 hover:bg-slate-700' 
+                                : 'bg-blue-50 text-blue-700 hover:text-blue-900 border-blue-200 hover:bg-blue-100')
+                        }`}
+                      >
+                        <Settings size={11} className={isSessionPaidActive ? "text-blue-400 animate-spin-slow" : "text-slate-400 dark:text-slate-300"} />
+                        <span className="truncate max-w-[65px] sm:max-w-[78px]">Tempo & Frases</span>
+                        {isSessionPaidActive && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shrink-0" title="Cobrança ativa" />
+                        )}
+                      </button>
+
+                      <button
+                        onClick={(e) => handleCloseSession(e, session.id)}
+                        title="Fechar sala"
+                        className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-red-600 hover:bg-red-500 rounded-full text-white shadow-md transition-all z-10"
+                      >
+                        <X size={12} strokeWidth={3} />
+                      </button>
+                    </div>
                   </div>
                   <div className="flex justify-between items-center mt-1">
                     <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'} truncate font-medium`}>{session.lastMessage}</p>
@@ -3313,6 +3756,83 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                 ) : (
                   /* ... (Same simplified input bar logic as previous) ... */
                   <div className="flex flex-col gap-1.5 sm:gap-2 md:gap-3 w-full max-w-full">
+                    {/* Quick Phrases Balloon Strip (Balões de Frases) - Horizontal Scrollable Row */}
+                    {(() => {
+                      const activePhrases = isHost 
+                        ? (quickPhrasesConfig?.creatorPhrases?.length ? quickPhrasesConfig.creatorPhrases : DEFAULT_CREATOR_PHRASES)
+                        : (quickPhrasesConfig?.visitorPhrases?.length ? quickPhrasesConfig.visitorPhrases : DEFAULT_VISITOR_PHRASES);
+
+                      return (
+                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide no-scrollbar w-full max-w-full">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setQuickSettingsTab('phrases');
+                              setIsQuickSettingsOpen(true);
+                            }}
+                            className={`flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-all select-none ${
+                              isDark 
+                                ? 'bg-blue-950/40 text-blue-400 border-blue-500/30 hover:bg-blue-900/50' 
+                                : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                            }`}
+                            title="Gerenciar e personalizar frases balão"
+                          >
+                            <Sparkles size={11} className="text-amber-400 shrink-0" />
+                            <span>{isHost ? 'Frases' : 'Sugestões'}</span>
+                          </button>
+
+                          {activePhrases.map((phrase, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => handleSendQuickPhrase(phrase)}
+                              disabled={isChatPausedDueToRenewal && !isHost}
+                              className={`flex-shrink-0 px-3.5 py-1.5 rounded-full border text-xs sm:text-xs font-semibold whitespace-nowrap transition-all duration-150 active:scale-95 cursor-pointer shadow-xs select-none ${
+                                isDark
+                                  ? 'bg-slate-900/90 hover:bg-slate-800 border-slate-700/80 text-slate-200 hover:text-white hover:border-blue-500/50 active:bg-blue-600 active:text-white'
+                                  : 'bg-white hover:bg-gray-100 border-gray-200 text-slate-800 hover:text-slate-950 hover:border-blue-400 active:bg-blue-600 active:text-white'
+                              } ${isChatPausedDueToRenewal && !isHost ? 'opacity-40 cursor-not-allowed' : ''}`}
+                              title={`Clique para enviar: "${phrase}"`}
+                            >
+                              {phrase}
+                            </button>
+                          ))}
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setQuickSettingsTab('phrases');
+                              setIsQuickSettingsOpen(true);
+                            }}
+                            className={`flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full border transition-all ${
+                              isDark
+                                ? 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-white hover:border-slate-500'
+                                : 'bg-gray-100 text-slate-500 border-gray-200 hover:text-slate-900 hover:border-gray-300'
+                            }`}
+                            title="Adicionar mais frases balão"
+                          >
+                            <Plus size={13} />
+                          </button>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Chat Paused Warning Banner */}
+                    {isChatPausedDueToRenewal && !isHost && (
+                      <div 
+                        onClick={() => setIsRenewalModalOpen(true)}
+                        className="w-full p-2.5 rounded-2xl bg-red-500/15 border border-red-500/40 text-red-400 text-xs font-bold flex items-center justify-between cursor-pointer hover:bg-red-500/20 transition-all animate-pulse"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Clock size={15} className="text-red-400 shrink-0" />
+                          <span>Tempo esgotado! Clique para renovar o chat (-{paidChatConfig.costCredits} créditos).</span>
+                        </div>
+                        <span className="px-2.5 py-1 rounded-xl bg-red-600 text-white text-[10px] font-black uppercase tracking-wider shadow-sm shrink-0">
+                          Renovar Agora
+                        </span>
+                      </div>
+                    )}
+
                     {/* Function Icons Bar (Visible on Mobile, Hidden on Desktop) */}
                     <div className="flex md:hidden items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide no-scrollbar w-full max-w-full">
                       <button 
@@ -3328,7 +3848,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                       <button disabled={isUploading} onClick={() => startQuickRecording('photo')} className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Foto"><Camera size={14} /></button>
                       <button disabled={isUploading} onClick={() => { setActiveTab('cinema'); handleNewVideoSelection(); }} className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20" title="Subir Vídeo / Link" style={{touchAction:'manipulation'}}><Tv size={14} /></button>
                       <button disabled={isUploading} onClick={() => setIsCardModalOpen(true)} className={`flex-shrink-0 w-8 h-8 flex items-center justify-center ${colors.primary} text-white rounded-xl shadow-lg`} title="Novo Card"><Plus size={16} /></button>
-                      <button disabled={isUploading} onClick={() => setIsQuickSettingsOpen(true)} className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Ajustes"><Settings size={13} /></button>
+                      <button disabled={isUploading} onClick={() => { setQuickSettingsTab('paid_chat'); setIsQuickSettingsOpen(true); }} className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl border transition-all ${paidChatConfig.enabled ? 'bg-blue-600/25 text-blue-400 border-blue-500/50 shadow-sm' : 'bg-slate-800 text-slate-400 border-slate-700/50'}`} title="Ajustes (Tempo & Frases)"><Settings size={13} /></button>
                       <button disabled={isUploading} onClick={() => startQuickRecording('audio')} className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Áudio"><Mic size={14} /></button>
                       <button disabled={isUploading} onClick={() => startQuickRecording('video')} className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Vídeo"><Video size={14} /></button>
                       <button disabled={isUploading} onClick={() => setIsClearChatModalOpen(true)} className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-red-950/30 text-red-400 hover:bg-red-900/40 rounded-xl border border-red-500/20" title="Limpar Conversa e Mídias"><Trash2 size={14} /></button>
@@ -3349,15 +3869,16 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                           value={inputText}
                           onChange={(e) => setInputText(e.target.value)}
                           onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                          placeholder="Fale algo..."
-                          className={`w-full min-w-0 bg-transparent border-none text-[15px] sm:text-[16px] py-2.5 sm:py-3.5 md:py-4.5 ${colors.textHighlight} outline-none placeholder:opacity-40 font-medium`}
+                          placeholder={isChatPausedDueToRenewal && !isHost ? "Chat pausado (renovação necessária)..." : "Fale algo..."}
+                          disabled={isChatPausedDueToRenewal && !isHost}
+                          className={`w-full min-w-0 bg-transparent border-none text-[15px] sm:text-[16px] py-2.5 sm:py-3.5 md:py-4.5 ${colors.textHighlight} outline-none placeholder:opacity-40 font-medium ${isChatPausedDueToRenewal && !isHost ? 'cursor-not-allowed opacity-50' : ''}`}
                         />
                       </div>
 
                       <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2 shrink-0">
                         {/* Desktop Only Actions - Right Side */}
                         <div className="hidden md:flex gap-2">
-                          <button disabled={isUploading} onClick={() => setIsQuickSettingsOpen(true)} className="w-12 h-12 flex items-center justify-center bg-slate-800 text-slate-400 hover:text-emerald-400 rounded-2xl transition-all border border-slate-700" title="Configurar Padrões"><Settings size={18} /></button>
+                          <button disabled={isUploading} onClick={() => { setQuickSettingsTab('paid_chat'); setIsQuickSettingsOpen(true); }} className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-all border ${paidChatConfig.enabled ? 'bg-blue-600/25 text-blue-400 border-blue-500/50 shadow-sm' : 'bg-slate-800 text-slate-400 hover:text-emerald-400 border-slate-700'}`} title="Configurações (Tempo, Frases & Padrões)"><Settings size={18} /></button>
                           <button disabled={isUploading} onClick={() => startQuickRecording('audio')} className={`w-12 h-12 flex items-center justify-center ${isDark ? 'bg-slate-800 text-slate-400 hover:text-red-400' : 'bg-gray-200 text-slate-500 hover:text-red-500'} rounded-2xl transition-all`} title="Áudio Rápido"><Mic size={20} /></button>
                           <button disabled={isUploading} onClick={() => startQuickRecording('video')} className={`w-12 h-12 flex items-center justify-center ${isDark ? 'bg-slate-800 text-slate-400 hover:text-blue-400' : 'bg-gray-200 text-slate-500 hover:text-blue-500'} rounded-2xl transition-all`} title="Vídeo Rápido"><Video size={20} /></button>
                           <button disabled={isUploading} onClick={() => setIsClearChatModalOpen(true)} className={`w-12 h-12 flex items-center justify-center ${isDark ? 'bg-red-950/30 text-red-400 hover:bg-red-900/40' : 'bg-red-50 text-red-500 hover:bg-red-100'} rounded-2xl transition-all border border-red-500/20`} title="Limpar Conversa e Mídias"><Trash2 size={18} /></button>
@@ -3365,7 +3886,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
                         {/* Send Button */}
                         <button
-                          onClick={handleSendMessage}
+                          onClick={() => handleSendMessage()}
                           disabled={!inputText.trim()}
                           className={`w-10 h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 flex-shrink-0 flex items-center justify-center ${colors.primary} text-white rounded-2xl hover:opacity-90 shadow-lg transition-all disabled:opacity-25 active:scale-90`}
                         >
@@ -3746,7 +4267,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         placeholder="Comentar..."
                         className="flex-1 bg-transparent border-none text-[16px] py-3 text-white outline-none"
                       />
-                      <button onClick={handleSendMessage} disabled={!inputText.trim()} className="text-blue-500 disabled:opacity-30"><Send size={18} /></button>
+                      <button onClick={() => handleSendMessage()} disabled={!inputText.trim()} className="text-blue-500 disabled:opacity-30"><Send size={18} /></button>
                     </div>
                   </div>
                 </>
@@ -3983,13 +4504,44 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         {isQuickSettingsOpen && (
           <QuickSettingsModal
             theme={theme}
-            onClose={() => setIsQuickSettingsOpen(false)}
-            initialDefaults={quickDefaults}
-            onSave={(newDefaults: CardDefaults) => {
-              setQuickDefaults(newDefaults);
+            onClose={() => {
               setIsQuickSettingsOpen(false);
-              showToast('Configurações padrão salvas!', 'success');
+              setTargetSessionConfig(null);
             }}
+            initialDefaults={targetSessionConfig?.defaults || quickDefaults}
+            paidChatConfig={targetSessionConfig?.paidChat || paidChatConfig}
+            quickPhrasesConfig={targetSessionConfig?.phrases || quickPhrasesConfig}
+            initialTab={quickSettingsTab}
+            isRoomCreator={targetSessionConfig?.sessionId ? (targetSessionConfig.sessionId === roomId ? isHost : true) : isHost}
+            roomTitle={targetSessionConfig?.sessionName || (roomDetails?.name || 'Esta Sala')}
+            onSave={handleSaveQuickSettings}
+          />
+        )}
+
+        {/* Modal de Renovação de Chat (Cobrança Rotativa com Cronômetro em Vermelho e Débito Automático) */}
+        {isRenewalModalOpen && !isHost && paidChatConfig.enabled && (
+          <ChatRenewalModal
+            isOpen={isRenewalModalOpen}
+            onClose={() => {
+              if (!isChatPausedDueToRenewal) {
+                setIsRenewalModalOpen(false);
+              } else {
+                showToast('Chat pausado. Renove para continuar conversando.', 'info');
+              }
+            }}
+            onRenew={handleRenewChat}
+            onOpenWallet={() => openWallet('recharge')}
+            secondsRemaining={renewalSecondsRemaining}
+            totalWarningSeconds={paidChatConfig.warningSeconds || 60}
+            costCredits={paidChatConfig.costCredits}
+            intervalMinutes={paidChatConfig.intervalMinutes}
+            userCredits={user.credits}
+            autoDebit={autoDebit}
+            onToggleAutoDebit={handleToggleAutoDebit}
+            roomName={roomDetails?.name || 'Conversa'}
+            creatorName={roomDetails?.creator_id ? 'Criador' : undefined}
+            theme={theme}
+            isExpired={isChatPausedDueToRenewal}
           />
         )}
 
