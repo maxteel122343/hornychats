@@ -3523,7 +3523,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col scrollbar-hide relative w-full max-w-full ${activeTab === 'cinema' && watchPartySource ? 'p-0 overflow-hidden' : 'p-3 sm:p-4 md:p-6'}`}
             >
               {activeTab === 'chat' ? (
-                <div className="flex-1 space-y-6 sm:space-y-8 max-w-5xl mx-auto w-full max-w-full py-2 sm:py-4 pb-24 overflow-x-hidden">
+                <div className="flex-1 space-y-6 sm:space-y-8 max-w-5xl mx-auto w-full max-w-full py-2 sm:py-4 pb-36 sm:pb-32 md:pb-28 overflow-x-hidden">
                   {messages.length === 0 && (
                     <div className="h-full flex flex-col items-center justify-center opacity-30 select-none group">
                       <div
@@ -3894,6 +3894,141 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         </button>
                       </div>
                     </div>
+
+                    {/* Mobile Horizontal Sidebar / Navigation Dock: Carteira, Feed, Cinema, Perfil */}
+                    <nav 
+                      aria-label="Navegação Rápida Mobile"
+                      className={`flex md:hidden items-center justify-between gap-1.5 sm:gap-2 pt-2 mt-0.5 border-t ${
+                        isDark ? 'border-slate-800/80' : 'border-gray-200/80'
+                      } w-full max-w-full select-none`}
+                    >
+                      {/* 1. CARTEIRA */}
+                      <button
+                        type="button"
+                        onClick={() => openWallet('recharge')}
+                        className={`flex-1 py-1.5 px-1 rounded-xl flex flex-col items-center justify-center transition-all duration-150 active:scale-95 cursor-pointer border ${
+                          isWalletModalOpen
+                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-sm'
+                            : (isDark 
+                                ? 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 border-slate-800/80' 
+                                : 'bg-emerald-50/70 hover:bg-emerald-100 text-emerald-800 border-emerald-200/70')
+                        }`}
+                        title="Carteira & Créditos"
+                      >
+                        <div className="relative flex items-center justify-center">
+                          <Wallet size={16} className="text-emerald-500 shrink-0" />
+                          <span className="absolute -top-1 -right-3 px-1 py-0.2 rounded-full bg-emerald-600 text-white dark:bg-emerald-500 dark:text-slate-950 text-[8px] font-black leading-none shadow-xs">
+                            {user.credits}c
+                          </span>
+                        </div>
+                        <span className="text-[9px] font-black uppercase tracking-wider mt-1 text-emerald-600 dark:text-emerald-400">
+                          Carteira
+                        </span>
+                      </button>
+
+                      {/* 2. FEED */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('chat');
+                          if (isWatchPartyOpen) setIsWatchPartyOpen(false);
+                        }}
+                        className={`flex-1 py-1.5 px-1 rounded-xl flex flex-col items-center justify-center transition-all duration-150 active:scale-95 cursor-pointer border ${
+                          activeTab === 'chat'
+                            ? (isDark
+                                ? 'bg-blue-600/25 text-blue-400 border-blue-500/50 shadow-sm'
+                                : 'bg-red-50 text-red-600 border-red-200 shadow-sm')
+                            : (isDark
+                                ? 'bg-slate-900/80 hover:bg-slate-800 text-slate-400 border-slate-800/80'
+                                : 'bg-gray-100 hover:bg-gray-200 text-slate-600 border-gray-200')
+                        }`}
+                        title="Feed do Chat"
+                      >
+                        <div className="relative flex items-center justify-center">
+                          <MessageSquare size={16} className={activeTab === 'chat' ? (isDark ? 'text-blue-400' : 'text-red-600') : 'text-slate-400'} />
+                          {activeTab === 'chat' && (
+                            <span className={`absolute -top-0.5 -right-1 w-1.5 h-1.5 rounded-full ${isDark ? 'bg-blue-400' : 'bg-red-500'}`} />
+                          )}
+                        </div>
+                        <span className={`text-[9px] font-black uppercase tracking-wider mt-1 ${
+                          activeTab === 'chat' ? (isDark ? 'text-blue-400 font-black' : 'text-red-600 font-black') : (isDark ? 'text-slate-400' : 'text-slate-600')
+                        }`}>
+                          Feed
+                        </span>
+                      </button>
+
+                      {/* 3. CINEMA */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('cinema');
+                          if (!watchPartySource) {
+                            handleNewVideoSelection();
+                          }
+                        }}
+                        className={`flex-1 py-1.5 px-1 rounded-xl flex flex-col items-center justify-center transition-all duration-150 active:scale-95 cursor-pointer border ${
+                          activeTab === 'cinema'
+                            ? 'bg-indigo-600/25 text-indigo-400 border-indigo-500/50 shadow-sm'
+                            : (isDark
+                                ? 'bg-slate-900/80 hover:bg-slate-800 text-slate-400 border-slate-800/80'
+                                : 'bg-indigo-50/60 hover:bg-indigo-100 text-slate-600 border-indigo-200/60')
+                        }`}
+                        title="Cinema & Transmissão"
+                        style={{ touchAction: 'manipulation' }}
+                      >
+                        <div className="relative flex items-center justify-center">
+                          <Tv size={16} className={activeTab === 'cinema' ? 'text-indigo-400' : 'text-slate-400'} />
+                          {watchPartySource && (
+                            <span className="absolute -top-0.5 -right-1 w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" title="Em reprodução" />
+                          )}
+                        </div>
+                        <span className={`text-[9px] font-black uppercase tracking-wider mt-1 ${
+                          activeTab === 'cinema' ? 'text-indigo-400 font-black' : (isDark ? 'text-slate-400' : 'text-slate-600')
+                        }`}>
+                          Cinema
+                        </span>
+                      </button>
+
+                      {/* 4. PERFIL */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (user.isLoggedIn) {
+                            setIsMobileMenuOpen(true);
+                          } else {
+                            openAuth();
+                          }
+                        }}
+                        className={`flex-1 py-1.5 px-1 rounded-xl flex flex-col items-center justify-center transition-all duration-150 active:scale-95 cursor-pointer border ${
+                          isMobileMenuOpen
+                            ? 'bg-purple-600/25 text-purple-400 border-purple-500/50 shadow-sm'
+                            : (isDark
+                                ? 'bg-slate-900/80 hover:bg-slate-800 text-slate-400 border-slate-800/80'
+                                : 'bg-purple-50/60 hover:bg-purple-100 text-slate-600 border-purple-200/60')
+                        }`}
+                        title="Meu Perfil & Conversas"
+                      >
+                        <div className="relative flex items-center justify-center">
+                          {user.profilePhoto ? (
+                            <img 
+                              src={user.profilePhoto} 
+                              alt={user.name} 
+                              className="w-4 h-4 rounded-full object-cover ring-1 ring-purple-400/50" 
+                            />
+                          ) : (
+                            <UserIcon size={16} className={isMobileMenuOpen ? 'text-purple-400' : 'text-slate-400'} />
+                          )}
+                          {user.isLoggedIn && (
+                            <span className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 ring-1 ring-slate-900" />
+                          )}
+                        </div>
+                        <span className={`text-[9px] font-black uppercase tracking-wider mt-1 ${
+                          isMobileMenuOpen ? 'text-purple-400 font-black' : (isDark ? 'text-slate-400' : 'text-slate-600')
+                        }`}>
+                          Perfil
+                        </span>
+                      </button>
+                    </nav>
                   </div>
                 )}
               </div>
