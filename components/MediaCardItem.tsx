@@ -187,7 +187,7 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
 
   if (expiresIn === 0 && !isHostMode && card.id !== 'preview') {
     return (
-      <div className={`p-4 rounded-3xl border flex items-center justify-center my-3 opacity-60 select-none max-w-[340px] w-full ${isDark ? 'bg-slate-900/50 border-slate-800' : 'bg-gray-100 border-gray-200'}`}>
+      <div className={`p-4 rounded-3xl border flex items-center justify-center my-3 opacity-60 select-none max-w-[calc(100vw-3rem)] sm:max-w-[340px] w-full ${isDark ? 'bg-slate-900/50 border-slate-800' : 'bg-gray-100 border-gray-200'}`}>
         <span className="text-[10px] font-black uppercase text-slate-500">Conteúdo Expirado</span>
       </div>
     );
@@ -250,7 +250,7 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
   return (
     <>
       <div
-        className={`group relative rounded-3xl overflow-hidden border transition-all duration-300 shadow-lg flex flex-col justify-between w-full max-w-[340px] sm:max-w-[360px] mx-auto sm:mx-0 my-3 select-none ${
+        className={`group relative rounded-3xl overflow-hidden border transition-all duration-300 shadow-lg flex flex-col justify-between w-full max-w-[calc(100vw-3rem)] sm:max-w-[360px] mx-auto sm:mx-0 my-3 select-none ${
           isDark 
             ? 'bg-slate-900/90 border-white/10 hover:border-indigo-500/60 shadow-2xl' 
             : 'bg-white border-gray-200 hover:border-indigo-400 hover:shadow-2xl shadow-gray-200/80'

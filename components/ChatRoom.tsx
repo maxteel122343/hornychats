@@ -374,6 +374,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const roomImageUploadRef = useRef<HTMLInputElement>(null);
   const watchVideoUploadRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatScrollContainerRef = useRef<HTMLDivElement>(null);
+  const cinemaChatContainerRef = useRef<HTMLDivElement>(null);
 
   // Recording Refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -1297,7 +1299,24 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     };
   }, [roomId, isPrivateLocked, user.id, isWatchPartyHost]);
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, activeTab]);
+  useEffect(() => {
+    // Only scroll the specific internal chat container, NEVER window.scrollIntoView which moves/minimizes header
+    if (activeTab === 'chat' && chatScrollContainerRef.current) {
+      chatScrollContainerRef.current.scrollTo({
+        top: chatScrollContainerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    } else if (activeTab === 'cinema' && cinemaChatContainerRef.current) {
+      cinemaChatContainerRef.current.scrollTo({
+        top: cinemaChatContainerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+    // Guarantee window itself stays at top (0, 0)
+    if (typeof window !== 'undefined' && window.scrollY !== 0) {
+      window.scrollTo(0, 0);
+    }
+  }, [messages, activeTab]);
 
   useEffect(() => {
     if (!activePayment) return;
@@ -2675,8 +2694,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
   return (
     <div 
-      className={`flex overflow-hidden ${colors.text} ${colors.bg}`}
-      style={{ height: 'var(--viewport-height, 100vh)' }}
+      className={`flex overflow-hidden ${colors.text} ${colors.bg} w-full max-w-full h-full`}
+      style={{ height: 'var(--viewport-height, 100vh)', maxHeight: '100dvh' }}
     >
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-[100] bg-black/80 md:hidden animate-in fade-in" onClick={() => setIsMobileMenuOpen(false)}>
@@ -2688,7 +2707,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       <aside className={`hidden md:flex flex-col border-r ${colors.border} transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'w-20' : 'w-[300px]'}`}><SidebarContent /></aside>
 
       <main
-        className={`flex-1 flex flex-col relative ${colors.bg}`}
+        className={`flex-1 flex flex-col relative ${colors.bg} w-full max-w-full min-w-0 overflow-hidden h-full`}
         style={roomDetails?.background_url ? {
           backgroundImage: `linear-gradient(rgba(0,0,0,${isDark ? 0.6 : 0.4}), rgba(0,0,0,${isDark ? 0.6 : 0.4})), url(${roomDetails.background_url})`,
           backgroundSize: 'cover',
@@ -2698,23 +2717,23 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       >
         <input type="file" ref={bgUploadRef} onChange={handleBackgroundUpload} className="hidden" accept="image/*" />
         <input type="file" ref={roomImageUploadRef} onChange={handleRoomImageUpload} className="hidden" accept="image/*" />
-        <header className={`h-[64px] border-b ${colors.border} flex items-center justify-between px-2 sm:px-4 md:px-6 ${colors.headerBg} backdrop-blur-md gap-2`}>
+        <header className={`h-[58px] sm:h-[64px] border-b ${colors.border} flex items-center justify-between px-2 sm:px-4 md:px-6 ${colors.headerBg} backdrop-blur-md gap-1 sm:gap-2 shrink-0 w-full max-w-full z-20 overflow-hidden`}>
           {/* Header Left: Back + Menu + Room Title (Clickable) */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1">
+          <div className="flex items-center gap-1 sm:gap-2 min-w-0 flex-1 overflow-hidden">
             <button 
               onClick={() => navigate('/')} 
-              className={`p-2 sm:p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 hover:text-white transition-all flex items-center justify-center shrink-0 active:scale-95 border border-slate-700/50 shadow-sm`}
+              className={`p-1.5 sm:p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 hover:text-white transition-all flex items-center justify-center shrink-0 active:scale-95 border border-slate-700/50 shadow-sm`}
               title="Voltar para Início"
             >
-              <ArrowLeft size={18} />
+              <ArrowLeft size={16} className="sm:w-[18px] sm:h-[18px]" />
             </button>
 
             <button 
               onClick={() => setIsMobileMenuOpen(true)} 
-              className="md:hidden p-2 sm:p-2.5 rounded-xl bg-slate-800/40 hover:bg-slate-800 text-slate-300 hover:text-white transition-all shrink-0 active:scale-95"
+              className="md:hidden p-1.5 sm:p-2.5 rounded-xl bg-slate-800/40 hover:bg-slate-800 text-slate-300 hover:text-white transition-all shrink-0 active:scale-95"
               title="Abrir Menu"
             >
-              <Menu size={18} className={colors.textHighlight} />
+              <Menu size={16} className={`${colors.textHighlight} sm:w-[18px] sm:h-[18px]`} />
             </button>
 
             {/* Room Info Clickable Area (Changes Room Photo and Name) */}
@@ -2723,30 +2742,30 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                 setTempRoomName(roomDetails?.name || sessions.find(s => s.id === roomId)?.name || 'Conversa');
                 setIsEditingRoom(true);
               }}
-              className="flex items-center gap-2 sm:gap-3 py-1 px-1.5 sm:px-2 rounded-xl hover:bg-white/5 active:bg-white/10 cursor-pointer transition-all min-w-0 flex-1 group/header select-none"
+              className="flex items-center gap-1.5 sm:gap-3 py-1 px-1 sm:px-2 rounded-xl hover:bg-white/5 active:bg-white/10 cursor-pointer transition-all min-w-0 flex-1 group/header select-none overflow-hidden"
               title="Clique para alterar foto e nome da sala"
             >
-              <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl overflow-hidden border ${colors.border} bg-slate-800 flex items-center justify-center shrink-0 relative group shadow-sm group-hover/header:border-blue-500/50 transition-colors`}>
+              <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl overflow-hidden border ${colors.border} bg-slate-800 flex items-center justify-center shrink-0 relative group shadow-sm group-hover/header:border-blue-500/50 transition-colors`}>
                 {roomDetails?.image_url ? (
                   <img src={roomDetails.image_url} alt="Sala" className="w-full h-full object-cover" />
                 ) : (
-                  <MessageSquare size={18} className="text-slate-400 group-hover/header:text-blue-400 transition-colors" />
+                  <MessageSquare size={16} className="text-slate-400 group-hover/header:text-blue-400 transition-colors sm:w-[18px] sm:h-[18px]" />
                 )}
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/header:opacity-100 flex items-center justify-center transition-opacity">
-                  <Camera size={13} className="text-white" />
+                  <Camera size={12} className="text-white" />
                 </div>
               </div>
 
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1">
-                  <h2 className={`text-xs sm:text-sm font-black ${colors.textHighlight} uppercase tracking-tighter truncate max-w-[120px] sm:max-w-[220px] group-hover/header:text-blue-400 transition-colors`}>
+              <div className="min-w-0 flex-1 overflow-hidden">
+                <div className="flex items-center gap-1 min-w-0">
+                  <h2 className={`text-[11px] sm:text-sm font-black ${colors.textHighlight} uppercase tracking-tighter truncate max-w-[90px] xs:max-w-[120px] sm:max-w-[220px] group-hover/header:text-blue-400 transition-colors`}>
                     {roomDetails?.name || sessions.find(s => s.id === roomId)?.name || 'Conversa'}
                   </h2>
-                  <Edit size={12} className="text-slate-500 group-hover/header:text-blue-400 shrink-0 opacity-70" />
+                  <Edit size={11} className="text-slate-500 group-hover/header:text-blue-400 shrink-0 opacity-70" />
                 </div>
-                <div className="flex items-center gap-1.5 mt-0.5">
+                <div className="flex items-center gap-1 sm:gap-1.5 mt-0.5 min-w-0">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></div>
-                  <span className={`text-[8px] sm:text-[9px] font-black ${colors.text} uppercase tracking-widest truncate`}>
+                  <span className={`text-[7.5px] sm:text-[9px] font-black ${colors.text} uppercase tracking-widest truncate`}>
                     {isAdmin ? 'MEU ESPAÇO • EDITAR' : 'ONLINE • EDITAR'}
                   </span>
                 </div>
@@ -2755,37 +2774,37 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           </div>
 
           {/* Header Right: Theme + Wallet/Credits + Video Call + Lixeira (Limpar) + Earnings + Share + Close */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             <button 
               type="button"
               onClick={toggleTheme} 
-              className={`p-2 sm:p-2.5 rounded-xl border ${colors.border} ${colors.text} hover:opacity-70 transition-all active:scale-95`}
+              className={`p-1.5 sm:p-2.5 rounded-xl border ${colors.border} ${colors.text} hover:opacity-70 transition-all active:scale-95`}
               title="Alternar Tema"
             >
-              {isDark ? <Sun size={17} /> : <Moon size={17} />}
+              {isDark ? <Sun size={15} className="sm:w-[17px] sm:h-[17px]" /> : <Moon size={15} className="sm:w-[17px] sm:h-[17px]" />}
             </button>
 
             {/* Wallet / Credits Recharge Button - Always visible on mobile and desktop */}
             <button 
-              type="button"
+              type="button" 
               onClick={() => openWallet('recharge')} 
-              className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs border border-emerald-500/30 font-black cursor-pointer transition-all active:scale-95 shrink-0 shadow-sm"
+              className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] sm:text-xs border border-emerald-500/30 font-black cursor-pointer transition-all active:scale-95 shrink-0 shadow-sm"
               title="Carteira & Depositar Créditos"
             >
-              <Wallet size={15} className="shrink-0 text-emerald-500" />
-              <span className="text-xs font-black">{user.credits}c</span>
+              <Wallet size={13} className="shrink-0 text-emerald-500 sm:w-[15px] sm:h-[15px]" />
+              <span className="text-[11px] sm:text-xs font-black">{user.credits}c</span>
             </button>
 
             {/* Earnings Dollar Button */}
             {user.isLoggedIn && (
               <button 
-                type="button"
+                type="button" 
                 onClick={() => openWallet('earnings')} 
-                className="flex items-center gap-1 px-2.5 py-1.5 sm:py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/20 font-black active:scale-95 shrink-0"
+                className="flex items-center gap-1 px-1.5 sm:px-2.5 py-1.5 sm:py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/20 font-black active:scale-95 shrink-0"
                 title="Central de Ganhos & Saques"
               >
-                <DollarSign size={15} />
-                <span className="hidden xs:inline text-[11px] font-black">{user.earnings}</span>
+                <DollarSign size={13} className="sm:w-[15px] sm:h-[15px]" />
+                <span className="hidden xs:inline text-[10px] sm:text-[11px] font-black">{user.earnings}</span>
               </button>
             )}
 
@@ -2834,10 +2853,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
             <button 
               onClick={() => navigate('/')} 
-              className="p-2 sm:p-2.5 hover:bg-red-500/10 rounded-xl text-slate-400 hover:text-red-500 transition-all active:scale-95" 
+              className="p-1.5 sm:p-2.5 hover:bg-red-500/10 rounded-xl text-slate-400 hover:text-red-500 transition-all active:scale-95 shrink-0" 
               title="Fechar / Sair do Chat"
             >
-              <X size={18} />
+              <X size={16} className="sm:w-[18px] sm:h-[18px]" />
             </button>
           </div>
         </header>
@@ -2869,16 +2888,19 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           </div>
         ) : (
           <>
-            <nav className={`flex px-2 md:px-6 border-b ${colors.border} ${isDark ? 'bg-slate-900/10' : 'bg-gray-100'} overflow-x-auto scrollbar-hide no-scrollbar`}>
-              <button onClick={() => setActiveTab('chat')} className={`px-4 md:px-8 py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'chat' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><MessageSquare size={14} /> Feed</button>
-              <button onClick={() => setActiveTab('showcase')} className={`px-4 md:px-8 py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'showcase' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><LayoutGrid size={14} /> Vitrine</button>
-              <button onClick={() => setActiveTab('my_cards')} className={`px-4 md:px-8 py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'my_cards' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><FolderOpen size={14} /> Meus Cards</button>
-              <button onClick={() => setActiveTab('cinema')} className={`px-4 md:px-8 py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'cinema' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><Tv size={14} /> Cinema</button>
+            <nav className={`flex px-2 md:px-6 border-b ${colors.border} ${isDark ? 'bg-slate-900/10' : 'bg-gray-100'} overflow-x-auto scrollbar-hide no-scrollbar w-full max-w-full shrink-0 z-10`}>
+              <button onClick={() => setActiveTab('chat')} className={`px-3 sm:px-4 md:px-8 py-3 sm:py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'chat' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><MessageSquare size={14} /> Feed</button>
+              <button onClick={() => setActiveTab('showcase')} className={`px-3 sm:px-4 md:px-8 py-3 sm:py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'showcase' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><LayoutGrid size={14} /> Vitrine</button>
+              <button onClick={() => setActiveTab('my_cards')} className={`px-3 sm:px-4 md:px-8 py-3 sm:py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'my_cards' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><FolderOpen size={14} /> Meus Cards</button>
+              <button onClick={() => setActiveTab('cinema')} className={`px-3 sm:px-4 md:px-8 py-3 sm:py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'cinema' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><Tv size={14} /> Cinema</button>
             </nav>
 
-            <div className={`flex-1 overflow-y-auto flex flex-col scrollbar-hide relative ${activeTab === 'cinema' && watchPartySource ? 'p-0 overflow-hidden' : 'p-4 md:p-6'}`}>
+            <div 
+              ref={chatScrollContainerRef}
+              className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col scrollbar-hide relative w-full max-w-full ${activeTab === 'cinema' && watchPartySource ? 'p-0 overflow-hidden' : 'p-3 sm:p-4 md:p-6'}`}
+            >
               {activeTab === 'chat' ? (
-                <div className="flex-1 space-y-8 max-w-5xl mx-auto w-full py-4 pb-24">
+                <div className="flex-1 space-y-6 sm:space-y-8 max-w-5xl mx-auto w-full max-w-full py-2 sm:py-4 pb-24 overflow-x-hidden">
                   {messages.length === 0 && (
                     <div className="h-full flex flex-col items-center justify-center opacity-30 select-none group">
                       <div
@@ -2904,9 +2926,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                     </div>
                   )}
                   {messages.map((msg) => (
-                    <div key={msg.id} className={`flex flex-col ${msg.senderId === user.id ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-3 duration-500`}>
+                    <div key={msg.id} className={`flex flex-col ${msg.senderId === user.id ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-3 duration-500 w-full max-w-full`}>
                       {msg.text && (
-                        <div className={`max-w-[88%] md:max-w-[80%] px-4 sm:px-5 py-2.5 sm:py-3.5 rounded-2xl text-xs sm:text-sm shadow-sm font-medium break-words [word-break:break-word] [overflow-wrap:anywhere] ${msg.senderId === user.id ? `${colors.primary} text-white rounded-tr-none` : `${isDark ? 'bg-slate-800/80 text-slate-200 border-slate-700/30' : 'bg-white text-slate-800 border-gray-200'} border rounded-tl-none`}`}>
+                        <div className={`max-w-[85%] sm:max-w-[80%] px-3.5 sm:px-5 py-2.5 sm:py-3.5 rounded-2xl text-xs sm:text-sm shadow-sm font-medium break-all [word-break:break-word] [overflow-wrap:anywhere] ${msg.senderId === user.id ? `${colors.primary} text-white rounded-tr-none` : `${isDark ? 'bg-slate-800/80 text-slate-200 border-slate-700/30' : 'bg-white text-slate-800 border-gray-200'} border rounded-tl-none`}`}>
                           {msg.text}
                         </div>
                       )}
@@ -3018,8 +3040,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               )}
             </div>
 
-            <div className={`absolute bottom-0 left-0 right-0 p-4 md:p-6 border-t ${colors.border} ${isDark ? 'bg-[#070d18]/90' : 'bg-white/90'} backdrop-blur-md transition-all duration-300`}>
-              <div className="max-w-4xl mx-auto">
+            <div className={`absolute bottom-0 left-0 right-0 p-2.5 sm:p-3 md:p-6 border-t ${colors.border} ${isDark ? 'bg-[#070d18]/90' : 'bg-white/90'} backdrop-blur-md transition-all duration-300 z-30 w-full max-w-full overflow-hidden`}>
+              <div className="max-w-4xl mx-auto w-full max-w-full min-w-0">
                 {/* ... (Existing Quick Input) ... */}
                 <input type="file" ref={quickUploadRef} onChange={handleQuickUpload} className="hidden" accept="image/*,video/*,audio/*" />
                 {isQuickRecording || isReviewing ? (
@@ -3110,31 +3132,31 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                   </div>
                 ) : (
                   /* ... (Same simplified input bar logic as previous) ... */
-                  <div className="flex flex-col gap-2 md:gap-3">
+                  <div className="flex flex-col gap-1.5 sm:gap-2 md:gap-3 w-full max-w-full">
                     {/* Function Icons Bar (Visible on Mobile, Hidden on Desktop) */}
-                    <div className="flex md:hidden items-center gap-2 overflow-x-auto pb-1 scrollbar-hide no-scrollbar -mx-2 px-2">
+                    <div className="flex md:hidden items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide no-scrollbar w-full max-w-full">
                       <button 
                         type="button" 
                         onClick={() => openWallet('recharge')} 
-                        className="flex-shrink-0 h-9 px-2.5 flex items-center gap-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/30 text-xs font-black active:scale-95 shadow-sm" 
+                        className="flex-shrink-0 h-8 px-2 flex items-center gap-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/30 text-[11px] font-black active:scale-95 shadow-sm" 
                         title="Carteira & Depositar Créditos"
                       >
-                        <Wallet size={15} className="text-emerald-500 shrink-0" />
+                        <Wallet size={13} className="text-emerald-500 shrink-0" />
                         <span>{user.credits}c</span>
                       </button>
-                      <button disabled={isUploading} onClick={() => quickUploadRef.current?.click()} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Upload"><Upload size={16} /></button>
-                      <button disabled={isUploading} onClick={() => startQuickRecording('photo')} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Foto"><Camera size={16} /></button>
-                      <button disabled={isUploading} onClick={() => { setActiveTab('cinema'); handleNewVideoSelection(); }} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20" title="Subir Vídeo / Link" style={{touchAction:'manipulation'}}><Tv size={16} /></button>
-                      <button disabled={isUploading} onClick={() => setIsCardModalOpen(true)} className={`flex-shrink-0 w-9 h-9 flex items-center justify-center ${colors.primary} text-white rounded-xl shadow-lg`} title="Novo Card"><Plus size={18} /></button>
-                      <button disabled={isUploading} onClick={() => setIsQuickSettingsOpen(true)} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Ajustes"><Settings size={14} /></button>
-                      <button disabled={isUploading} onClick={() => startQuickRecording('audio')} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Áudio"><Mic size={16} /></button>
-                      <button disabled={isUploading} onClick={() => startQuickRecording('video')} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Vídeo"><Video size={16} /></button>
-                      <button disabled={isUploading} onClick={() => setIsClearChatModalOpen(true)} className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-red-950/30 text-red-400 hover:bg-red-900/40 rounded-xl border border-red-500/20" title="Limpar Conversa e Mídias"><Trash2 size={15} /></button>
+                      <button disabled={isUploading} onClick={() => quickUploadRef.current?.click()} className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Upload"><Upload size={14} /></button>
+                      <button disabled={isUploading} onClick={() => startQuickRecording('photo')} className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Foto"><Camera size={14} /></button>
+                      <button disabled={isUploading} onClick={() => { setActiveTab('cinema'); handleNewVideoSelection(); }} className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20" title="Subir Vídeo / Link" style={{touchAction:'manipulation'}}><Tv size={14} /></button>
+                      <button disabled={isUploading} onClick={() => setIsCardModalOpen(true)} className={`flex-shrink-0 w-8 h-8 flex items-center justify-center ${colors.primary} text-white rounded-xl shadow-lg`} title="Novo Card"><Plus size={16} /></button>
+                      <button disabled={isUploading} onClick={() => setIsQuickSettingsOpen(true)} className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Ajustes"><Settings size={13} /></button>
+                      <button disabled={isUploading} onClick={() => startQuickRecording('audio')} className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Áudio"><Mic size={14} /></button>
+                      <button disabled={isUploading} onClick={() => startQuickRecording('video')} className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Vídeo"><Video size={14} /></button>
+                      <button disabled={isUploading} onClick={() => setIsClearChatModalOpen(true)} className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-red-950/30 text-red-400 hover:bg-red-900/40 rounded-xl border border-red-500/20" title="Limpar Conversa e Mídias"><Trash2 size={14} /></button>
                     </div>
 
-                    <div className="flex items-center gap-2 md:gap-3">
+                    <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 w-full max-w-full">
                       {/* Desktop Only Actions - Left Side */}
-                      <div className="hidden md:flex items-center gap-2">
+                      <div className="hidden md:flex items-center gap-2 shrink-0">
                         <button disabled={isUploading} onClick={() => quickUploadRef.current?.click()} className={`w-12 h-12 flex items-center justify-center ${isDark ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-gray-200 text-slate-500 hover:bg-gray-300'} rounded-2xl transition-all`} title="Upload Rápido"><Upload size={20} /></button>
                         <button disabled={isUploading} onClick={() => startQuickRecording('photo')} className={`w-12 h-12 flex items-center justify-center ${isDark ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-gray-200 text-slate-500 hover:bg-gray-300'} rounded-2xl transition-all`} title="Foto Rápida"><Camera size={20} /></button>
                         <button disabled={isUploading} onClick={() => { setActiveTab('cinema'); handleNewVideoSelection(); }} className={`w-12 h-12 flex items-center justify-center ${isDark ? 'bg-slate-800 text-slate-400 hover:bg-indigo-400' : 'bg-indigo-100 text-indigo-500 hover:bg-indigo-200'} rounded-2xl transition-all`} title="Subir Vídeo / Link" style={{touchAction:'manipulation'}}><Tv size={20} /></button>
@@ -3142,17 +3164,17 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                       </div>
 
                       {/* Main Text Input Area */}
-                      <div className={`flex-1 ${colors.inputBg} rounded-2xl border ${colors.border} flex items-center px-4 focus-within:ring-1 ${isDark ? 'focus-within:ring-blue-500/30' : 'focus-within:ring-red-500/30'} transition-all shadow-sm`}>
+                      <div className={`flex-1 min-w-0 ${colors.inputBg} rounded-2xl border ${colors.border} flex items-center px-3 sm:px-4 focus-within:ring-1 ${isDark ? 'focus-within:ring-blue-500/30' : 'focus-within:ring-red-500/30'} transition-all shadow-sm`}>
                         <input
                           value={inputText}
                           onChange={(e) => setInputText(e.target.value)}
                           onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                           placeholder="Fale algo..."
-                          className={`w-full bg-transparent border-none text-[16px] py-3.5 md:py-4.5 ${colors.textHighlight} outline-none placeholder:opacity-40 font-medium`}
+                          className={`w-full min-w-0 bg-transparent border-none text-[15px] sm:text-[16px] py-2.5 sm:py-3.5 md:py-4.5 ${colors.textHighlight} outline-none placeholder:opacity-40 font-medium`}
                         />
                       </div>
 
-                      <div className="flex items-center gap-1.5 md:gap-2">
+                      <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2 shrink-0">
                         {/* Desktop Only Actions - Right Side */}
                         <div className="hidden md:flex gap-2">
                           <button disabled={isUploading} onClick={() => setIsQuickSettingsOpen(true)} className="w-12 h-12 flex items-center justify-center bg-slate-800 text-slate-400 hover:text-emerald-400 rounded-2xl transition-all border border-slate-700" title="Configurar Padrões"><Settings size={18} /></button>
@@ -3165,9 +3187,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         <button
                           onClick={handleSendMessage}
                           disabled={!inputText.trim()}
-                          className={`w-11 h-11 md:w-12 md:h-12 flex-shrink-0 flex items-center justify-center ${colors.primary} text-white rounded-2xl hover:opacity-90 shadow-lg transition-all disabled:opacity-25 active:scale-90`}
+                          className={`w-10 h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 flex-shrink-0 flex items-center justify-center ${colors.primary} text-white rounded-2xl hover:opacity-90 shadow-lg transition-all disabled:opacity-25 active:scale-90`}
                         >
-                          <Send size={18} />
+                          <Send size={16} className="sm:w-[18px] sm:h-[18px]" />
                         </button>
                       </div>
                     </div>
@@ -3498,7 +3520,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               {(!isAdmin || sidebarTab === 'chat') ? (
                 <>
                   {!isChatMinimized && (
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
+                  <div ref={cinemaChatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
                     {messages.slice(-15).map((msg, i) => (
                       <div key={msg.id} className={`flex flex-col ${msg.senderId === user.id ? 'items-end' : 'items-start'} animate-in slide-in-from-bottom-2 fade-in fill-mode-both`} style={{ animationDelay: `${i * 0.05}s` }}>
                         <span

@@ -239,7 +239,7 @@ const App: React.FC = () => {
 
   return (
     <Router>
-      <div className={`min-h-screen transition-colors duration-300 ${theme === 'dark' ? 'bg-slate-950 text-white selection:bg-indigo-500/30' : 'bg-gray-50 text-slate-900 selection:bg-red-500/30'}`}>
+      <div className={`min-h-screen w-full max-w-full overflow-x-hidden transition-colors duration-300 ${theme === 'dark' ? 'bg-slate-950 text-white selection:bg-indigo-500/30' : 'bg-gray-50 text-slate-900 selection:bg-red-500/30'}`}>
         <Routes>
           <Route
             path="/"
