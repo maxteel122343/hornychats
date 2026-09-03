@@ -5,7 +5,7 @@ import {
   Camera, Phone, MessageSquare, Loader2, CheckCircle2, 
   AlertCircle, ArrowRight, User as UserIcon
 } from 'lucide-react';
-import { User, MediaCard, CardType } from '../types';
+import { User, MediaCard, CardType, AppTheme } from '../types';
 
 interface UnlockPurchaseModalProps {
   card: MediaCard;
@@ -15,7 +15,7 @@ interface UnlockPurchaseModalProps {
   onConfirmPurchase: (card: MediaCard, useFreeCredits: boolean) => Promise<boolean>;
   onOpenRecharge?: () => void;
   onShowToast?: (message: string, type: 'success' | 'error' | 'info') => void;
-  theme?: 'dark' | 'light';
+  theme?: AppTheme;
 }
 
 export const UnlockPurchaseModal: React.FC<UnlockPurchaseModalProps> = ({
@@ -34,6 +34,7 @@ export const UnlockPurchaseModal: React.FC<UnlockPurchaseModalProps> = ({
   if (!isOpen || !card) return null;
 
   const isDark = theme === 'dark';
+  const isGold = theme === 'gold';
   const cost = card.creditCost || 0;
   const regularCredits = user.credits || 0;
   const freeCredits = user.free_credits || 0;

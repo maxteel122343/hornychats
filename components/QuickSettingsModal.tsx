@@ -3,13 +3,13 @@ import {
   X, Save, Settings, Layers, Palette, Eye, Sliders, Timer, Zap, Tag, DollarSign, 
   FolderOpen, ArrowLeft, Clock, MessageSquare, Plus, Trash2, Sparkles, AlertCircle, RotateCcw
 } from 'lucide-react';
-import { CardDefaults, PaidChatConfig, QuickPhrasesConfig } from '../types';
+import { CardDefaults, PaidChatConfig, QuickPhrasesConfig, AppTheme } from '../types';
 
 interface QuickSettingsModalProps {
   onClose: () => void;
   onSave: (defaults: CardDefaults, paidChat?: PaidChatConfig, phrases?: QuickPhrasesConfig) => void;
   initialDefaults: CardDefaults;
-  theme?: 'dark' | 'light';
+  theme?: AppTheme;
   paidChatConfig?: PaidChatConfig;
   quickPhrasesConfig?: QuickPhrasesConfig;
   initialTab?: 'general' | 'advanced' | 'paid_chat' | 'phrases';
@@ -37,6 +37,7 @@ export const DEFAULT_CREATOR_PHRASES = [
 ];
 
 export const DEFAULT_VISITOR_PHRASES = [
+  'KKK',
   'Oi linda! Tudo bem? 😍',
   'Adorei seu perfil e conteúdos! 🔥',
   'Como faço para acessar o VIP? 💎',

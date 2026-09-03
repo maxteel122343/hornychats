@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, ArrowLeft, Wallet, DollarSign, QrCode, Zap, ArrowUpRight, Loader2, Copy, CheckCircle, RefreshCw, CreditCard, History, ShoppingCart, Lock, Users, UserCheck, UserMinus, UserPlus, MessageSquare } from 'lucide-react';
-import { User, PaymentTransaction } from '../types';
+import { User, PaymentTransaction, AppTheme } from '../types';
 import { supabase } from '../lib/supabase';
 import { ToastType } from './Toast';
 import { getFollowers, getFollowing, unfollowUser, followUser, FollowerUser } from '../lib/followers';
@@ -37,7 +37,7 @@ interface WalletModalProps {
   claimTimer?: number | null;
   onRefreshHistory?: () => void;
   onNavigateToChat?: (userId: string, name?: string) => void;
-  theme?: 'dark' | 'light';
+  theme?: AppTheme;
 }
 
 export const WalletModal: React.FC<WalletModalProps> = ({
@@ -58,6 +58,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
   theme = 'dark'
 }) => {
   const isDark = theme === 'dark';
+  const isGold = theme === 'gold';
   const [activeTab, setActiveTab] = useState<'recharge' | 'earnings' | 'followers'>(initialTab);
 
   // Followers & Following State

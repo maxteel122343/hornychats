@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Send, Plus, Home, Wallet, Share2, MessageSquare, LayoutGrid, QrCode, X, User as UserIcon, LogIn, Camera, Settings, Sun, Moon, Menu, ChevronLeft, ChevronRight, ChevronDown, Copy, CheckCircle, Loader2, RefreshCw, DollarSign, ArrowUpRight, Mic, Video, Upload, StopCircle, Trash2, Aperture, Lock, Zap, History, CreditCard, Mail, ShoppingCart, LogOut, FolderOpen, Edit, Tv, Image as ImageIcon, Cloud, MoreVertical, Minimize2, Maximize2, Power, Sliders, ArrowLeft, Users, Clock, Sparkles } from 'lucide-react';
-import { User, Message, MediaCard, ChatSession, CardType, PaymentTransaction, CardDefaults, PaidChatConfig, QuickPhrasesConfig } from '../types';
+import { User, Message, MediaCard, ChatSession, CardType, PaymentTransaction, CardDefaults, PaidChatConfig, QuickPhrasesConfig, AppTheme } from '../types';
 import { supabase } from '../lib/supabase';
 import CardModal from './CardModal';
 import MediaCardItem from './MediaCardItem';
@@ -147,7 +147,7 @@ interface ChatRoomProps {
   updateCredits: (amount: number) => void;
   updateFreeCredits: (amount: number, updateTimestamp?: boolean) => void;
   openAuth: () => void;
-  theme: 'dark' | 'light';
+  theme: AppTheme;
   toggleTheme: () => void;
   onShowToast?: (message: string, type?: ToastType, options?: ToastOptions) => void;
 }
@@ -753,6 +753,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     }
   }, [activeTab, isWatchPartyOpen, sidebarTab, isWatchPartyHost, watchPartySource, watchPartyVideoName, watchPartyCardId]);
   const isDark = theme === 'dark';
+  const isGold = theme === 'gold';
+  const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
+  const [isPhrasesExpanded, setIsPhrasesExpanded] = useState(false);
 
   // WebRTC Effects
   // FIX 1+3: When host gets a stream, connect all pending viewers AND broadcast 'stream-ready' to all
@@ -857,17 +860,19 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   };
 
   const colors = {
-    bg: isDark ? 'bg-[#050a14]' : 'bg-gray-50',
-    sidebarBg: isDark ? 'bg-[#0a111f]' : 'bg-white',
-    headerBg: isDark ? 'bg-[#0a111f]/80' : 'bg-white/80',
-    border: isDark ? 'border-slate-800/50' : 'border-gray-200',
-    text: isDark ? 'text-slate-300' : 'text-slate-600',
-    textHighlight: isDark ? 'text-white' : 'text-slate-900',
-    primary: isDark ? 'bg-blue-600' : 'bg-red-600',
-    primaryText: isDark ? 'text-blue-500' : 'text-red-600',
-    primarySoft: isDark ? 'bg-blue-600/10' : 'bg-red-600/10',
-    primaryBorder: isDark ? 'border-blue-500/20' : 'border-red-500/20',
-    inputBg: isDark ? 'bg-slate-800/40' : 'bg-gray-100',
+    bg: isGold ? 'bg-[#F3F0EA]' : isDark ? 'bg-[#050a14]' : 'bg-gray-50',
+    surface: isGold ? 'bg-[#FFFCF8]' : isDark ? 'bg-[#0a111f]' : 'bg-white',
+    sidebarBg: isGold ? 'bg-[#FFFCF8]' : isDark ? 'bg-[#0a111f]' : 'bg-white',
+    headerBg: isGold ? 'bg-[#FFFCF8]/95' : isDark ? 'bg-[#0a111f]/80' : 'bg-white/80',
+    border: isGold ? 'border-[#1A1712]/10' : isDark ? 'border-slate-800/50' : 'border-gray-200',
+    text: isGold ? 'text-[#1A1712]' : isDark ? 'text-slate-300' : 'text-slate-600',
+    textMuted: isGold ? 'text-[#6E675C]' : isDark ? 'text-slate-400' : 'text-slate-500',
+    textHighlight: isGold ? 'text-[#1A1712]' : isDark ? 'text-white' : 'text-slate-900',
+    primary: isGold ? 'bg-[#1A1712]' : isDark ? 'bg-blue-600' : 'bg-red-600',
+    primaryText: isGold ? 'text-[#A37B14]' : isDark ? 'text-blue-500' : 'text-red-600',
+    primarySoft: isGold ? 'bg-[#A37B14]/12' : isDark ? 'bg-blue-600/10' : 'bg-red-600/10',
+    primaryBorder: isGold ? 'border-[#A37B14]/25' : isDark ? 'border-blue-500/20' : 'border-red-500/20',
+    inputBg: isGold ? 'bg-white' : isDark ? 'bg-slate-800/40' : 'bg-gray-100',
   };
 
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
@@ -3156,20 +3161,28 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               <div className="flex flex-col items-center gap-1.5 mt-1">
                 <p className={`text-[9px] ${colors.text} font-bold uppercase`}>{user.isLoggedIn ? 'Autenticado' : 'Visitante'}</p>
                 {user.isLoggedIn && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsMobileMenuOpen(false);
-                      openWallet('followers');
-                    }}
-                    className="inline-flex items-center justify-center gap-1.5 py-1 px-2.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/20 transition-all text-[9px] font-black uppercase tracking-wider mx-auto active:scale-95 shadow-xs cursor-pointer"
-                    title="Ver quem te segue e seus seguidores"
-                  >
-                    <Users size={11} />
-                    <span>{followersCount} Seguidores</span>
-                    <span className="opacity-40">•</span>
-                    <span>{followingCount} Seguindo</span>
-                  </button>
+                  isGold && followersCount === 0 && followingCount === 0 ? (
+                    <span className="text-[10px] text-[#6E675C] font-medium py-1">0 seguidores • 0 seguindo</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        openWallet('followers');
+                      }}
+                      className={`inline-flex items-center justify-center gap-1.5 py-1 px-2.5 rounded-xl transition-all text-[9px] font-black uppercase tracking-wider mx-auto active:scale-95 shadow-xs cursor-pointer ${
+                        isGold
+                          ? 'bg-[#1A1712]/5 text-[#6E675C] hover:text-[#1A1712] border border-[#1A1712]/10'
+                          : 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/20'
+                      }`}
+                      title="Ver quem te segue e seus seguidores"
+                    >
+                      <Users size={11} />
+                      <span>{followersCount} Seguidores</span>
+                      <span className="opacity-40">•</span>
+                      <span>{followingCount} Seguindo</span>
+                    </button>
+                  )
                 )}
               </div>
             </div>
@@ -3181,19 +3194,25 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                 setIsMobileMenuOpen(false);
                 openWallet('recharge');
               }}
-              className="w-full flex items-center justify-between p-2.5 sm:p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-all active:scale-95 shadow-sm"
+              className={`w-full flex items-center justify-between p-2.5 sm:p-3 rounded-2xl border transition-all active:scale-95 shadow-xs ${
+                isGold
+                  ? 'bg-white border-[#1A1712]/10 hover:border-[#A37B14]/30'
+                  : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 shadow-sm'
+              }`}
               title="Carteira & Depositar Créditos"
             >
               <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-xl bg-emerald-500/20 text-emerald-500">
+                <div className={`p-1.5 rounded-xl ${isGold ? 'bg-[#A37B14]/10 text-[#A37B14]' : 'bg-emerald-500/20 text-emerald-500'}`}>
                   <Wallet size={16} />
                 </div>
                 <div className="text-left">
-                  <span className="text-[8px] font-black uppercase tracking-wider block text-slate-500 dark:text-slate-400">Saldo</span>
-                  <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">{user.credits} Créditos</span>
+                  <span className={`text-[8px] font-black uppercase tracking-wider block ${isGold ? 'text-[#6E675C]' : 'text-slate-500 dark:text-slate-400'}`}>Saldo</span>
+                  <span className={`text-xs font-black ${isGold ? 'text-[#A37B14]' : 'text-emerald-600 dark:text-emerald-400'}`}>{user.credits} Créditos</span>
                 </div>
               </div>
-              <span className="text-[9px] font-black uppercase tracking-wider bg-emerald-600 text-white dark:bg-emerald-500 dark:text-slate-950 px-2.5 py-1 rounded-xl shadow-sm">
+              <span className={`text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-xl shadow-xs ${
+                isGold ? 'bg-[#1A1712] text-white' : 'bg-emerald-600 text-white dark:bg-emerald-500 dark:text-slate-950 shadow-sm'
+              }`}>
                 Depositar
               </span>
             </button>
@@ -3229,18 +3248,22 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               onClick={() => { navigate(`/chat/${session.id}`); setIsMobileMenuOpen(false); }} 
               className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center gap-3 group ${
                 isActive 
-                  ? (isDark 
-                      ? 'bg-blue-950/70 border-blue-500/80 text-white shadow-md ring-1 ring-blue-500/40' 
-                      : 'bg-red-50 border-red-400 text-slate-900 shadow-sm ring-1 ring-red-400/30')
-                  : (isDark 
-                      ? 'bg-slate-900/60 border-slate-800/80 text-slate-200 hover:bg-slate-800 hover:border-slate-700' 
-                      : 'bg-white border-gray-200 text-slate-800 hover:bg-gray-100 hover:border-gray-300')
+                  ? (isGold
+                      ? 'bg-[#1A1712]/5 border-[#1A1712]/15 text-[#1A1712] shadow-xs'
+                      : isDark 
+                        ? 'bg-blue-950/70 border-blue-500/80 text-white shadow-md ring-1 ring-blue-500/40' 
+                        : 'bg-red-50 border-red-400 text-slate-900 shadow-sm ring-1 ring-red-400/30')
+                  : (isGold
+                      ? 'bg-white border-[#1A1712]/10 text-[#1A1712] hover:bg-[#F3F0EA]/70'
+                      : isDark 
+                        ? 'bg-slate-900/60 border-slate-800/80 text-slate-200 hover:bg-slate-800 hover:border-slate-700' 
+                        : 'bg-white border-gray-200 text-slate-800 hover:bg-gray-100 hover:border-gray-300')
               } ${isSidebarCollapsed ? 'justify-center' : ''}`}
             >
               <div className={`w-10 h-10 min-w-[2.5rem] rounded-xl flex items-center justify-center transition-colors overflow-hidden ${
                 isActive 
-                  ? `${colors.primary} text-white shadow-lg` 
-                  : (isDark ? 'bg-slate-800 text-slate-400 group-hover:text-white' : 'bg-slate-100 text-slate-500 group-hover:text-slate-900')
+                  ? (isGold ? 'bg-[#1A1712] text-[#A37B14] shadow-xs' : `${colors.primary} text-white shadow-lg`) 
+                  : (isGold ? 'bg-[#1A1712]/5 text-[#6E675C] group-hover:text-[#1A1712]' : isDark ? 'bg-slate-800 text-slate-400 group-hover:text-white' : 'bg-slate-100 text-slate-500 group-hover:text-slate-900')
               }`}>
                 {displayImage ? (
                   <img src={displayImage} className="w-full h-full object-cover" />
@@ -3254,13 +3277,13 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                     <div className="flex flex-col min-w-0 flex-1">
                       <h3 className={`text-sm font-bold truncate ${
                         isOtherUserRoom 
-                          ? 'text-blue-400' 
-                          : (isActive ? (isDark ? 'text-blue-200 font-black' : 'text-red-700 font-black') : (isDark ? 'text-slate-100' : 'text-slate-900'))
+                          ? (isGold ? 'text-[#A37B14]' : 'text-blue-400') 
+                          : (isActive ? (isGold ? 'text-[#1A1712] font-black' : isDark ? 'text-blue-200 font-black' : 'text-red-700 font-black') : (isGold ? 'text-[#1A1712]' : isDark ? 'text-slate-100' : 'text-slate-900'))
                       }`}>
                         {isActive && roomDetails?.name ? roomDetails.name : session.name}
                       </h3>
                       {isOtherUserRoom && (
-                        <span className="text-[8px] text-blue-400 font-black uppercase tracking-wider mt-0.5">
+                        <span className={`text-[8px] font-black uppercase tracking-wider mt-0.5 ${isGold ? 'text-[#A37B14]' : 'text-blue-400'}`}>
                           Sala de outro usuário ({session.id.slice(0, 6)})
                         </span>
                       )}
@@ -3278,13 +3301,17 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         title={`Ajustes de Tempo & Frases de "${session.name}"`}
                         className={`flex items-center gap-1 px-2 py-0.5 sm:py-1 rounded-xl border text-[9px] font-black uppercase tracking-wider transition-all duration-150 active:scale-95 shadow-xs cursor-pointer ${
                           isSessionPaidActive
-                            ? 'bg-blue-600/25 text-blue-400 border-blue-500/50 hover:bg-blue-600/35 ring-1 ring-blue-500/30'
-                            : (isDark 
-                                ? 'bg-slate-800/90 text-slate-300 hover:text-white border-slate-700/80 hover:bg-slate-700' 
-                                : 'bg-blue-50 text-blue-700 hover:text-blue-900 border-blue-200 hover:bg-blue-100')
+                            ? (isGold
+                                ? 'bg-[#A37B14]/15 text-[#A37B14] border-[#A37B14]/40 ring-1 ring-[#A37B14]/30'
+                                : 'bg-blue-600/25 text-blue-400 border-blue-500/50 hover:bg-blue-600/35 ring-1 ring-blue-500/30')
+                            : (isGold
+                                ? 'bg-white text-[#6E675C] hover:text-[#1A1712] border-[#1A1712]/10'
+                                : isDark 
+                                  ? 'bg-slate-800/90 text-slate-300 hover:text-white border-slate-700/80 hover:bg-slate-700' 
+                                  : 'bg-blue-50 text-blue-700 hover:text-blue-900 border-blue-200 hover:bg-blue-100')
                         }`}
                       >
-                        <Settings size={11} className={isSessionPaidActive ? "text-blue-400 animate-spin-slow" : "text-slate-400 dark:text-slate-300"} />
+                        <Settings size={11} className={isSessionPaidActive ? (isGold ? "text-[#A37B14] animate-spin-slow" : "text-blue-400 animate-spin-slow") : (isGold ? "text-[#6E675C]" : "text-slate-400 dark:text-slate-300")} />
                         <span className="truncate max-w-[65px] sm:max-w-[78px]">Tempo & Frases</span>
                         {isSessionPaidActive && (
                           <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shrink-0" title="Cobrança ativa" />
@@ -3294,15 +3321,18 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                       <button
                         onClick={(e) => handleCloseSession(e, session.id)}
                         title="Fechar sala"
-                        className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-red-600 hover:bg-red-500 rounded-full text-white shadow-md transition-all z-10"
+                        className={isGold
+                          ? "opacity-0 group-hover:opacity-100 p-1 text-[#6E675C] hover:text-[#1A1712] rounded-lg transition-opacity z-10"
+                          : "flex-shrink-0 w-6 h-6 flex items-center justify-center bg-red-600 hover:bg-red-500 rounded-full text-white shadow-md transition-all z-10"
+                        }
                       >
-                        <X size={12} strokeWidth={3} />
+                        <X size={isGold ? 14 : 12} strokeWidth={isGold ? 2 : 3} />
                       </button>
                     </div>
                   </div>
                   <div className="flex justify-between items-center mt-1">
-                    <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'} truncate font-medium`}>{session.lastMessage}</p>
-                    <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'} flex-shrink-0 ml-2 font-medium`}>{session.time}</span>
+                    <p className={`text-[11px] ${isGold ? 'text-[#6E675C]' : isDark ? 'text-slate-400' : 'text-slate-500'} truncate font-medium`}>{session.lastMessage}</p>
+                    <span className={`text-[10px] ${isGold ? 'text-[#6E675C]' : isDark ? 'text-slate-500' : 'text-slate-400'} flex-shrink-0 ml-2 font-medium`}>{session.time}</span>
                   </div>
                 </div>
               )}
@@ -3313,7 +3343,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       <div className={`p-4 border-t ${colors.border}`}>
         {user.isLoggedIn ? (
           !isSidebarCollapsed && (
-            <button onClick={handleSignOut} className={`w-full flex items-center justify-center gap-2 py-3 mb-4 rounded-xl bg-red-600/10 text-red-500 border border-red-500/20 text-[10px] font-black uppercase hover:bg-red-600 hover:text-white transition-all`}>
+            <button onClick={handleSignOut} className={isGold
+              ? `w-full flex items-center justify-center gap-2 py-2.5 mb-2 text-xs font-semibold text-[#6E675C] hover:text-[#1A1712] transition-colors`
+              : `w-full flex items-center justify-center gap-2 py-3 mb-4 rounded-xl bg-red-600/10 text-red-500 border border-red-500/20 text-[10px] font-black uppercase hover:bg-red-600 hover:text-white transition-all`
+            }>
               <LogOut size={14} /> Sair
             </button>
           )
@@ -3411,29 +3444,65 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           </div>
 
           {/* Header Right: Theme + Wallet/Credits + Video Call + Lixeira (Limpar) + Earnings + Share + Close */}
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0 relative">
             <button 
               type="button"
               onClick={toggleTheme} 
-              className={`p-1.5 sm:p-2.5 rounded-xl border ${colors.border} ${colors.text} hover:opacity-70 transition-all active:scale-95`}
-              title="Alternar Tema"
+              className={`p-1.5 sm:p-2 rounded-xl border transition-all active:scale-95 ${
+                isGold 
+                  ? 'bg-white border-[#1A1712]/10 text-[#A37B14] hover:bg-[#F3F0EA]' 
+                  : `${colors.border} ${colors.text} hover:opacity-70`
+              }`}
+              title="Alternar Tema (Gold / Escuro / Claro)"
             >
-              {isDark ? <Sun size={15} className="sm:w-[17px] sm:h-[17px]" /> : <Moon size={15} className="sm:w-[17px] sm:h-[17px]" />}
+              {theme === 'gold' ? (
+                <Sparkles size={15} className="text-[#A37B14] sm:w-[17px] sm:h-[17px]" />
+              ) : isDark ? (
+                <Sun size={15} className="sm:w-[17px] sm:h-[17px]" />
+              ) : (
+                <Moon size={15} className="sm:w-[17px] sm:h-[17px]" />
+              )}
             </button>
 
             {/* Wallet / Credits Recharge Button - Always visible on mobile and desktop */}
             <button 
               type="button" 
               onClick={() => openWallet('recharge')} 
-              className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] sm:text-xs border border-emerald-500/30 font-black cursor-pointer transition-all active:scale-95 shrink-0 shadow-sm"
+              className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-black cursor-pointer transition-all active:scale-95 shrink-0 shadow-xs border ${
+                isGold
+                  ? 'bg-white border-[#1A1712]/10 text-[#1A1712] hover:border-[#A37B14]/40'
+                  : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+              }`}
               title="Carteira & Depositar Créditos"
             >
-              <Wallet size={13} className="shrink-0 text-emerald-500 sm:w-[15px] sm:h-[15px]" />
+              <Wallet size={13} className={`shrink-0 sm:w-[15px] sm:h-[15px] ${isGold ? 'text-[#A37B14]' : 'text-emerald-500'}`} />
               <span className="text-[11px] sm:text-xs font-black">{user.credits}c</span>
             </button>
 
-            {/* Earnings Dollar Button */}
-            {user.isLoggedIn && (
+            {/* CONVIDAR BUTTON (Directly visible on both mobile and desktop in Gold mode) */}
+            <button 
+              onClick={() => { 
+                const roomUrl = `${window.location.origin}/#/chat/${roomId}`;
+                navigator.clipboard.writeText(roomUrl); 
+                showToast('Link da sala copiado com sucesso!', 'success', {
+                  link: roomUrl,
+                  subMessage: `Compartilhe o link da sala "${roomDetails?.name || 'LinkCard Chat'}".`,
+                  shareText: `Venha conversar e interagir comigo na sala "${roomDetails?.name || 'LinkCard Chat'}"! Acesse pelo link: ${roomUrl}`
+                }); 
+              }} 
+              className={`flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl transition-all font-bold text-xs uppercase tracking-wider active:scale-95 shadow-xs ${
+                isGold 
+                  ? 'bg-[#1A1712] hover:bg-[#2A241D] text-white' 
+                  : `hidden sm:flex ${colors.primarySoft} ${colors.primaryText} border ${colors.primaryBorder} hover:opacity-80`
+              }`}
+              title="Convidar Amigos para a Sala"
+            >
+              <Share2 size={14} />
+              <span>Convidar</span>
+            </button>
+
+            {/* Non-gold desktop buttons */}
+            {!isGold && user.isLoggedIn && (
               <button 
                 type="button" 
                 onClick={() => openWallet('earnings')} 
@@ -3445,56 +3514,136 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               </button>
             )}
 
-            {/* Video Call / Cinema Button (Desktop/Tablet, available in mobile bar) */}
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('cinema');
-                handleNewVideoSelection();
-              }}
-              className="hidden sm:flex p-2 sm:p-2.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 hover:text-indigo-300 transition-all active:scale-95 items-center gap-1.5"
-              title="Chamada de Vídeo / Transmissão Cinema"
-              style={{ touchAction: 'manipulation' }}
-            >
-              <Video size={17} />
-              <span className="hidden xl:inline text-[11px] font-black uppercase tracking-tighter">Vídeo</span>
-            </button>
+            {!isGold && (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('cinema');
+                  handleNewVideoSelection();
+                }}
+                className="hidden sm:flex p-2 sm:p-2.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 hover:text-indigo-300 transition-all active:scale-95 items-center gap-1.5"
+                title="Chamada de Vídeo / Transmissão Cinema"
+                style={{ touchAction: 'manipulation' }}
+              >
+                <Video size={17} />
+                <span className="hidden xl:inline text-[11px] font-black uppercase tracking-tighter">Vídeo</span>
+              </button>
+            )}
 
-            {/* Lixeira (Limpar Conversa e Mídias) Button - Desktop/Tablet, available in mobile bar */}
-            <button
-              type="button"
-              onClick={() => setIsClearChatModalOpen(true)}
-              className="hidden sm:flex p-2 sm:p-2.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all active:scale-95 items-center gap-1.5"
-              title="Limpar conversa e mídias do chat"
-            >
-              <Trash2 size={17} />
-              <span className="hidden xl:inline text-[11px] font-black uppercase tracking-tighter">Limpar</span>
-            </button>
+            {!isGold && (
+              <button
+                type="button"
+                onClick={() => setIsClearChatModalOpen(true)}
+                className="hidden sm:flex p-2 sm:p-2.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all active:scale-95 items-center gap-1.5"
+                title="Limpar conversa e mídias do chat"
+              >
+                <Trash2 size={17} />
+                <span className="hidden xl:inline text-[11px] font-black uppercase tracking-tighter">Limpar</span>
+              </button>
+            )}
 
-            <button 
-              onClick={() => { 
-                const roomUrl = `${window.location.origin}/#/chat/${roomId}`;
-                navigator.clipboard.writeText(roomUrl); 
-                showToast('Link da sala copiado com sucesso!', 'success', {
-                  link: roomUrl,
-                  subMessage: `Compartilhe o link da sala "${roomDetails?.name || 'LinkCard Chat'}".`,
-                  shareText: `Venha conversar e interagir comigo na sala "${roomDetails?.name || 'LinkCard Chat'}"! Acesse pelo link: ${roomUrl}`
-                }); 
-              }} 
-              className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-2 ${colors.primarySoft} ${colors.primaryText} rounded-xl border ${colors.primaryBorder} hover:opacity-80 transition-all font-black text-xs uppercase tracking-tighter active:scale-95`}
-              title="Convidar Amigos para a Sala"
-            >
-              <Share2 size={15} />
-              <span className="hidden md:inline">Convidar</span>
-            </button>
+            {/* Menu "···" (Quiet Chrome for Gold Prime, keeps all features without visual clutter) */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsHeaderMenuOpen(prev => !prev)}
+                className={`p-1.5 sm:p-2 rounded-xl border transition-all active:scale-95 ${
+                  isGold
+                    ? 'bg-white border-[#1A1712]/10 text-[#1A1712] hover:bg-[#F3F0EA]'
+                    : `border ${colors.border} ${colors.text} hover:opacity-70`
+                }`}
+                title="Mais opções da sala"
+              >
+                <MoreVertical size={16} />
+              </button>
 
-            <button 
-              onClick={() => navigate('/')} 
-              className="p-1.5 sm:p-2.5 hover:bg-red-500/10 rounded-xl text-slate-400 hover:text-red-500 transition-all active:scale-95 shrink-0" 
-              title="Fechar / Sair do Chat"
-            >
-              <X size={16} className="sm:w-[18px] sm:h-[18px]" />
-            </button>
+              {isHeaderMenuOpen && (
+                <div 
+                  className={`absolute right-0 top-full mt-2 w-52 rounded-2xl border shadow-xl z-50 p-1.5 animate-in fade-in zoom-in-95 ${
+                    isGold
+                      ? 'bg-[#FFFCF8] border-[#1A1712]/10 text-[#1A1712]'
+                      : isDark
+                        ? 'bg-slate-900 border-slate-800 text-white'
+                        : 'bg-white border-gray-200 text-slate-800'
+                  }`}
+                >
+                  {user.isLoggedIn && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsHeaderMenuOpen(false);
+                        openWallet('earnings');
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                        isGold ? 'hover:bg-[#1A1712]/5 text-[#1A1712]' : 'hover:bg-white/10'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <DollarSign size={14} className={isGold ? 'text-[#A37B14]' : 'text-emerald-500'} />
+                        <span>Central de Ganhos</span>
+                      </div>
+                      <span className="text-[10px] font-black opacity-80">{user.earnings}</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsHeaderMenuOpen(false);
+                      setActiveTab('cinema');
+                      handleNewVideoSelection();
+                    }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                      isGold ? 'hover:bg-[#1A1712]/5 text-[#1A1712]' : 'hover:bg-white/10'
+                    }`}
+                  >
+                    <Video size={14} className={isGold ? 'text-[#A37B14]' : 'text-indigo-400'} />
+                    <span>Transmissão Cinema</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsHeaderMenuOpen(false);
+                      setIsClearChatModalOpen(true);
+                    }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all text-red-500 ${
+                      isGold ? 'hover:bg-red-50' : 'hover:bg-red-500/10'
+                    }`}
+                  >
+                    <Trash2 size={14} />
+                    <span>Limpar Conversa</span>
+                  </button>
+
+                  <div className={`my-1 border-t ${isGold ? 'border-[#1A1712]/10' : 'border-white/10'}`} />
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsHeaderMenuOpen(false);
+                      navigate('/');
+                    }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                      isGold ? 'text-[#6E675C] hover:text-[#1A1712] hover:bg-[#1A1712]/5' : 'text-slate-400 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <X size={14} />
+                    <span>Sair da Sala</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Non-gold close button */}
+            {!isGold && (
+              <button 
+                onClick={() => navigate('/')} 
+                className="p-1.5 sm:p-2.5 hover:bg-red-500/10 rounded-xl text-slate-400 hover:text-red-500 transition-all active:scale-95 shrink-0" 
+                title="Fechar / Sair do Chat"
+              >
+                <X size={16} className="sm:w-[18px] sm:h-[18px]" />
+              </button>
+            )}
           </div>
         </header>
 
@@ -3525,11 +3674,39 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           </div>
         ) : (
           <>
-            <nav className={`flex px-2 md:px-6 border-b ${colors.border} ${isDark ? 'bg-slate-900/10' : 'bg-gray-100'} overflow-x-auto scrollbar-hide no-scrollbar w-full max-w-full shrink-0 z-10`}>
-              <button onClick={() => setActiveTab('chat')} className={`px-3 sm:px-4 md:px-8 py-3 sm:py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'chat' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><MessageSquare size={14} /> Feed</button>
-              <button onClick={() => setActiveTab('showcase')} className={`px-3 sm:px-4 md:px-8 py-3 sm:py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'showcase' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><LayoutGrid size={14} /> Vitrine</button>
-              <button onClick={() => setActiveTab('my_cards')} className={`px-3 sm:px-4 md:px-8 py-3 sm:py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'my_cards' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><FolderOpen size={14} /> Meus Cards</button>
-              <button onClick={() => setActiveTab('cinema')} className={`px-3 sm:px-4 md:px-8 py-3 sm:py-4 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'cinema' ? `border-b-2 ${isDark ? 'border-blue-500 text-white' : 'border-red-600 text-red-600'}` : `${colors.text} hover:opacity-70`}`}><Tv size={14} /> Cinema</button>
+            <nav className={`flex px-2 md:px-6 border-b ${colors.border} ${isGold ? 'bg-[#FFFCF8]' : isDark ? 'bg-slate-900/10' : 'bg-gray-100'} overflow-x-auto scrollbar-hide no-scrollbar w-full max-w-full shrink-0 z-10`}>
+              {[
+                { id: 'chat', label: 'Feed', icon: MessageSquare },
+                { id: 'showcase', label: 'Vitrine', icon: LayoutGrid },
+                { id: 'my_cards', label: 'Meus Cards', icon: FolderOpen },
+                { id: 'cinema', label: 'Cinema', icon: Tv },
+              ].map(tab => {
+                const isActive = activeTab === tab.id;
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`relative px-3 sm:px-4 md:px-7 py-3 sm:py-3.5 text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${
+                      isActive
+                        ? (isGold
+                            ? 'text-[#1A1712]'
+                            : isDark
+                              ? 'border-b-2 border-blue-500 text-white'
+                              : 'border-b-2 border-red-600 text-red-600')
+                        : (isGold
+                            ? 'text-[#6E675C] hover:text-[#1A1712]'
+                            : `${colors.text} hover:opacity-70`)
+                    }`}
+                  >
+                    <Icon size={14} className={isActive && isGold ? 'text-[#A37B14]' : undefined} />
+                    <span>{tab.label}</span>
+                    {isActive && isGold && (
+                      <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-[2px] bg-[#A37B14] rounded-full" />
+                    )}
+                  </button>
+                );
+              })}
             </nav>
 
             <div 
@@ -3677,7 +3854,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               )}
             </div>
 
-            <div className={`absolute bottom-0 left-0 right-0 p-2.5 sm:p-3 md:p-6 border-t ${colors.border} ${isDark ? 'bg-[#070d18]/90' : 'bg-white/90'} backdrop-blur-md transition-all duration-300 z-30 w-full max-w-full overflow-hidden`}>
+            <div className={`absolute bottom-0 left-0 right-0 p-2.5 sm:p-3 md:p-6 border-t ${colors.border} ${isGold ? 'bg-[#FFFCF8] border-[#1A1712]/10 shadow-lg' : isDark ? 'bg-[#070d18]/90 backdrop-blur-md' : 'bg-white/90 backdrop-blur-md'} transition-all duration-300 z-30 w-full max-w-full overflow-hidden`}>
               <div className="max-w-4xl mx-auto w-full max-w-full min-w-0">
                 {/* ... (Existing Quick Input) ... */}
                 <input type="file" ref={quickUploadRef} onChange={handleQuickUpload} className="hidden" accept="image/*,video/*,audio/*" />
@@ -3770,29 +3947,52 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                 ) : (
                   /* ... (Same simplified input bar logic as previous) ... */
                   <div className="flex flex-col gap-1.5 sm:gap-2 md:gap-3 w-full max-w-full">
-                    {/* Quick Phrases Balloon Strip (Balões de Frases) - Horizontal Scrollable Row */}
+                    {/* Quick Phrases Balloon Strip (Balões de Frases) */}
                     {(() => {
                       const activePhrases = isHost 
                         ? (quickPhrasesConfig?.creatorPhrases?.length ? quickPhrasesConfig.creatorPhrases : DEFAULT_CREATOR_PHRASES)
                         : (quickPhrasesConfig?.visitorPhrases?.length ? quickPhrasesConfig.visitorPhrases : DEFAULT_VISITOR_PHRASES);
+
+                      if (isGold && !isPhrasesExpanded) {
+                        return (
+                          <div className="flex items-center gap-1.5 pb-1">
+                            <button
+                              type="button"
+                              onClick={() => setIsPhrasesExpanded(true)}
+                              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-[#1A1712]/10 text-[11px] font-bold text-[#6E675C] hover:text-[#1A1712] hover:border-[#A37B14]/40 transition-all select-none shadow-xs"
+                            >
+                              <Sparkles size={12} className="text-[#A37B14]" />
+                              <span>Frases</span>
+                              <span className="text-[9px] opacity-60">▾</span>
+                            </button>
+                          </div>
+                        );
+                      }
 
                       return (
                         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide no-scrollbar w-full max-w-full">
                           <button
                             type="button"
                             onClick={() => {
-                              setQuickSettingsTab('phrases');
-                              setIsQuickSettingsOpen(true);
+                              if (isGold) {
+                                setIsPhrasesExpanded(false);
+                              } else {
+                                setQuickSettingsTab('phrases');
+                                setIsQuickSettingsOpen(true);
+                              }
                             }}
                             className={`flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-all select-none ${
-                              isDark 
-                                ? 'bg-blue-950/40 text-blue-400 border-blue-500/30 hover:bg-blue-900/50' 
-                                : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                              isGold
+                                ? 'bg-white text-[#A37B14] border-[#1A1712]/10 hover:bg-[#F3F0EA]'
+                                : isDark 
+                                  ? 'bg-blue-950/40 text-blue-400 border-blue-500/30 hover:bg-blue-900/50' 
+                                  : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
                             }`}
-                            title="Gerenciar e personalizar frases balão"
+                            title={isGold ? "Recolher Frases" : "Gerenciar e personalizar frases balão"}
                           >
-                            <Sparkles size={11} className="text-amber-400 shrink-0" />
+                            <Sparkles size={11} className={isGold ? "text-[#A37B14] shrink-0" : "text-amber-400 shrink-0"} />
                             <span>{isHost ? 'Frases' : 'Sugestões'}</span>
+                            {isGold && <span className="text-[9px]">▴</span>}
                           </button>
 
                           {activePhrases.map((phrase, idx) => (
@@ -3802,9 +4002,11 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                               onClick={() => handleSendQuickPhrase(phrase)}
                               disabled={isChatPausedDueToRenewal && !isHost}
                               className={`flex-shrink-0 px-3.5 py-1.5 rounded-full border text-xs sm:text-xs font-semibold whitespace-nowrap transition-all duration-150 active:scale-95 cursor-pointer shadow-xs select-none ${
-                                isDark
-                                  ? 'bg-slate-900/90 hover:bg-slate-800 border-slate-700/80 text-slate-200 hover:text-white hover:border-blue-500/50 active:bg-blue-600 active:text-white'
-                                  : 'bg-white hover:bg-gray-100 border-gray-200 text-slate-800 hover:text-slate-950 hover:border-blue-400 active:bg-blue-600 active:text-white'
+                                isGold
+                                  ? 'bg-white hover:bg-[#F3F0EA] border-[#1A1712]/10 text-[#1A1712] hover:border-[#A37B14]/40 active:bg-[#A37B14] active:text-white'
+                                  : isDark
+                                    ? 'bg-slate-900/90 hover:bg-slate-800 border-slate-700/80 text-slate-200 hover:text-white hover:border-blue-500/50 active:bg-blue-600 active:text-white'
+                                    : 'bg-white hover:bg-gray-100 border-gray-200 text-slate-800 hover:text-slate-950 hover:border-blue-400 active:bg-blue-600 active:text-white'
                               } ${isChatPausedDueToRenewal && !isHost ? 'opacity-40 cursor-not-allowed' : ''}`}
                               title={`Clique para enviar: "${phrase}"`}
                             >
@@ -3819,9 +4021,11 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                               setIsQuickSettingsOpen(true);
                             }}
                             className={`flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full border transition-all ${
-                              isDark
-                                ? 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-white hover:border-slate-500'
-                                : 'bg-gray-100 text-slate-500 border-gray-200 hover:text-slate-900 hover:border-gray-300'
+                              isGold
+                                ? 'bg-white text-[#6E675C] border-[#1A1712]/10 hover:text-[#1A1712] hover:border-[#A37B14]/40'
+                                : isDark
+                                  ? 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-white hover:border-slate-500'
+                                  : 'bg-gray-100 text-slate-500 border-gray-200 hover:text-slate-900 hover:border-gray-300'
                             }`}
                             title="Adicionar mais frases balão"
                           >
@@ -3849,36 +4053,38 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
                     {/* Function Icons Bar (Visible on Mobile, Hidden on Desktop) */}
                     <div className="flex md:hidden items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide no-scrollbar w-full max-w-full">
-                      <button 
-                        type="button" 
-                        onClick={() => openWallet('recharge')} 
-                        className="flex-shrink-0 h-8 px-2 flex items-center gap-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/30 text-[11px] font-black active:scale-95 shadow-sm" 
-                        title="Carteira & Depositar Créditos"
-                      >
-                        <Wallet size={13} className="text-emerald-500 shrink-0" />
-                        <span>{user.credits}c</span>
-                      </button>
-                      <button disabled={isUploading} onClick={() => quickUploadRef.current?.click()} className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Upload"><Upload size={14} /></button>
-                      <button disabled={isUploading} onClick={() => startQuickRecording('photo')} className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Foto"><Camera size={14} /></button>
-                      <button disabled={isUploading} onClick={() => { setActiveTab('cinema'); handleNewVideoSelection(); }} className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20" title="Subir Vídeo / Link" style={{touchAction:'manipulation'}}><Tv size={14} /></button>
+                      {!isGold && (
+                        <button 
+                          type="button" 
+                          onClick={() => openWallet('recharge')} 
+                          className="flex-shrink-0 h-8 px-2 flex items-center gap-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/30 text-[11px] font-black active:scale-95 shadow-sm" 
+                          title="Carteira & Depositar Créditos"
+                        >
+                          <Wallet size={13} className="text-emerald-500 shrink-0" />
+                          <span>{user.credits}c</span>
+                        </button>
+                      )}
+                      <button disabled={isUploading} onClick={() => quickUploadRef.current?.click()} className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl border ${isGold ? 'bg-white border-[#1A1712]/10 text-[#6E675C] hover:text-[#1A1712]' : 'bg-slate-800 text-slate-400 border-slate-700/50'}`} title="Upload"><Upload size={14} /></button>
+                      <button disabled={isUploading} onClick={() => startQuickRecording('photo')} className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl border ${isGold ? 'bg-white border-[#1A1712]/10 text-[#6E675C] hover:text-[#1A1712]' : 'bg-slate-800 text-slate-400 border-slate-700/50'}`} title="Foto"><Camera size={14} /></button>
+                      <button disabled={isUploading} onClick={() => { setActiveTab('cinema'); handleNewVideoSelection(); }} className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl border ${isGold ? 'bg-white border-[#1A1712]/10 text-[#A37B14]' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'}`} title="Subir Vídeo / Link" style={{touchAction:'manipulation'}}><Tv size={14} /></button>
                       <button disabled={isUploading} onClick={() => setIsCardModalOpen(true)} className={`flex-shrink-0 w-8 h-8 flex items-center justify-center ${colors.primary} text-white rounded-xl shadow-lg`} title="Novo Card"><Plus size={16} /></button>
-                      <button disabled={isUploading} onClick={() => { setQuickSettingsTab('paid_chat'); setIsQuickSettingsOpen(true); }} className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl border transition-all ${paidChatConfig.enabled ? 'bg-blue-600/25 text-blue-400 border-blue-500/50 shadow-sm' : 'bg-slate-800 text-slate-400 border-slate-700/50'}`} title="Ajustes (Tempo & Frases)"><Settings size={13} /></button>
-                      <button disabled={isUploading} onClick={() => startQuickRecording('audio')} className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Áudio"><Mic size={14} /></button>
-                      <button disabled={isUploading} onClick={() => startQuickRecording('video')} className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-slate-800 text-slate-400 rounded-xl border border-slate-700/50" title="Vídeo"><Video size={14} /></button>
-                      <button disabled={isUploading} onClick={() => setIsClearChatModalOpen(true)} className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-red-950/30 text-red-400 hover:bg-red-900/40 rounded-xl border border-red-500/20" title="Limpar Conversa e Mídias"><Trash2 size={14} /></button>
+                      <button disabled={isUploading} onClick={() => { setQuickSettingsTab('paid_chat'); setIsQuickSettingsOpen(true); }} className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl border transition-all ${isGold ? (paidChatConfig.enabled ? 'bg-[#A37B14]/15 text-[#A37B14] border-[#A37B14]/40' : 'bg-white text-[#6E675C] border-[#1A1712]/10') : (paidChatConfig.enabled ? 'bg-blue-600/25 text-blue-400 border-blue-500/50 shadow-sm' : 'bg-slate-800 text-slate-400 border-slate-700/50')}`} title="Ajustes (Tempo & Frases)"><Settings size={13} /></button>
+                      <button disabled={isUploading} onClick={() => startQuickRecording('audio')} className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl border ${isGold ? 'bg-white border-[#1A1712]/10 text-[#6E675C] hover:text-[#1A1712]' : 'bg-slate-800 text-slate-400 border-slate-700/50'}`} title="Áudio"><Mic size={14} /></button>
+                      <button disabled={isUploading} onClick={() => startQuickRecording('video')} className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl border ${isGold ? 'bg-white border-[#1A1712]/10 text-[#6E675C] hover:text-[#1A1712]' : 'bg-slate-800 text-slate-400 border-slate-700/50'}`} title="Vídeo"><Video size={14} /></button>
+                      <button disabled={isUploading} onClick={() => setIsClearChatModalOpen(true)} className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl border ${isGold ? 'bg-white text-red-500 border-red-200 hover:bg-red-50' : 'bg-red-950/30 text-red-400 hover:bg-red-900/40 border-red-500/20'}`} title="Limpar Conversa e Mídias"><Trash2 size={14} /></button>
                     </div>
 
                     <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 w-full max-w-full">
                       {/* Desktop Only Actions - Left Side */}
                       <div className="hidden md:flex items-center gap-2 shrink-0">
-                        <button disabled={isUploading} onClick={() => quickUploadRef.current?.click()} className={`w-12 h-12 flex items-center justify-center ${isDark ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-gray-200 text-slate-500 hover:bg-gray-300'} rounded-2xl transition-all`} title="Upload Rápido"><Upload size={20} /></button>
-                        <button disabled={isUploading} onClick={() => startQuickRecording('photo')} className={`w-12 h-12 flex items-center justify-center ${isDark ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-gray-200 text-slate-500 hover:bg-gray-300'} rounded-2xl transition-all`} title="Foto Rápida"><Camera size={20} /></button>
-                        <button disabled={isUploading} onClick={() => { setActiveTab('cinema'); handleNewVideoSelection(); }} className={`w-12 h-12 flex items-center justify-center ${isDark ? 'bg-slate-800 text-slate-400 hover:bg-indigo-400' : 'bg-indigo-100 text-indigo-500 hover:bg-indigo-200'} rounded-2xl transition-all`} title="Subir Vídeo / Link" style={{touchAction:'manipulation'}}><Tv size={20} /></button>
-                        <button disabled={isUploading} onClick={() => setIsCardModalOpen(true)} className={`w-12 h-12 flex items-center justify-center ${colors.primary} text-white rounded-2xl shadow-xl hover:opacity-90 transform hover:-translate-y-0.5 transition-all`} title="Criar Card Avançado"><Plus size={24} /></button>
+                        <button disabled={isUploading} onClick={() => quickUploadRef.current?.click()} className={`w-12 h-12 flex items-center justify-center ${isGold ? 'bg-white border border-[#1A1712]/10 text-[#6E675C] hover:text-[#1A1712] hover:bg-[#F3F0EA]' : isDark ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-gray-200 text-slate-500 hover:bg-gray-300'} rounded-2xl transition-all`} title="Upload Rápido"><Upload size={20} /></button>
+                        <button disabled={isUploading} onClick={() => startQuickRecording('photo')} className={`w-12 h-12 flex items-center justify-center ${isGold ? 'bg-white border border-[#1A1712]/10 text-[#6E675C] hover:text-[#1A1712] hover:bg-[#F3F0EA]' : isDark ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-gray-200 text-slate-500 hover:bg-gray-300'} rounded-2xl transition-all`} title="Foto Rápida"><Camera size={20} /></button>
+                        <button disabled={isUploading} onClick={() => { setActiveTab('cinema'); handleNewVideoSelection(); }} className={`w-12 h-12 flex items-center justify-center ${isGold ? 'bg-white border border-[#1A1712]/10 text-[#A37B14] hover:bg-[#F3F0EA]' : isDark ? 'bg-slate-800 text-slate-400 hover:bg-indigo-400' : 'bg-indigo-100 text-indigo-500 hover:bg-indigo-200'} rounded-2xl transition-all`} title="Subir Vídeo / Link" style={{touchAction:'manipulation'}}><Tv size={20} /></button>
+                        <button disabled={isUploading} onClick={() => setIsCardModalOpen(true)} className={`w-12 h-12 flex items-center justify-center ${colors.primary} text-white rounded-2xl shadow-md hover:opacity-90 transform hover:-translate-y-0.5 transition-all`} title="Criar Card Avançado"><Plus size={24} /></button>
                       </div>
 
                       {/* Main Text Input Area */}
-                      <div className={`flex-1 min-w-0 ${colors.inputBg} rounded-2xl border ${colors.border} flex items-center px-3 sm:px-4 focus-within:ring-1 ${isDark ? 'focus-within:ring-blue-500/30' : 'focus-within:ring-red-500/30'} transition-all shadow-sm`}>
+                      <div className={`flex-1 min-w-0 ${colors.inputBg} rounded-2xl border ${colors.border} flex items-center px-3 sm:px-4 focus-within:ring-1 ${isGold ? 'focus-within:ring-[#A37B14]/30' : isDark ? 'focus-within:ring-blue-500/30' : 'focus-within:ring-red-500/30'} transition-all shadow-xs`}>
                         <input
                           value={inputText}
                           onChange={(e) => setInputText(e.target.value)}
@@ -3892,28 +4098,28 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                       <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2 shrink-0">
                         {/* Desktop Only Actions - Right Side */}
                         <div className="hidden md:flex gap-2">
-                          <button disabled={isUploading} onClick={() => { setQuickSettingsTab('paid_chat'); setIsQuickSettingsOpen(true); }} className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-all border ${paidChatConfig.enabled ? 'bg-blue-600/25 text-blue-400 border-blue-500/50 shadow-sm' : 'bg-slate-800 text-slate-400 hover:text-emerald-400 border-slate-700'}`} title="Configurações (Tempo, Frases & Padrões)"><Settings size={18} /></button>
-                          <button disabled={isUploading} onClick={() => startQuickRecording('audio')} className={`w-12 h-12 flex items-center justify-center ${isDark ? 'bg-slate-800 text-slate-400 hover:text-red-400' : 'bg-gray-200 text-slate-500 hover:text-red-500'} rounded-2xl transition-all`} title="Áudio Rápido"><Mic size={20} /></button>
-                          <button disabled={isUploading} onClick={() => startQuickRecording('video')} className={`w-12 h-12 flex items-center justify-center ${isDark ? 'bg-slate-800 text-slate-400 hover:text-blue-400' : 'bg-gray-200 text-slate-500 hover:text-blue-500'} rounded-2xl transition-all`} title="Vídeo Rápido"><Video size={20} /></button>
-                          <button disabled={isUploading} onClick={() => setIsClearChatModalOpen(true)} className={`w-12 h-12 flex items-center justify-center ${isDark ? 'bg-red-950/30 text-red-400 hover:bg-red-900/40' : 'bg-red-50 text-red-500 hover:bg-red-100'} rounded-2xl transition-all border border-red-500/20`} title="Limpar Conversa e Mídias"><Trash2 size={18} /></button>
+                          <button disabled={isUploading} onClick={() => { setQuickSettingsTab('paid_chat'); setIsQuickSettingsOpen(true); }} className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-all border ${isGold ? (paidChatConfig.enabled ? 'bg-[#A37B14]/15 text-[#A37B14] border-[#A37B14]/40' : 'bg-white text-[#6E675C] hover:text-[#1A1712] border-[#1A1712]/10') : (paidChatConfig.enabled ? 'bg-blue-600/25 text-blue-400 border-blue-500/50 shadow-sm' : 'bg-slate-800 text-slate-400 hover:text-emerald-400 border-slate-700')}`} title="Configurações (Tempo, Frases & Padrões)"><Settings size={18} /></button>
+                          <button disabled={isUploading} onClick={() => startQuickRecording('audio')} className={`w-12 h-12 flex items-center justify-center ${isGold ? 'bg-white border border-[#1A1712]/10 text-[#6E675C] hover:text-[#1A1712]' : isDark ? 'bg-slate-800 text-slate-400 hover:text-red-400' : 'bg-gray-200 text-slate-500 hover:text-red-500'} rounded-2xl transition-all`} title="Áudio Rápido"><Mic size={20} /></button>
+                          <button disabled={isUploading} onClick={() => startQuickRecording('video')} className={`w-12 h-12 flex items-center justify-center ${isGold ? 'bg-white border border-[#1A1712]/10 text-[#6E675C] hover:text-[#1A1712]' : isDark ? 'bg-slate-800 text-slate-400 hover:text-blue-400' : 'bg-gray-200 text-slate-500 hover:text-blue-500'} rounded-2xl transition-all`} title="Vídeo Rápido"><Video size={20} /></button>
+                          <button disabled={isUploading} onClick={() => setIsClearChatModalOpen(true)} className={`w-12 h-12 flex items-center justify-center ${isGold ? 'bg-white text-red-500 border border-red-200 hover:bg-red-50' : isDark ? 'bg-red-950/30 text-red-400 hover:bg-red-900/40 border border-red-500/20' : 'bg-red-50 text-red-500 hover:bg-red-100 border border-red-500/20'} rounded-2xl transition-all`} title="Limpar Conversa e Mídias"><Trash2 size={18} /></button>
                         </div>
 
                         {/* Send Button */}
                         <button
                           onClick={() => handleSendMessage()}
                           disabled={!inputText.trim()}
-                          className={`w-10 h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 flex-shrink-0 flex items-center justify-center ${colors.primary} text-white rounded-2xl hover:opacity-90 shadow-lg transition-all disabled:opacity-25 active:scale-90`}
+                          className={`w-10 h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 flex-shrink-0 flex items-center justify-center ${colors.primary} text-white rounded-2xl hover:opacity-90 shadow-md transition-all disabled:opacity-25 active:scale-90`}
                         >
                           <Send size={16} className="sm:w-[18px] sm:h-[18px]" />
                         </button>
                       </div>
                     </div>
 
-                    {/* Mobile Horizontal Sidebar / Navigation Dock: Carteira, Feed, Cinema, Perfil */}
+                    {/* Mobile Horizontal Navigation Dock: Carteira, Feed, Criar, Cinema, Perfil */}
                     <nav 
                       aria-label="Navegação Rápida Mobile"
-                      className={`flex md:hidden items-center justify-between gap-1.5 sm:gap-2 pt-2 mt-0.5 border-t ${
-                        isDark ? 'border-slate-800/80' : 'border-gray-200/80'
+                      className={`flex md:hidden items-center justify-between gap-1 pt-2 mt-0.5 border-t ${
+                        isGold ? 'border-[#1A1712]/10' : isDark ? 'border-slate-800/80' : 'border-gray-200/80'
                       } w-full max-w-full select-none`}
                     >
                       {/* 1. CARTEIRA */}
@@ -3922,20 +4128,24 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         onClick={() => openWallet('recharge')}
                         className={`flex-1 py-1.5 px-1 rounded-xl flex flex-col items-center justify-center transition-all duration-150 active:scale-95 cursor-pointer border ${
                           isWalletModalOpen
-                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-sm'
-                            : (isDark 
-                                ? 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 border-slate-800/80' 
-                                : 'bg-emerald-50/70 hover:bg-emerald-100 text-emerald-800 border-emerald-200/70')
+                            ? (isGold ? 'bg-[#A37B14]/10 text-[#A37B14] border-[#A37B14]/30' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-sm')
+                            : (isGold
+                                ? 'bg-transparent text-[#6E675C] border-transparent hover:text-[#1A1712]'
+                                : isDark 
+                                  ? 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 border-slate-800/80' 
+                                  : 'bg-emerald-50/70 hover:bg-emerald-100 text-emerald-800 border-emerald-200/70')
                         }`}
                         title="Carteira & Créditos"
                       >
                         <div className="relative flex items-center justify-center">
-                          <Wallet size={16} className="text-emerald-500 shrink-0" />
-                          <span className="absolute -top-1 -right-3 px-1 py-0.2 rounded-full bg-emerald-600 text-white dark:bg-emerald-500 dark:text-slate-950 text-[8px] font-black leading-none shadow-xs">
-                            {user.credits}c
-                          </span>
+                          <Wallet size={16} className={isGold ? 'text-[#A37B14]' : 'text-emerald-500'} />
+                          {!isGold && (
+                            <span className="absolute -top-1 -right-3 px-1 py-0.2 rounded-full bg-emerald-600 text-white dark:bg-emerald-500 dark:text-slate-950 text-[8px] font-black leading-none shadow-xs">
+                              {user.credits}c
+                            </span>
+                          )}
                         </div>
-                        <span className="text-[9px] font-black uppercase tracking-wider mt-1 text-emerald-600 dark:text-emerald-400">
+                        <span className={`text-[9px] font-black uppercase tracking-wider mt-1 ${isGold ? 'text-[#6E675C]' : 'text-emerald-600 dark:text-emerald-400'}`}>
                           Carteira
                         </span>
                       </button>
@@ -3949,29 +4159,54 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         }}
                         className={`flex-1 py-1.5 px-1 rounded-xl flex flex-col items-center justify-center transition-all duration-150 active:scale-95 cursor-pointer border ${
                           activeTab === 'chat'
-                            ? (isDark
-                                ? 'bg-blue-600/25 text-blue-400 border-blue-500/50 shadow-sm'
-                                : 'bg-red-50 text-red-600 border-red-200 shadow-sm')
-                            : (isDark
-                                ? 'bg-slate-900/80 hover:bg-slate-800 text-slate-400 border-slate-800/80'
-                                : 'bg-gray-100 hover:bg-gray-200 text-slate-600 border-gray-200')
+                            ? (isGold
+                                ? 'bg-[#A37B14]/10 text-[#1A1712] border-[#A37B14]/30 font-black'
+                                : isDark
+                                  ? 'bg-blue-600/25 text-blue-400 border-blue-500/50 shadow-sm'
+                                  : 'bg-red-50 text-red-600 border-red-200 shadow-sm')
+                            : (isGold
+                                ? 'bg-transparent text-[#6E675C] border-transparent hover:text-[#1A1712]'
+                                : isDark
+                                  ? 'bg-slate-900/80 hover:bg-slate-800 text-slate-400 border-slate-800/80'
+                                  : 'bg-gray-100 hover:bg-gray-200 text-slate-600 border-gray-200')
                         }`}
                         title="Feed do Chat"
                       >
                         <div className="relative flex items-center justify-center">
-                          <MessageSquare size={16} className={activeTab === 'chat' ? (isDark ? 'text-blue-400' : 'text-red-600') : 'text-slate-400'} />
+                          <MessageSquare size={16} className={activeTab === 'chat' ? (isGold ? 'text-[#A37B14]' : isDark ? 'text-blue-400' : 'text-red-600') : (isGold ? 'text-[#6E675C]' : 'text-slate-400')} />
                           {activeTab === 'chat' && (
-                            <span className={`absolute -top-0.5 -right-1 w-1.5 h-1.5 rounded-full ${isDark ? 'bg-blue-400' : 'bg-red-500'}`} />
+                            <span className={`absolute -top-0.5 -right-1 w-1.5 h-1.5 rounded-full ${isGold ? 'bg-[#A37B14]' : isDark ? 'bg-blue-400' : 'bg-red-500'}`} />
                           )}
                         </div>
                         <span className={`text-[9px] font-black uppercase tracking-wider mt-1 ${
-                          activeTab === 'chat' ? (isDark ? 'text-blue-400 font-black' : 'text-red-600 font-black') : (isDark ? 'text-slate-400' : 'text-slate-600')
+                          activeTab === 'chat' ? (isGold ? 'text-[#1A1712] font-black' : isDark ? 'text-blue-400 font-black' : 'text-red-600 font-black') : (isGold ? 'text-[#6E675C]' : isDark ? 'text-slate-400' : 'text-slate-600')
                         }`}>
                           Feed
                         </span>
                       </button>
 
-                      {/* 3. CINEMA */}
+                      {/* 3. CRIAR (Mobile Creation Trigger) */}
+                      <button
+                        type="button"
+                        onClick={() => setIsCardModalOpen(true)}
+                        className={`flex-1 py-1.5 px-1 rounded-xl flex flex-col items-center justify-center transition-all duration-150 active:scale-95 cursor-pointer border ${
+                          isGold
+                            ? 'bg-white text-[#1A1712] border-[#1A1712]/10 hover:border-[#A37B14]/40'
+                            : isDark
+                              ? 'bg-slate-900/80 hover:bg-slate-800 text-slate-400 border-slate-800/80'
+                              : 'bg-gray-100 hover:bg-gray-200 text-slate-600 border-gray-200'
+                        }`}
+                        title="Criar Novo Card"
+                      >
+                        <div className="relative flex items-center justify-center">
+                          <Plus size={16} className={isGold ? 'text-[#A37B14]' : colors.primaryText} />
+                        </div>
+                        <span className={`text-[9px] font-black uppercase tracking-wider mt-1 ${isGold ? 'text-[#6E675C]' : 'text-slate-500'}`}>
+                          Criar
+                        </span>
+                      </button>
+
+                      {/* 4. CINEMA */}
                       <button
                         type="button"
                         onClick={() => {
@@ -3982,28 +4217,32 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         }}
                         className={`flex-1 py-1.5 px-1 rounded-xl flex flex-col items-center justify-center transition-all duration-150 active:scale-95 cursor-pointer border ${
                           activeTab === 'cinema'
-                            ? 'bg-indigo-600/25 text-indigo-400 border-indigo-500/50 shadow-sm'
-                            : (isDark
-                                ? 'bg-slate-900/80 hover:bg-slate-800 text-slate-400 border-slate-800/80'
-                                : 'bg-indigo-50/60 hover:bg-indigo-100 text-slate-600 border-indigo-200/60')
+                            ? (isGold
+                                ? 'bg-[#A37B14]/10 text-[#1A1712] border-[#A37B14]/30'
+                                : 'bg-indigo-600/25 text-indigo-400 border-indigo-500/50 shadow-sm')
+                            : (isGold
+                                ? 'bg-transparent text-[#6E675C] border-transparent hover:text-[#1A1712]'
+                                : isDark
+                                  ? 'bg-slate-900/80 hover:bg-slate-800 text-slate-400 border-slate-800/80'
+                                  : 'bg-indigo-50/60 hover:bg-indigo-100 text-slate-600 border-indigo-200/60')
                         }`}
                         title="Cinema & Transmissão"
                         style={{ touchAction: 'manipulation' }}
                       >
                         <div className="relative flex items-center justify-center">
-                          <Tv size={16} className={activeTab === 'cinema' ? 'text-indigo-400' : 'text-slate-400'} />
+                          <Tv size={16} className={activeTab === 'cinema' ? (isGold ? 'text-[#A37B14]' : 'text-indigo-400') : (isGold ? 'text-[#6E675C]' : 'text-slate-400')} />
                           {watchPartySource && (
                             <span className="absolute -top-0.5 -right-1 w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" title="Em reprodução" />
                           )}
                         </div>
                         <span className={`text-[9px] font-black uppercase tracking-wider mt-1 ${
-                          activeTab === 'cinema' ? 'text-indigo-400 font-black' : (isDark ? 'text-slate-400' : 'text-slate-600')
+                          activeTab === 'cinema' ? (isGold ? 'text-[#1A1712] font-black' : 'text-indigo-400 font-black') : (isGold ? 'text-[#6E675C]' : isDark ? 'text-slate-400' : 'text-slate-600')
                         }`}>
                           Cinema
                         </span>
                       </button>
 
-                      {/* 4. PERFIL */}
+                      {/* 5. PERFIL */}
                       <button
                         type="button"
                         onClick={() => {
@@ -4015,10 +4254,14 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         }}
                         className={`flex-1 py-1.5 px-1 rounded-xl flex flex-col items-center justify-center transition-all duration-150 active:scale-95 cursor-pointer border ${
                           isMobileMenuOpen
-                            ? 'bg-purple-600/25 text-purple-400 border-purple-500/50 shadow-sm'
-                            : (isDark
-                                ? 'bg-slate-900/80 hover:bg-slate-800 text-slate-400 border-slate-800/80'
-                                : 'bg-purple-50/60 hover:bg-purple-100 text-slate-600 border-purple-200/60')
+                            ? (isGold
+                                ? 'bg-[#A37B14]/10 text-[#1A1712] border-[#A37B14]/30'
+                                : 'bg-purple-600/25 text-purple-400 border-purple-500/50 shadow-sm')
+                            : (isGold
+                                ? 'bg-transparent text-[#6E675C] border-transparent hover:text-[#1A1712]'
+                                : isDark
+                                  ? 'bg-slate-900/80 hover:bg-slate-800 text-slate-400 border-slate-800/80'
+                                  : 'bg-purple-50/60 hover:bg-purple-100 text-slate-600 border-purple-200/60')
                         }`}
                         title="Meu Perfil & Conversas"
                       >
@@ -4027,17 +4270,17 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                             <img 
                               src={user.profilePhoto} 
                               alt={user.name} 
-                              className="w-4 h-4 rounded-full object-cover ring-1 ring-purple-400/50" 
+                              className={`w-4 h-4 rounded-full object-cover ring-1 ${isGold ? 'ring-[#A37B14]/50' : 'ring-purple-400/50'}`} 
                             />
                           ) : (
-                            <UserIcon size={16} className={isMobileMenuOpen ? 'text-purple-400' : 'text-slate-400'} />
+                            <UserIcon size={16} className={isMobileMenuOpen ? (isGold ? 'text-[#A37B14]' : 'text-purple-400') : (isGold ? 'text-[#6E675C]' : 'text-slate-400')} />
                           )}
                           {user.isLoggedIn && (
                             <span className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 ring-1 ring-slate-900" />
                           )}
                         </div>
                         <span className={`text-[9px] font-black uppercase tracking-wider mt-1 ${
-                          isMobileMenuOpen ? 'text-purple-400 font-black' : (isDark ? 'text-slate-400' : 'text-slate-600')
+                          isMobileMenuOpen ? (isGold ? 'text-[#1A1712] font-black' : 'text-purple-400 font-black') : (isGold ? 'text-[#6E675C]' : isDark ? 'text-slate-400' : 'text-slate-600')
                         }`}>
                           Perfil
                         </span>

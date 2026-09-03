@@ -6,7 +6,7 @@ import Home from './components/Home';
 import Gallery from './components/Gallery';
 import AuthModal from './components/AuthModal';
 import { Toast, ToastType, ToastOptions } from './components/Toast';
-import { User } from './types';
+import { User, AppTheme } from './types';
 import { supabase } from './lib/supabase';
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
@@ -74,11 +74,26 @@ const App: React.FC = () => {
     return newGuest;
   });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  // Alterado para 'light' como padrão
-  const [theme, setTheme] = useState<'dark' | 'light'>('light');
+  // Padrão 'gold' (Gold Prime light)
+  const [theme, setTheme] = useState<AppTheme>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('app_theme') as AppTheme;
+      if (saved === 'gold' || saved === 'dark' || saved === 'light') return saved;
+    }
+    return 'gold';
+  });
 
   const toggleTheme = () => {
-    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+    setTheme(prev => {
+      let next: AppTheme = 'gold';
+      if (prev === 'gold') next = 'light';
+      else if (prev === 'light') next = 'dark';
+      else next = 'gold';
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('app_theme', next);
+      }
+      return next;
+    });
   };
 
   const [toast, setToast] = useState<{ 
@@ -108,10 +123,21 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('app_theme', theme);
+    }
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('theme-gold');
+      document.body.classList.remove('theme-gold');
+    } else if (theme === 'gold') {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('theme-gold');
+      document.body.classList.add('theme-gold');
     } else {
       document.documentElement.classList.remove('dark');
+      document.documentElement.classList.remove('theme-gold');
+      document.body.classList.remove('theme-gold');
     }
   }, [theme]);
 
@@ -297,7 +323,13 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary>
       <Router>
-        <div className={`min-h-screen w-full max-w-full overflow-x-hidden transition-colors duration-300 ${theme === 'dark' ? 'bg-slate-950 text-white selection:bg-indigo-500/30' : 'bg-gray-50 text-slate-900 selection:bg-red-500/30'}`}>
+        <div className={`min-h-screen w-full max-w-full overflow-x-hidden transition-colors duration-300 ${
+          theme === 'gold'
+            ? 'bg-[#F3F0EA] text-[#1A1712] selection:bg-[#A37B14]/25'
+            : theme === 'dark'
+            ? 'bg-slate-950 text-white selection:bg-indigo-500/30'
+            : 'bg-gray-50 text-slate-900 selection:bg-red-500/30'
+        }`}>
           <Routes>
             <Route
               path="/"

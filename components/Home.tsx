@@ -1,15 +1,15 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Share2, LayoutGrid, MessageCircle, LogIn, TrendingUp, User as UserIcon, LogOut, Sun, Moon } from 'lucide-react';
-import { User } from '../types';
+import { Share2, LayoutGrid, MessageCircle, LogIn, TrendingUp, User as UserIcon, LogOut, Sun, Moon, Sparkles } from 'lucide-react';
+import { User, AppTheme } from '../types';
 import { supabase } from '../lib/supabase';
 import { ToastType, ToastOptions } from './Toast';
 
 interface HomeProps {
   user: User;
   openAuth: () => void;
-  theme: 'dark' | 'light';
+  theme: AppTheme;
   toggleTheme: () => void;
   onShowToast?: (message: string, type?: ToastType, options?: ToastOptions) => void;
 }
@@ -18,6 +18,7 @@ const Home: React.FC<HomeProps> = ({ user, openAuth, theme, toggleTheme, onShowT
   const navigate = useNavigate();
   const personalRoomId = user.id;
   const isDark = theme === 'dark';
+  const isGold = theme === 'gold';
 
   const handleStartChat = () => {
     navigate(`/chat/${personalRoomId}`);
@@ -43,12 +44,12 @@ const Home: React.FC<HomeProps> = ({ user, openAuth, theme, toggleTheme, onShowT
   };
 
   const colors = {
-    text: isDark ? 'text-white' : 'text-slate-900',
-    subText: isDark ? 'text-slate-400' : 'text-slate-600',
-    cardBg: isDark ? 'bg-white/5 border-white/10' : 'bg-white border-gray-200 shadow-xl',
-    primary: isDark ? 'bg-indigo-600' : 'bg-red-600',
-    primaryText: isDark ? 'text-indigo-400' : 'text-red-600',
-    glass: isDark ? 'glass' : 'bg-white/80 backdrop-blur-md border border-gray-200 shadow-sm'
+    text: isGold ? 'text-[#1A1712]' : isDark ? 'text-white' : 'text-slate-900',
+    subText: isGold ? 'text-[#6E675C]' : isDark ? 'text-slate-400' : 'text-slate-600',
+    cardBg: isGold ? 'bg-[#FFFCF8] border border-[#1A1712]/10 shadow-xs' : isDark ? 'bg-white/5 border-white/10' : 'bg-white border-gray-200 shadow-xl',
+    primary: isGold ? 'bg-[#1A1712]' : isDark ? 'bg-indigo-600' : 'bg-red-600',
+    primaryText: isGold ? 'text-[#A37B14]' : isDark ? 'text-indigo-400' : 'text-red-600',
+    glass: isGold ? 'bg-[#FFFCF8] border border-[#1A1712]/10 shadow-xs' : isDark ? 'glass' : 'bg-white/80 backdrop-blur-md border border-gray-200 shadow-sm'
   };
 
   return (
@@ -64,8 +65,9 @@ const Home: React.FC<HomeProps> = ({ user, openAuth, theme, toggleTheme, onShowT
           <button
             onClick={toggleTheme}
             className={`p-2.5 rounded-2xl ${colors.glass} hover:opacity-80 transition-all ${colors.text} flex-shrink-0`}
+            title={`Tema atual: ${theme}. Clique para alternar.`}
           >
-            {isDark ? <Sun size={18} /> : <Moon size={18} />}
+            {theme === 'gold' ? <Sparkles size={18} className="text-[#A37B14]" /> : isDark ? <Sun size={18} /> : <Moon size={18} />}
           </button>
           <button
             onClick={() => navigate('/gallery')}

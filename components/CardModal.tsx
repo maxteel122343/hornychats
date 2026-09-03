@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { X, ArrowLeft, Upload, Mic, Video, Image as ImageIcon, MessageSquare, DollarSign, Clock, Tag, Camera, StopCircle, RefreshCw, LayoutGrid, Eye, EyeOff, Maximize, Sliders, Phone, LayoutTemplate, Timer, Zap, Settings, Save, Trash2, Edit, PlayCircle, FolderOpen, CalendarClock, Palette, Layers, Repeat, Play, Pause, Tv } from 'lucide-react';
-import { CardType, MediaCard, CardDefaults } from '../types';
+import { CardType, MediaCard, CardDefaults, AppTheme } from '../types';
 import { supabase } from '../lib/supabase';
 import MediaCardItem from './MediaCardItem';
 import { QuickSettingsModal } from './QuickSettingsModal';
@@ -13,7 +13,7 @@ interface CardModalProps {
   initialData?: MediaCard | null;
   onShowToast?: (message: string, type: 'success' | 'error' | 'info') => void;
   onNavigateTab?: (tab: 'chat' | 'showcase' | 'my_cards' | 'cinema') => void;
-  theme?: 'dark' | 'light';
+  theme?: AppTheme;
 }
 
 const DEFAULT_SETTINGS_KEY = 'linkcard_defaults';

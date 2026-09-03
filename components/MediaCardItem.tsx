@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Lock, Play, Volume2, Camera, Phone, MessageSquare, Eye, Clock, Tag, MoreVertical, X, Check, Maximize2, DownloadCloud, Timer, ImageOff, Trash2, Edit, AlertTriangle, LogIn, Link as LinkIcon, DoorOpen, CalendarClock, ZoomIn, Heart, UserPlus } from 'lucide-react';
-import { MediaCard, CardType } from '../types';
+import { Lock, Play, Volume2, Camera, Phone, MessageSquare, Eye, Clock, Tag, MoreVertical, X, Check, Maximize2, DownloadCloud, Timer, ImageOff, Trash2, Edit, AlertTriangle, LogIn, Link as LinkIcon, DoorOpen, CalendarClock, ZoomIn, Heart, UserPlus, Crown } from 'lucide-react';
+import { MediaCard, CardType, AppTheme } from '../types';
 import { ToastType, ToastOptions } from './Toast';
 import ImageViewerModal from './ImageViewerModal';
 import { fetchLikesForCards, toggleCardLike } from '../lib/likes';
@@ -17,7 +17,7 @@ interface MediaCardItemProps {
   onInsertToRoom?: (card: MediaCard) => void;
   onSchedule?: (card: MediaCard) => void;
   onShowToast?: (message: string, type?: ToastType, options?: ToastOptions) => void;
-  theme?: 'dark' | 'light';
+  theme?: AppTheme;
 }
 
 const MediaCardItem: React.FC<MediaCardItemProps> = ({ 
@@ -30,9 +30,10 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
   onInsertToRoom, 
   onSchedule, 
   onShowToast,
-  theme = 'dark'
+  theme = 'gold'
 }) => {
   const isDark = theme === 'dark';
+  const isGold = theme === 'gold';
   const [isUnlocked, setIsUnlocked] = useState(canManage);
   const [showSession, setShowSession] = useState(false);
   const [timeLeft, setTimeLeft] = useState(card.duration);
@@ -307,8 +308,10 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
   return (
     <>
       <div
-        className={`group relative rounded-3xl overflow-hidden border transition-all duration-300 shadow-lg flex flex-col justify-between w-full max-w-[calc(100vw-3rem)] sm:max-w-[360px] mx-auto sm:mx-0 my-3 select-none ${
-          isDark 
+        className={`group relative rounded-2xl overflow-hidden border transition-all duration-300 flex flex-col justify-between w-full max-w-[calc(100vw-3rem)] sm:max-w-[360px] mx-auto sm:mx-0 my-3 select-none ${
+          isGold
+            ? 'bg-[#FFFCF8] border-[#1A1712]/10 text-[#1A1712] shadow-xs hover:border-[#1A1712]/20'
+            : isDark 
             ? 'bg-slate-900/90 border-white/10 hover:border-indigo-500/60 shadow-2xl' 
             : 'bg-white border-gray-200 hover:border-indigo-400 hover:shadow-2xl shadow-gray-200/80'
         }`}
@@ -320,7 +323,11 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
           {/* TOP BADGES & CONTROLS */}
           <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between gap-1.5 z-10">
             {/* Media Type Badge */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-black/75 backdrop-blur-md text-white border border-white/10 text-[9px] font-black uppercase tracking-wider">
+            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-lg backdrop-blur-md text-[9px] font-black uppercase tracking-wider border ${
+              isGold 
+                ? 'bg-[#1A1712]/80 text-white border-white/15' 
+                : 'bg-black/75 text-white border-white/10'
+            }`}>
               {getIcon()}
               <span>{card.type}</span>
             </div>
@@ -328,17 +335,21 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
             <div className="flex items-center gap-1.5">
               {/* Expiry Timer Badge */}
               {expiresIn !== null && expiresIn > 0 && (
-                <div className="flex items-center gap-1 bg-red-600/80 text-white backdrop-blur-md px-2 py-0.5 rounded-xl text-[8px] font-black font-mono border border-red-400/40 animate-pulse">
+                <div className="flex items-center gap-1 bg-red-600/80 text-white backdrop-blur-md px-2 py-0.5 rounded-lg text-[8px] font-black font-mono border border-red-400/40 animate-pulse">
                   <Timer size={10} />
                   <span>{formatExpiry(expiresIn)}</span>
                 </div>
               )}
 
               {/* Status / Credit Cost Badge */}
-              <div className={`px-2.5 py-1 rounded-xl backdrop-blur-md text-[9px] font-black uppercase tracking-wider border shadow-md ${
+              <div className={`px-2 py-0.5 rounded-lg backdrop-blur-md text-[9px] font-black uppercase tracking-wider border shadow-xs ${
                 isUnlocked
-                  ? 'bg-emerald-500/90 text-white border-emerald-400/40'
-                  : 'bg-amber-500/90 text-slate-950 border-amber-300/60'
+                  ? (isGold 
+                      ? 'bg-[#5B6D4A]/20 text-[#5B6D4A] border-[#5B6D4A]/30' 
+                      : 'bg-emerald-500/90 text-white border-emerald-400/40')
+                  : (isGold 
+                      ? 'bg-[#A37B14]/15 text-[#A37B14] border-[#A37B14]/30' 
+                      : 'bg-amber-500/90 text-slate-950 border-amber-300/60')
               }`}>
                 {isUnlocked ? 'LIBERADO' : `${card.creditCost} CR`}
               </div>
@@ -348,7 +359,11 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setShowControls(!showControls); }}
-                  className="p-1 rounded-xl bg-black/75 hover:bg-black text-white border border-white/15 backdrop-blur-md transition-all active:scale-95"
+                  className={`p-1 rounded-lg backdrop-blur-md transition-all active:scale-95 border ${
+                    isGold 
+                      ? 'bg-[#1A1712]/80 text-[#A37B14] border-white/15 hover:bg-[#1A1712]' 
+                      : 'bg-black/75 hover:bg-black text-white border-white/15'
+                  }`}
                   title="Gerenciar Card"
                 >
                   <MoreVertical size={13} />
@@ -360,23 +375,27 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
           {/* Creator Controls Dropdown */}
           {showControls && <CreatorControls />}
 
-          {/* CREATOR PROFILE CHIP ON CARD */}
+          {/* CREATOR/HOST PROFILE CHIP ON CARD */}
           <div className="absolute bottom-2.5 left-2.5 right-2.5 z-10 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-xl bg-black/80 backdrop-blur-md border border-white/20 text-slate-200 min-w-0 max-w-[62%]">
+            <div className={`flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-lg backdrop-blur-md border text-slate-200 min-w-0 max-w-[65%] ${
+              isGold ? 'bg-[#1A1712]/80 border-white/15' : 'bg-black/80 border-white/20'
+            }`}>
               {resolvedCreatorPhoto && !avatarImgError ? (
                 <img
                   src={resolvedCreatorPhoto}
                   alt={creatorName}
                   onError={() => setAvatarImgError(true)}
-                  className="w-5 h-5 rounded-full object-cover border border-white/30 shrink-0"
+                  className="w-4 h-4 rounded-full object-cover border border-white/30 shrink-0"
                 />
+              ) : isHostMode ? (
+                <Crown size={11} className="text-[#A37B14] shrink-0" />
               ) : (
-                <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-black text-[9px] border border-white/30 shrink-0 shadow-xs">
+                <div className="w-4 h-4 rounded-full bg-[#A37B14] flex items-center justify-center text-white font-black text-[8px] border border-white/30 shrink-0 shadow-xs">
                   {creatorName.charAt(0).toUpperCase()}
                 </div>
               )}
               <span className="text-[9px] font-black uppercase tracking-tight truncate">
-                {creatorName}
+                {isHostMode ? 'HOST' : creatorName}
               </span>
             </div>
 
@@ -387,20 +406,22 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
                   type="button"
                   onClick={handleFollowToggle}
                   title={isFollowing ? `Deixar de seguir ${creatorName}` : `Seguir ${creatorName}`}
-                  className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all flex items-center gap-1 backdrop-blur-md border shadow-sm active:scale-95 ${
+                  className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all flex items-center gap-1 backdrop-blur-md border shadow-xs active:scale-95 ${
                     isFollowing
                       ? 'bg-emerald-600/90 text-white border-emerald-400/40 hover:bg-emerald-700'
+                      : isGold
+                      ? 'bg-[#FFFCF8]/90 text-[#1A1712] border-[#1A1712]/20 hover:bg-white'
                       : 'bg-white/95 text-slate-950 border-white/50 hover:bg-white font-bold'
                   }`}
                 >
                   {isFollowing ? (
                     <>
-                      <Check size={10} className="stroke-[3]" />
+                      <Check size={9} className="stroke-[3]" />
                       <span>Seguindo</span>
                     </>
                   ) : (
                     <>
-                      <UserPlus size={10} />
+                      <UserPlus size={9} />
                       <span>Seguir</span>
                     </>
                   )}
@@ -410,18 +431,30 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
               <button
                 onClick={handleCopyLink}
                 title="Copiar Link da Sala Exclusiva"
-                className="p-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-400/30 backdrop-blur-md transition-all shadow-lg active:scale-95 flex items-center justify-center"
+                className={`p-1.5 rounded-lg backdrop-blur-md transition-all active:scale-95 flex items-center justify-center border ${
+                  isGold 
+                    ? 'bg-[#1A1712]/80 hover:bg-[#1A1712] text-[#A37B14] border-white/15' 
+                    : 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-400/30 shadow-lg'
+                }`}
               >
-                <MessageSquare size={13} />
+                <MessageSquare size={12} strokeWidth={1.5} />
               </button>
             </div>
           </div>
 
           {/* BLUR OVERLAY IF LOCKED */}
           {!isUnlocked && card.isBlur && (
-            <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[6px] flex flex-col items-center justify-center p-4 text-center z-[5]">
-              <Lock size={22} className="text-amber-400 mb-1 drop-shadow-md" />
-              <span className="text-[8px] font-black uppercase tracking-widest text-white drop-shadow">
+            <div className={`absolute inset-0 backdrop-blur-[8px] flex flex-col items-center justify-center p-4 text-center z-[5] ${
+              isGold ? 'bg-[#1A1712]/40' : 'bg-slate-950/40'
+            }`}>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-1.5 shadow-sm ${
+                isGold ? 'bg-[#FFFCF8] text-[#A37B14] border border-[#1A1712]/10' : 'bg-black/60 text-amber-400'
+              }`}>
+                <Lock size={18} />
+              </div>
+              <span className={`text-[9px] font-black uppercase tracking-widest drop-shadow ${
+                isGold ? 'text-[#A37B14]' : 'text-white'
+              }`}>
                 Conteúdo Exclusivo
               </span>
             </div>
@@ -429,15 +462,26 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
         </div>
 
         {/* BOTTOM INFO AREA */}
-        <div className={`p-4 flex flex-col flex-1 justify-between border-t space-y-3 ${
-          isDark ? 'bg-slate-900/90 border-white/5' : 'bg-white border-gray-100'
+        <div className={`p-3.5 sm:p-4 flex flex-col flex-1 justify-between border-t space-y-2.5 ${
+          isGold 
+            ? 'bg-[#FFFCF8] border-[#1A1712]/10 text-[#1A1712]' 
+            : isDark 
+            ? 'bg-slate-900/90 border-white/5' 
+            : 'bg-white border-gray-100'
         }`}>
           <div>
             <div className="flex items-center justify-between gap-2 mb-1">
-              <span className={`text-[8px] font-black uppercase tracking-[0.2em] ${
-                isDark ? 'text-indigo-400' : 'text-indigo-600'
+              <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${
+                isGold ? 'text-[#A37B14]' : isDark ? 'text-indigo-400' : 'text-indigo-600'
               }`}>
                 {card.category || 'PREMIUM'}
+                {card.duration > 0 && (
+                  <span className={`ml-1.5 font-semibold ${
+                    isGold ? 'text-[#6E675C]' : isDark ? 'text-slate-400' : 'text-slate-500'
+                  }`}>
+                    • {Math.floor(card.duration / 60)}:{(card.duration % 60).toString().padStart(2, '0')} MIN
+                  </span>
+                )}
               </span>
               <div className="flex items-center gap-2">
                 {/* BOTÃO CURTIR TOPO */}
@@ -445,37 +489,33 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
                   type="button"
                   onClick={handleLikeToggle}
                   title={isLiked ? "Descurtir" : "Curtir este card"}
-                  className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md border transition-all active:scale-90 ${
+                  className={`flex items-center gap-1 px-1.5 py-0.5 rounded-lg border transition-all active:scale-90 ${
                     isLiked
                       ? 'bg-red-500/15 border-red-500/40 text-red-500'
+                      : isGold
+                      ? 'bg-transparent border-[#1A1712]/10 text-[#6E675C] hover:text-red-500'
                       : (isDark ? 'bg-white/5 border-white/10 text-slate-400 hover:text-red-400' : 'bg-gray-100 border-gray-200 text-slate-500 hover:text-red-500')
                   }`}
                 >
-                  <Heart size={11} className={isLiked ? "fill-red-500 text-red-500" : ""} />
+                  <Heart size={11} strokeWidth={1.5} className={isLiked ? "fill-red-500 text-red-500" : ""} />
                   <span className="text-[9px] font-bold">{likesCount}</span>
                 </button>
-
-                {card.duration > 0 && (
-                  <span className={`text-[8px] font-bold uppercase tracking-widest ${
-                    isDark ? 'text-slate-400' : 'text-slate-500'
-                  }`}>
-                    {Math.floor(card.duration / 60)}:{(card.duration % 60).toString().padStart(2, '0')} MIN
-                  </span>
-                )}
               </div>
             </div>
 
-            <h3 className={`text-sm font-black leading-snug uppercase tracking-tight line-clamp-1 mb-1 ${
-              isDark ? 'text-white' : 'text-slate-900'
+            <h3 className={`text-sm sm:text-base font-black leading-snug uppercase tracking-tight line-clamp-1 mb-1 ${
+              isGold ? 'text-[#1A1712]' : isDark ? 'text-white' : 'text-slate-900'
             }`} title={card.title}>
               {card.title}
             </h3>
 
-            <p className={`text-[10px] line-clamp-2 leading-relaxed font-medium ${
-              isDark ? 'text-slate-400' : 'text-slate-600'
-            }`}>
-              {card.description || 'Sem descrição.'}
-            </p>
+            {card.description && card.description.trim() !== '' && card.description.trim() !== 'Sem descrição.' && (
+              <p className={`text-[11px] line-clamp-2 leading-relaxed font-normal ${
+                isGold ? 'text-[#6E675C]' : isDark ? 'text-slate-400' : 'text-slate-600'
+              }`}>
+                {card.description}
+              </p>
+            )}
 
             {/* TAGS */}
             {card.tags && card.tags.length > 0 && (
@@ -484,7 +524,11 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
                   <span
                     key={idx}
                     className={`px-2 py-0.5 rounded-lg border text-[8px] font-bold uppercase tracking-wider ${
-                      isDark ? 'bg-white/5 border-white/5 text-slate-400' : 'bg-gray-100 border-gray-200 text-slate-600'
+                      isGold 
+                        ? 'bg-[#1A1712]/5 border-[#1A1712]/10 text-[#6E675C]' 
+                        : isDark 
+                        ? 'bg-white/5 border-white/5 text-slate-400' 
+                        : 'bg-gray-100 border-gray-200 text-slate-600'
                     }`}
                   >
                     #{tag}
@@ -496,16 +540,18 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
 
           {/* ACTION BUTTONS (VER / DESBLOQUEAR & CURTIR & CHAT) */}
           <div className={`flex items-center gap-2 pt-2 border-t w-full ${
-            isDark ? 'border-white/5' : 'border-gray-100'
+            isGold ? 'border-[#1A1712]/10' : isDark ? 'border-white/5' : 'border-gray-100'
           }`}>
             <button
               onClick={handleInteraction}
-              className={`flex-1 min-w-0 py-2.5 px-2 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 truncate ${
-                card.type === CardType.CHAT
-                  ? 'bg-blue-600 hover:bg-blue-500 text-white'
+              className={`flex-1 min-w-0 py-2.5 px-3 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 truncate ${
+                isGold
+                  ? 'bg-[#1A1712] hover:bg-[#2A241D] text-[#A37B14] shadow-xs'
+                  : card.type === CardType.CHAT
+                  ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-md'
                   : isUnlocked
-                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                  : (isDark ? 'bg-white text-slate-950 hover:bg-indigo-600 hover:text-white' : 'bg-indigo-600 hover:bg-indigo-500 text-white')
+                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md'
+                  : (isDark ? 'bg-white text-slate-950 hover:bg-indigo-600 hover:text-white shadow-md' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md')
               }`}
             >
               {card.type === CardType.CHAT ? (
@@ -531,28 +577,34 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
               type="button"
               onClick={handleLikeToggle}
               title={isLiked ? "Descurtir" : "Curtir este card"}
-              className={`shrink-0 h-10 px-2.5 rounded-xl border transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 ${
-                isLiked
-                  ? 'bg-red-500/15 border-red-500/40 text-red-500'
-                  : (isDark 
-                      ? 'bg-slate-800/80 hover:bg-slate-800 text-slate-400 border-white/10 hover:text-red-400' 
-                      : 'bg-gray-100 hover:bg-gray-200 text-slate-500 border-gray-200 hover:text-red-500')
+              className={`shrink-0 h-10 px-2.5 rounded-xl border transition-all flex items-center justify-center gap-1.5 active:scale-95 ${
+                isGold
+                  ? (isLiked 
+                      ? 'bg-red-500/10 border-red-500/30 text-red-500' 
+                      : 'bg-transparent hover:bg-[#1A1712]/5 text-[#6E675C] border-[#1A1712]/10')
+                  : (isLiked
+                      ? 'bg-red-500/15 border-red-500/40 text-red-500 shadow-sm'
+                      : (isDark 
+                          ? 'bg-slate-800/80 hover:bg-slate-800 text-slate-400 border-white/10 hover:text-red-400 shadow-sm' 
+                          : 'bg-gray-100 hover:bg-gray-200 text-slate-500 border-gray-200 hover:text-red-500 shadow-sm'))
               }`}
             >
-              <Heart size={15} className={isLiked ? "fill-red-500 text-red-500" : ""} />
-              <span className="text-[10px] font-black">{likesCount}</span>
+              <Heart size={16} strokeWidth={1.5} className={isLiked ? "fill-red-500 text-red-500" : ""} />
+              <span className="text-[10px] font-bold">{likesCount}</span>
             </button>
 
             <button
               onClick={handleCopyLink}
               title="Copiar Link da Sala Exclusiva"
-              className={`shrink-0 w-10 h-10 rounded-xl border transition-all flex items-center justify-center shadow-md active:scale-95 ${
-                isDark 
-                  ? 'bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white border-indigo-500/30' 
-                  : 'bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white border-indigo-200'
+              className={`shrink-0 w-10 h-10 rounded-xl border transition-all flex items-center justify-center active:scale-95 ${
+                isGold
+                  ? 'bg-transparent hover:bg-[#1A1712]/5 text-[#6E675C] border-[#1A1712]/10'
+                  : isDark 
+                  ? 'bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white border-indigo-500/30 shadow-md' 
+                  : 'bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white border-indigo-200 shadow-md'
               }`}
             >
-              <MessageSquare size={14} />
+              <MessageSquare size={16} strokeWidth={1.5} />
             </button>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Clock, AlertTriangle, Zap, CheckCircle2, Wallet, X, ArrowRight, ShieldCheck } from 'lucide-react';
+import { AppTheme } from '../types';
 
 interface ChatRenewalModalProps {
   isOpen: boolean;
@@ -15,7 +16,7 @@ interface ChatRenewalModalProps {
   onToggleAutoDebit: (enabled: boolean) => void;
   roomName?: string;
   creatorName?: string;
-  theme?: 'dark' | 'light';
+  theme?: AppTheme;
   isExpired?: boolean;
 }
 

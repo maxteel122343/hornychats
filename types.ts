@@ -8,6 +8,8 @@ export enum CardType {
   VIDEO_CALL = 'VIDEO_CALL'
 }
 
+export type AppTheme = 'dark' | 'light' | 'gold';
+
 export interface MediaCard {
   id: string;
   creator_id?: string;
