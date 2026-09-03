@@ -1,11 +1,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Lock, Play, Volume2, Camera, Phone, MessageSquare, Eye, Clock, Tag, MoreVertical, X, Check, Maximize2, DownloadCloud, Timer, ImageOff, Trash2, Edit, AlertTriangle, LogIn, Link as LinkIcon, DoorOpen, CalendarClock, ZoomIn, Heart, UserPlus, Crown } from 'lucide-react';
 import { MediaCard, CardType, AppTheme } from '../types';
 import { ToastType, ToastOptions } from './Toast';
 import ImageViewerModal from './ImageViewerModal';
 import { fetchLikesForCards, toggleCardLike } from '../lib/likes';
 import { followUser, unfollowUser, getFollowing } from '../lib/followers';
+import { resolveShowcaseChatTarget, addRoomToSessions, copyChatRoomLink } from '../lib/chatRouting';
 
 interface MediaCardItemProps {
   card: MediaCard;
@@ -162,18 +164,72 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
     }
   };
 
-  const handleCopyLink = (e: React.MouseEvent) => {
+  const navigate = useNavigate();
+
+  const handleEnterChat = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const link = `${window.location.origin}/#/chat/priv-${card.id}`;
-    navigator.clipboard.writeText(link);
-    if (onShowToast) {
-      onShowToast("Link da sala privada copiado!", "success", {
-        link,
-        subMessage: `Link direto para o card exclusivo "${card.title}".`,
-        shareText: `Acesse este card exclusivo "${card.title}": ${link}`
-      });
-    } else {
-      alert("Link da sala privada copiado: " + link);
+    try {
+      // 1. Obter usuário atual
+      let currentUser = { id: '', name: 'Visitante' };
+      try {
+        const localUser = localStorage.getItem('linkcard_user');
+        if (localUser) {
+          const parsed = JSON.parse(localUser);
+          if (parsed?.id) currentUser = { id: parsed.id, name: parsed.name || 'Visitante' };
+        }
+      } catch (err) {
+        console.warn('Could not read user for chat routing:', err);
+      }
+
+      // 2. Resolver destino conforme configuração do criador (sala padrão vs nova sala 1x1)
+      const { targetRoomId, targetRoomName, isNewRoom } = await resolveShowcaseChatTarget(card, currentUser);
+
+      // 3. Adicionar sala às sessões para aparecer no menu lateral CONVERSAS
+      addRoomToSessions(
+        targetRoomId, 
+        targetRoomName, 
+        isNewRoom ? 'Nova conversa privada iniciada' : 'Entrou pelo card da vitrine'
+      );
+
+      if (onShowToast) {
+        onShowToast(
+          isNewRoom 
+            ? `Abrindo nova sala privada com ${card.creatorName || 'Criador'}...` 
+            : `Entrando na sala de ${card.creatorName || 'Chat'}...`, 
+          'info'
+        );
+      }
+
+      // 4. Navegar diretamente para a sala de chat do criador
+      navigate(`/chat/${targetRoomId}`);
+    } catch (err) {
+      console.error('Error entering showcase chat:', err);
+      const fallbackRoom = card.creator_id || `priv-${card.id}`;
+      navigate(`/chat/${fallbackRoom}`);
+    }
+  };
+
+  const handleCopyLink = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      let currentUser = { id: '', name: 'Visitante' };
+      try {
+        const localUser = localStorage.getItem('linkcard_user');
+        if (localUser) currentUser = JSON.parse(localUser);
+      } catch {}
+
+      const { targetRoomId } = await resolveShowcaseChatTarget(card, currentUser);
+      const link = await copyChatRoomLink(targetRoomId);
+
+      if (onShowToast) {
+        onShowToast("Link da sala de chat copiado!", "success", {
+          link,
+          subMessage: `Link direto para a sala "${card.creatorName || card.title}".`,
+          showWhatsApp: false
+        });
+      }
+    } catch (err) {
+      console.warn('Copy link error:', err);
     }
   };
 
@@ -429,8 +485,8 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
               )}
 
               <button
-                onClick={handleCopyLink}
-                title="Copiar Link da Sala Exclusiva"
+                onClick={handleEnterChat}
+                title="Entrar no Chat do Criador"
                 className={`p-1.5 rounded-lg backdrop-blur-md transition-all active:scale-95 flex items-center justify-center border ${
                   isGold 
                     ? 'bg-[#1A1712]/80 hover:bg-[#1A1712] text-[#A37B14] border-white/15' 
@@ -594,8 +650,8 @@ const MediaCardItem: React.FC<MediaCardItemProps> = ({
             </button>
 
             <button
-              onClick={handleCopyLink}
-              title="Copiar Link da Sala Exclusiva"
+              onClick={handleEnterChat}
+              title="Entrar no Chat do Criador"
               className={`shrink-0 w-10 h-10 rounded-xl border transition-all flex items-center justify-center active:scale-95 ${
                 isGold
                   ? 'bg-transparent hover:bg-[#1A1712]/5 text-[#6E675C] border-[#1A1712]/10'

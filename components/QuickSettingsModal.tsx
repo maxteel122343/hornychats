@@ -1,20 +1,25 @@
 import React, { useState } from 'react';
 import { 
   X, Save, Settings, Layers, Palette, Eye, Sliders, Timer, Zap, Tag, DollarSign, 
-  FolderOpen, ArrowLeft, Clock, MessageSquare, Plus, Trash2, Sparkles, AlertCircle, RotateCcw
+  FolderOpen, ArrowLeft, Clock, MessageSquare, Plus, Trash2, Sparkles, AlertCircle, RotateCcw,
+  DoorOpen, Users, CheckCircle2, Shield
 } from 'lucide-react';
-import { CardDefaults, PaidChatConfig, QuickPhrasesConfig, AppTheme } from '../types';
+import { CardDefaults, PaidChatConfig, QuickPhrasesConfig, ShowcaseChatConfig, AppTheme } from '../types';
+import { saveCreatorChatRouting } from '../lib/chatRouting';
 
 interface QuickSettingsModalProps {
   onClose: () => void;
-  onSave: (defaults: CardDefaults, paidChat?: PaidChatConfig, phrases?: QuickPhrasesConfig) => void;
+  onSave: (defaults: CardDefaults, paidChat?: PaidChatConfig, phrases?: QuickPhrasesConfig, showcaseChat?: ShowcaseChatConfig) => void;
   initialDefaults: CardDefaults;
   theme?: AppTheme;
   paidChatConfig?: PaidChatConfig;
   quickPhrasesConfig?: QuickPhrasesConfig;
-  initialTab?: 'general' | 'advanced' | 'paid_chat' | 'phrases';
+  showcaseChatConfig?: ShowcaseChatConfig;
+  initialTab?: 'general' | 'advanced' | 'paid_chat' | 'phrases' | 'showcase_chat';
   isRoomCreator?: boolean;
   roomTitle?: string;
+  currentRoomId?: string;
+  creatorId?: string;
 }
 
 const CARD_COLORS = [
@@ -53,13 +58,16 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({
   theme = 'dark',
   paidChatConfig: initialPaidChat,
   quickPhrasesConfig: initialPhrases,
+  showcaseChatConfig: initialShowcaseChat,
   initialTab = 'general',
   isRoomCreator = true,
-  roomTitle
+  roomTitle,
+  currentRoomId,
+  creatorId
 }) => {
   const isDark = theme === 'dark';
   const [data, setData] = useState<CardDefaults>(initialDefaults);
-  const [activeTab, setActiveTab] = useState<'general' | 'advanced' | 'paid_chat' | 'phrases'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'general' | 'advanced' | 'paid_chat' | 'phrases' | 'showcase_chat'>(initialTab);
 
   // Paid Chat State (Cobrança Rotativa de Chat)
   const [paidChat, setPaidChat] = useState<PaidChatConfig>(initialPaidChat || {
@@ -76,6 +84,13 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({
     visitorPhrases: [...DEFAULT_VISITOR_PHRASES]
   });
 
+  // Showcase Chat Routing State (Destino do Chat da Vitrine: Mesma Sala Padrão vs Nova Sala)
+  const [chatRouting, setChatRouting] = useState<ShowcaseChatConfig>(initialShowcaseChat || {
+    mode: 'default_room',
+    defaultRoomId: currentRoomId || creatorId || '',
+    defaultRoomName: roomTitle || 'Sala Principal'
+  });
+
   const [newCreatorPhrase, setNewCreatorPhrase] = useState('');
   const [newVisitorPhrase, setNewVisitorPhrase] = useState('');
 
@@ -85,6 +100,10 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({
 
   const handlePaidChatChange = (field: keyof PaidChatConfig, value: any) => {
     setPaidChat(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleChatRoutingChange = (field: keyof ShowcaseChatConfig, value: any) => {
+    setChatRouting(prev => ({ ...prev, [field]: value }));
   };
 
   // Phrases Handlers
@@ -130,7 +149,13 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({
   };
 
   const handleSaveAll = () => {
-    onSave(data, paidChat, phrases);
+    const activeTargetId = currentRoomId || creatorId;
+    if (activeTargetId) {
+      saveCreatorChatRouting(activeTargetId, chatRouting).catch(err => {
+        console.warn('Error saving creator chat routing:', err);
+      });
+    }
+    onSave(data, paidChat, phrases, chatRouting);
   };
 
   return (
@@ -214,6 +239,25 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({
             <span>FRASES BALÃO</span>
             {activeTab === 'phrases' && (
               <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 rounded-full" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('showcase_chat')}
+            className={`pb-3 text-xs font-black uppercase tracking-wider transition-all relative shrink-0 flex items-center gap-1.5 ${
+              activeTab === 'showcase_chat' 
+                ? 'text-amber-500 font-black' 
+                : (isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800')
+            }`}
+          >
+            <DoorOpen size={15} />
+            <span>CHAT DA VITRINE</span>
+            <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 uppercase tracking-tighter">
+              {chatRouting.mode === 'new_room' ? '1x1' : 'Padrão'}
+            </span>
+            {activeTab === 'showcase_chat' && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500 rounded-full" />
             )}
           </button>
 
@@ -627,6 +671,238 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({
                       </button>
                     </div>
                   ))}
+                </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* TAB: DESTINO DO CHAT DA VITRINE (CONFIGURAÇÃO DO CRIADOR) */}
+          {activeTab === 'showcase_chat' && (
+            <div className="space-y-5 animate-in fade-in duration-200">
+              
+              {/* Header Banner */}
+              <div className={`p-4 sm:p-5 rounded-3xl border transition-all ${
+                isDark ? 'bg-amber-950/20 border-amber-500/30' : 'bg-amber-50 border-amber-200'
+              }`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/20 font-black">
+                      <DoorOpen size={24} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                          Destino do Chat da Vitrine
+                        </span>
+                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                          {chatRouting.mode === 'new_room' ? 'NOVA SALA 1x1' : 'MESMA SALA PADRÃO'}
+                        </span>
+                      </div>
+                      <p className={`text-[11px] mt-0.5 font-medium ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                        Defina se os visitantes que clicam no ícone de chat da vitrine entram na mesma sala padrão ou abrem uma sala nova com você.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Mode Quick Toggle Switch */}
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={chatRouting.mode === 'new_room'}
+                    onClick={() => handleChatRoutingChange('mode', chatRouting.mode === 'new_room' ? 'default_room' : 'new_room')}
+                    className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      chatRouting.mode === 'new_room' ? 'bg-indigo-600' : 'bg-amber-500'
+                    }`}
+                    title="Alternar entre Mesma Sala Padrão e Nova Sala"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                        chatRouting.mode === 'new_room' ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modo Options Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                
+                {/* Opção 1: Mesma Sala Padrão */}
+                <div 
+                  onClick={() => handleChatRoutingChange('mode', 'default_room')}
+                  className={`p-4 sm:p-5 rounded-3xl border-2 transition-all cursor-pointer relative flex flex-col justify-between ${
+                    chatRouting.mode === 'default_room'
+                      ? 'border-amber-500 bg-amber-500/10 shadow-lg shadow-amber-500/10'
+                      : (isDark ? 'border-slate-800 bg-slate-900/50 hover:border-slate-700' : 'border-gray-200 bg-gray-50 hover:border-gray-300')
+                  }`}
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                        chatRouting.mode === 'default_room'
+                          ? 'bg-amber-500 text-slate-950 font-black'
+                          : (isDark ? 'bg-slate-800 text-slate-400' : 'bg-gray-200 text-slate-600')
+                      }`}>
+                        <Users size={20} />
+                      </div>
+                      <div className={`flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                        chatRouting.mode === 'default_room'
+                          ? 'bg-amber-500 text-slate-950'
+                          : (isDark ? 'bg-slate-800 text-slate-400' : 'bg-gray-200 text-slate-500')
+                      }`}>
+                        {chatRouting.mode === 'default_room' ? <CheckCircle2 size={12} /> : null}
+                        <span>{chatRouting.mode === 'default_room' ? 'Ativo' : 'Selecionar'}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className={`text-xs sm:text-sm font-black uppercase tracking-tight ${
+                        chatRouting.mode === 'default_room' ? 'text-amber-400' : (isDark ? 'text-white' : 'text-slate-900')
+                      }`}>
+                        Mesma Sala Padrão
+                      </h4>
+                      <p className={`text-[11px] mt-1 leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                        Quem entrar pelo ícone do chat da vitrine <strong>entra sempre pela mesma room de chat</strong>.
+                      </p>
+                    </div>
+
+                    <div className="text-[10px] text-slate-400 border-t border-white/5 pt-2">
+                      👥 Ideal para transmissões ao vivo, comunidades e bate-papo em grupo.
+                    </div>
+                  </div>
+                </div>
+
+                {/* Opção 2: Nova Sala 1x1 */}
+                <div 
+                  onClick={() => handleChatRoutingChange('mode', 'new_room')}
+                  className={`p-4 sm:p-5 rounded-3xl border-2 transition-all cursor-pointer relative flex flex-col justify-between ${
+                    chatRouting.mode === 'new_room'
+                      ? 'border-indigo-500 bg-indigo-500/10 shadow-lg shadow-indigo-500/10'
+                      : (isDark ? 'border-slate-800 bg-slate-900/50 hover:border-slate-700' : 'border-gray-200 bg-gray-50 hover:border-gray-300')
+                  }`}
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                        chatRouting.mode === 'new_room'
+                          ? 'bg-indigo-600 text-white font-black'
+                          : (isDark ? 'bg-slate-800 text-slate-400' : 'bg-gray-200 text-slate-600')
+                      }`}>
+                        <Shield size={20} />
+                      </div>
+                      <div className={`flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                        chatRouting.mode === 'new_room'
+                          ? 'bg-indigo-600 text-white'
+                          : (isDark ? 'bg-slate-800 text-slate-400' : 'bg-gray-200 text-slate-500')
+                      }`}>
+                        {chatRouting.mode === 'new_room' ? <CheckCircle2 size={12} /> : null}
+                        <span>{chatRouting.mode === 'new_room' ? 'Ativo' : 'Selecionar'}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className={`text-xs sm:text-sm font-black uppercase tracking-tight ${
+                        chatRouting.mode === 'new_room' ? 'text-indigo-400' : (isDark ? 'text-white' : 'text-slate-900')
+                      }`}>
+                        Nova Room para Cada Visitante
+                      </h4>
+                      <p className={`text-[11px] mt-1 leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                        Cada visitante que clicar no chat da vitrine <strong>vai enviar mensagem em uma room nova</strong> (1x1 exclusivo).
+                      </p>
+                    </div>
+
+                    <div className="text-[10px] text-slate-400 border-t border-white/5 pt-2">
+                      🔒 Ideal para atendimento privado, VIPs e conversas diretas separadas.
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Detalhes da Sala Padrão (Exibido quando o modo for Sala Padrão) */}
+              {chatRouting.mode === 'default_room' && (
+                <div className={`p-4 sm:p-5 rounded-2xl border space-y-4 animate-in fade-in ${
+                  isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-gray-50 border-gray-200'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className={`text-[10px] font-black uppercase tracking-widest block ${
+                        isDark ? 'text-slate-300' : 'text-slate-700'
+                      }`}>
+                        SALA PADRÃO ESPECÍFICA
+                      </span>
+                      <p className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        ID e nome da sala onde os usuários que clicarem no chat da vitrine irão se conectar.
+                      </p>
+                    </div>
+                    {currentRoomId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleChatRoutingChange('defaultRoomId', currentRoomId);
+                          if (roomTitle) handleChatRoutingChange('defaultRoomName', roomTitle);
+                        }}
+                        className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-[10px] uppercase tracking-wider transition-all active:scale-95 shadow-xs"
+                        title="Preencher com a sala atual"
+                      >
+                        Usar Esta Sala Atual
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className={`text-[10px] font-bold uppercase tracking-wider block ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                        ID da Sala
+                      </label>
+                      <input
+                        type="text"
+                        value={chatRouting.defaultRoomId || ''}
+                        onChange={(e) => handleChatRoutingChange('defaultRoomId', e.target.value)}
+                        placeholder="ex: sala-principal ou seu id de criador"
+                        className={`w-full border rounded-xl p-3 text-xs font-mono font-bold outline-none transition-all ${
+                          isDark 
+                            ? 'bg-slate-900 border-slate-700 text-white focus:border-amber-500' 
+                            : 'bg-white border-gray-200 text-slate-900 focus:border-amber-500'
+                        }`}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className={`text-[10px] font-bold uppercase tracking-wider block ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                        Nome de Exibição da Sala
+                      </label>
+                      <input
+                        type="text"
+                        value={chatRouting.defaultRoomName || ''}
+                        onChange={(e) => handleChatRoutingChange('defaultRoomName', e.target.value)}
+                        placeholder="ex: Sala Oficial do Criador"
+                        className={`w-full border rounded-xl p-3 text-xs font-bold outline-none transition-all ${
+                          isDark 
+                            ? 'bg-slate-900 border-slate-700 text-white focus:border-amber-500' 
+                            : 'bg-white border-gray-200 text-slate-900 focus:border-amber-500'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Fluxo Explicativo Dinâmico */}
+              <div className={`p-3.5 rounded-2xl border text-xs flex items-center gap-3 ${
+                chatRouting.mode === 'new_room'
+                  ? (isDark ? 'bg-indigo-950/30 border-indigo-500/30 text-indigo-300' : 'bg-indigo-50 border-indigo-200 text-indigo-900')
+                  : (isDark ? 'bg-amber-950/30 border-amber-500/30 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-900')
+              }`}>
+                <div className="shrink-0 font-bold">Fluxo Ativo:</div>
+                <div className="leading-relaxed">
+                  {chatRouting.mode === 'new_room' ? (
+                    <>Visitante clica no chat do card ➔ abre <strong>Nova Sala 1x1 Privada</strong> diretamente com você.</>
+                  ) : (
+                    <>Visitante clica no chat do card ➔ entra diretamente na <strong>Mesma Sala Padrão ({chatRouting.defaultRoomName || chatRouting.defaultRoomId || 'Principal'})</strong>.</>
+                  )}
                 </div>
               </div>
 

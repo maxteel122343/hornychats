@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Plus, Home, Wallet, Share2, MessageSquare, LayoutGrid, QrCode, X, User as UserIcon, LogIn, Camera, Settings, Sun, Moon, Menu, ChevronLeft, ChevronRight, ChevronDown, Copy, CheckCircle, Loader2, RefreshCw, DollarSign, ArrowUpRight, Mic, Video, Upload, StopCircle, Trash2, Aperture, Lock, Zap, History, CreditCard, Mail, ShoppingCart, LogOut, FolderOpen, Edit, Tv, Image as ImageIcon, Cloud, MoreVertical, Minimize2, Maximize2, Power, Sliders, ArrowLeft, Users, Clock, Sparkles } from 'lucide-react';
-import { User, Message, MediaCard, ChatSession, CardType, PaymentTransaction, CardDefaults, PaidChatConfig, QuickPhrasesConfig, AppTheme } from '../types';
+import { Send, Plus, Home, Wallet, Share2, MessageSquare, LayoutGrid, QrCode, X, User as UserIcon, LogIn, Camera, Settings, Sun, Moon, Menu, ChevronLeft, ChevronRight, ChevronDown, Copy, CheckCircle, Loader2, RefreshCw, DollarSign, ArrowUpRight, Mic, Video, Upload, StopCircle, Trash2, Aperture, Lock, Zap, History, CreditCard, Mail, ShoppingCart, LogOut, FolderOpen, Edit, Tv, Image as ImageIcon, Cloud, MoreVertical, Minimize2, Maximize2, Power, Sliders, ArrowLeft, Users, Clock, Sparkles, DoorOpen } from 'lucide-react';
+import { User, Message, MediaCard, ChatSession, CardType, PaymentTransaction, CardDefaults, PaidChatConfig, QuickPhrasesConfig, ShowcaseChatConfig, AppTheme } from '../types';
 import { supabase } from '../lib/supabase';
 import CardModal from './CardModal';
 import MediaCardItem from './MediaCardItem';
@@ -12,6 +12,7 @@ import { ChatRenewalModal } from './ChatRenewalModal';
 import { WalletModal } from './WalletModal';
 import { ToastType, ToastOptions } from './Toast';
 import { getFollowers, getFollowing } from '../lib/followers';
+import { copyChatRoomLink, ensureRoomExists, getChatRoomUrl, getCreatorChatRouting, saveCreatorChatRouting, addRoomToSessions } from '../lib/chatRouting';
 
 // IndexedDB configuration for storing recent local video files
 const DB_NAME = 'LocalWatchPartyDB';
@@ -187,6 +188,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const [activeTab, setActiveTab] = useState<'chat' | 'showcase' | 'my_cards' | 'cinema'>('chat');
   const [isCinemaSidebarCollapsed, setIsCinemaSidebarCollapsed] = useState(false);
   const [floatingMessages, setFloatingMessages] = useState<Array<{ id: string | number, text: string, senderName: string }>>([]);
+  const [userAvatars, setUserAvatars] = useState<Record<string, string>>({});
   const [roomChannel, setRoomChannel] = useState<any>(null);
   const [watchPartyFile, setWatchPartyFile] = useState<File | null>(null);
   const [uploadingWatchParty, setUploadingWatchParty] = useState(false);
@@ -235,8 +237,14 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     if (onShowToast) onShowToast(message, type, options);
   };
 
-  // Paid Chat & Quick Phrases State
-  const [quickSettingsTab, setQuickSettingsTab] = useState<'general' | 'advanced' | 'paid_chat' | 'phrases'>('paid_chat');
+  // Paid Chat & Quick Phrases & Showcase Chat Routing State
+  const [quickSettingsTab, setQuickSettingsTab] = useState<'general' | 'advanced' | 'paid_chat' | 'phrases' | 'showcase_chat'>('paid_chat');
+  const [showcaseChatConfig, setShowcaseChatConfig] = useState<ShowcaseChatConfig>({
+    mode: 'default_room',
+    defaultRoomId: roomId || user.id || '',
+    defaultRoomName: 'Sala Principal'
+  });
+
   const [paidChatConfig, setPaidChatConfig] = useState<PaidChatConfig>(() => {
     if (typeof window !== 'undefined' && roomId) {
       const saved = localStorage.getItem(`paid_chat_config_${roomId}`);
@@ -398,7 +406,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const handleSaveQuickSettings = async (
     newDefaults: CardDefaults, 
     newPaidChat?: PaidChatConfig, 
-    newPhrases?: QuickPhrasesConfig
+    newPhrases?: QuickPhrasesConfig,
+    newChatRouting?: ShowcaseChatConfig
   ) => {
     const targetId = targetSessionConfig?.sessionId || roomId;
     const targetName = targetSessionConfig?.sessionName || (roomDetails?.name || 'Sala');
@@ -439,6 +448,14 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
             payload: { phrases: newPhrases }
           });
         }
+      }
+    }
+
+    if (newChatRouting) {
+      setShowcaseChatConfig(newChatRouting);
+      const routingOwnerId = user.id || targetId;
+      if (routingOwnerId) {
+        await saveCreatorChatRouting(routingOwnerId, newChatRouting);
       }
     }
 
@@ -498,6 +515,22 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     creator_id?: string
   } | null>(null);
   const [roomAdmins, setRoomAdmins] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const creatorIdentifier = user.id || roomId;
+    if (creatorIdentifier) {
+      getCreatorChatRouting(creatorIdentifier).then(cfg => {
+        if (cfg) {
+          setShowcaseChatConfig(prev => ({
+            ...prev,
+            ...cfg,
+            defaultRoomId: cfg.defaultRoomId || roomId || user.id || '',
+            defaultRoomName: cfg.defaultRoomName || roomDetails?.name || 'Sala Principal'
+          }));
+        }
+      }).catch(console.warn);
+    }
+  }, [user.id, roomId, roomDetails?.name]);
 
   // Watch Party State
   const [isRoomDetailsLoading, setIsRoomDetailsLoading] = useState(true);
@@ -604,6 +637,16 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatScrollContainerRef = useRef<HTMLDivElement>(null);
   const cinemaChatContainerRef = useRef<HTMLDivElement>(null);
+
+  const currentUserPhoto = user.profilePhoto || 
+    (typeof window !== 'undefined' ? (localStorage.getItem(`linkcard_avatar_${user.id}`) || localStorage.getItem('linkcard_user_photo') || null) : null);
+
+  const getSenderPhoto = (senderId: string) => {
+    if (senderId === user.id) {
+      return currentUserPhoto;
+    }
+    return userAvatars[senderId] || (typeof window !== 'undefined' ? localStorage.getItem(`linkcard_avatar_${senderId}`) : null) || null;
+  };
 
   // Recording Refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -1318,6 +1361,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         }
       }
 
+      if (roomId) {
+        addRoomToSessions(roomId, data?.name || parsedCustomDetails?.name || 'Sala de Chat', 'Conversa ativa');
+      }
+
       if (watchPartyData) {
         setWatchPartySource(watchPartyData.source);
         setWatchPartyCardId(watchPartyData.card_id);
@@ -1366,6 +1413,27 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           card: m.card_data,
           timestamp: new Date(m.created_at).getTime()
         })));
+
+        // Cache profile photos of other senders
+        const otherSenderIds = Array.from(new Set(validMessages.map(m => m.sender_id).filter(id => id && id !== user.id)));
+        if (otherSenderIds.length > 0) {
+          try {
+            const { data: profs } = await supabase
+              .from('profiles')
+              .select('id, profile_photo, avatar_url, photo_url')
+              .in('id', otherSenderIds);
+            if (profs && profs.length > 0) {
+              const map: Record<string, string> = {};
+              profs.forEach((p: any) => {
+                const pic = p.profile_photo || p.avatar_url || p.photo_url;
+                if (pic) map[p.id] = pic;
+              });
+              setUserAvatars(prev => ({ ...prev, ...map }));
+            }
+          } catch (e) {
+            console.warn('Could not fetch avatars for senders:', e);
+          }
+        }
       }
     };
     fetchRoomDetails();
@@ -1375,6 +1443,17 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` },
         (payload) => {
           const m = payload.new;
+          if (m.sender_id && m.sender_id !== user.id) {
+            (async () => {
+              try {
+                const { data: p } = await supabase.from('profiles').select('id, profile_photo, avatar_url, photo_url').eq('id', m.sender_id).single();
+                if (p) {
+                  const pic = p.profile_photo || p.avatar_url || p.photo_url;
+                  if (pic) setUserAvatars(prev => ({ ...prev, [m.sender_id]: pic }));
+                }
+              } catch {}
+            })();
+          }
           setMessages(prev => [...prev, { id: m.id, senderId: m.sender_id, senderName: m.sender_name, text: m.text, card: m.card_data, timestamp: new Date(m.created_at).getTime() }]);
         })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` },
@@ -1684,8 +1763,49 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           }
         }
       })
+      .on('broadcast', { event: 'user-joined-room' }, ({ payload }) => {
+        if (payload && payload.userId) {
+          if (payload.userPhoto) {
+            setUserAvatars(prev => ({ ...prev, [payload.userId]: payload.userPhoto }));
+          }
+          if (payload.userId !== user.id) {
+            showToast(`👋 ${payload.userName || 'Um novo visitante'} entrou na sala!`, 'info');
+            const participantName = payload.userName || 'Visitante';
+            setSessions(prev => {
+              const next = [...prev];
+              const foundIdx = next.findIndex(s => s.id === roomId);
+              if (foundIdx >= 0) {
+                next[foundIdx] = {
+                  ...next[foundIdx],
+                  lastMessage: `${participantName} entrou na sala`,
+                  time: 'Agora'
+                };
+              } else {
+                next.unshift({
+                  id: roomId || 'room',
+                  name: roomDetails?.name || `Chat: ${participantName}`,
+                  lastMessage: `${participantName} entrou na sala`,
+                  time: 'Agora',
+                  isActive: true
+                });
+              }
+              return next;
+            });
+          }
+        }
+      })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
+          channel.send({
+            type: 'broadcast',
+            event: 'user-joined-room',
+            payload: {
+              userId: user.id,
+              userName: user.name || 'Visitante',
+              userPhoto: currentUserPhoto,
+              roomId: roomId
+            }
+          });
           channel.send({
             type: 'broadcast',
             event: 'webrtc-signal',
@@ -1835,45 +1955,67 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user.isLoggedIn) return;
+    if (!file) return;
+
+    // Instant local preview for immediate responsive feedback
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      localStorage.setItem(`linkcard_avatar_${user.id}`, base64);
+      localStorage.setItem('linkcard_user_photo', base64);
+      user.profilePhoto = base64;
+      setProfileRefresh(prev => prev + 1);
+    };
+    reader.readAsDataURL(file);
+
+    if (!user.isLoggedIn) {
+      showToast('Foto de perfil atualizada!', 'success');
+      return;
+    }
+
     const fileExt = file.name.split('.').pop();
     const fileName = `${user.id}.${fileExt}`; // Fixed filename for profile to avoid accumulation
     const filePath = `profiles/${fileName}`;
 
-    // Use upsert to overwrite existing file
-    const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file, { upsert: true });
-
-    if (uploadError) {
-      console.error(uploadError);
-      return alert('Erro ao subir foto. Verifique permissões ou tamanho do arquivo.');
-    }
-
-    const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(filePath);
-    const publicUrlWithTimestamp = `${publicUrl}?t=${Date.now()}`; // Bust cache
-
-    // Update Supabase (supports profile_photo and avatar_url)
     try {
-      await supabase.from('profiles').update({ 
-        profile_photo: publicUrlWithTimestamp,
-        avatar_url: publicUrlWithTimestamp 
-      }).eq('id', user.id);
-    } catch (err) {
-      try {
-        await supabase.from('profiles').update({ profile_photo: publicUrlWithTimestamp }).eq('id', user.id);
-      } catch {
-        try {
-          await supabase.from('profiles').update({ avatar_url: publicUrlWithTimestamp }).eq('id', user.id);
-        } catch {}
+      // Use upsert to overwrite existing file
+      const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file, { upsert: true });
+
+      if (uploadError) {
+        console.error(uploadError);
+        return;
       }
+
+      const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(filePath);
+      const publicUrlWithTimestamp = `${publicUrl}?t=${Date.now()}`; // Bust cache
+
+      // Update Supabase (supports profile_photo and avatar_url)
+      try {
+        await supabase.from('profiles').update({ 
+          profile_photo: publicUrlWithTimestamp,
+          avatar_url: publicUrlWithTimestamp 
+        }).eq('id', user.id);
+      } catch (err) {
+        try {
+          await supabase.from('profiles').update({ profile_photo: publicUrlWithTimestamp }).eq('id', user.id);
+        } catch {
+          try {
+            await supabase.from('profiles').update({ avatar_url: publicUrlWithTimestamp }).eq('id', user.id);
+          } catch {}
+        }
+      }
+
+      // Update local storage cache
+      localStorage.setItem(`linkcard_avatar_${user.id}`, publicUrlWithTimestamp);
+      localStorage.setItem('linkcard_user_photo', publicUrlWithTimestamp);
+
+      // Update local state and force re-render
+      user.profilePhoto = publicUrlWithTimestamp;
+      setProfileRefresh(prev => prev + 1);
+      showToast('Foto de perfil salva com sucesso!', 'success');
+    } catch (err) {
+      console.warn("Storage upload error:", err);
     }
-
-    // Update local storage cache
-    localStorage.setItem(`linkcard_avatar_${user.id}`, publicUrlWithTimestamp);
-    localStorage.setItem('linkcard_user_photo', publicUrlWithTimestamp);
-
-    // Update local state and force re-render
-    user.profilePhoto = publicUrlWithTimestamp;
-    setProfileRefresh(prev => prev + 1);
   };
 
   const handleBackgroundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -3117,8 +3259,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     <div className={`flex flex-col h-full ${colors.sidebarBg} transition-colors duration-300`}>
       <div className={`p-6 flex flex-col items-center border-b ${colors.border} gap-4`}>
         <div className="flex items-center justify-center gap-4 w-full">
-          <div onClick={() => user.isLoggedIn ? fileInputRef.current?.click() : openAuth()} className={`relative w-16 h-16 rounded-[2rem] border-2 ${colors.border} flex items-center justify-center cursor-pointer overflow-hidden group shadow-lg ${isDark ? 'bg-slate-800' : 'bg-gray-100'}`}>
-            {user.profilePhoto ? <img src={user.profilePhoto} className="w-full h-full object-cover" key={profileRefresh} /> : <UserIcon size={32} className="text-slate-500" />}
+          <div onClick={() => fileInputRef.current?.click()} className={`relative w-16 h-16 rounded-[2rem] border-2 ${colors.border} flex items-center justify-center cursor-pointer overflow-hidden group shadow-lg ${isDark ? 'bg-slate-800' : 'bg-gray-100'}`}>
+            {currentUserPhoto ? <img src={currentUserPhoto} className="w-full h-full object-cover" key={profileRefresh} /> : <UserIcon size={32} className="text-slate-500" />}
             <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Camera size={20} className="text-white" /></div>
             <input type="file" ref={fileInputRef} onChange={handlePhotoUpload} className="hidden" accept="image/*" />
           </div>
@@ -3479,23 +3621,29 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               <span className="text-[11px] sm:text-xs font-black">{user.credits}c</span>
             </button>
 
-            {/* CONVIDAR BUTTON (Directly visible on both mobile and desktop in Gold mode) */}
+            {/* CONVIDAR BUTTON (Directly visible on both mobile and desktop) */}
             <button 
-              onClick={() => { 
-                const roomUrl = `${window.location.origin}/#/chat/${roomId}`;
-                navigator.clipboard.writeText(roomUrl); 
-                showToast('Link da sala copiado com sucesso!', 'success', {
+              onClick={async () => { 
+                const targetId = roomId || user.id;
+                // Garantir persistência da sala no Supabase / storage
+                ensureRoomExists(targetId, {
+                  name: roomDetails?.name || 'Sala de Chat',
+                  creator_id: user.id
+                }).catch(console.warn);
+
+                const roomUrl = await copyChatRoomLink(targetId);
+                showToast('Link da sala copiado!', 'success', {
                   link: roomUrl,
-                  subMessage: `Compartilhe o link da sala "${roomDetails?.name || 'LinkCard Chat'}".`,
-                  shareText: `Venha conversar e interagir comigo na sala "${roomDetails?.name || 'LinkCard Chat'}"! Acesse pelo link: ${roomUrl}`
+                  subMessage: `O link direto para "${roomDetails?.name || 'esta sala'}" foi copiado. Quem entrar pelo link cairá diretamente aqui!`,
+                  showWhatsApp: false
                 }); 
               }} 
               className={`flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl transition-all font-bold text-xs uppercase tracking-wider active:scale-95 shadow-xs ${
                 isGold 
                   ? 'bg-[#1A1712] hover:bg-[#2A241D] text-white' 
-                  : `hidden sm:flex ${colors.primarySoft} ${colors.primaryText} border ${colors.primaryBorder} hover:opacity-80`
+                  : `${colors.primarySoft} ${colors.primaryText} border ${colors.primaryBorder} hover:opacity-80`
               }`}
-              title="Convidar Amigos para a Sala"
+              title="Copiar Link da Sala de Chat"
             >
               <Share2 size={14} />
               <span>Convidar</span>
@@ -3511,6 +3659,21 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               >
                 <DollarSign size={13} className="sm:w-[15px] sm:h-[15px]" />
                 <span className="hidden xs:inline text-[10px] sm:text-[11px] font-black">{user.earnings}</span>
+              </button>
+            )}
+
+            {!isGold && isHost && (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuickSettingsTab('showcase_chat');
+                  setIsQuickSettingsOpen(true);
+                }}
+                className="hidden sm:flex p-2 sm:p-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 transition-all active:scale-95 items-center gap-1.5"
+                title="Configurar Chat da Vitrine (Sala Padrão ou Nova Room)"
+              >
+                <DoorOpen size={17} />
+                <span className="hidden xl:inline text-[11px] font-black uppercase tracking-tighter">Vitrine</span>
               </button>
             )}
 
@@ -3583,6 +3746,23 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         <span>Central de Ganhos</span>
                       </div>
                       <span className="text-[10px] font-black opacity-80">{user.earnings}</span>
+                    </button>
+                  )}
+
+                  {isHost && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsHeaderMenuOpen(false);
+                        setQuickSettingsTab('showcase_chat');
+                        setIsQuickSettingsOpen(true);
+                      }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                        isGold ? 'hover:bg-[#1A1712]/5 text-[#A37B14]' : 'hover:bg-white/10 text-amber-400'
+                      }`}
+                    >
+                      <DoorOpen size={14} className={isGold ? 'text-[#A37B14]' : 'text-amber-400'} />
+                      <span>Chat da Vitrine</span>
                     </button>
                   )}
 
@@ -3739,30 +3919,92 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                       <span className={`text-[8px] md:text-[10px] ${colors.text} border ${colors.border} px-6 md:px-8 py-2 md:py-3 rounded-full uppercase tracking-[0.2em] md:tracking-[0.4em] font-black bg-black/5`}>Silêncio no chat...</span>
                     </div>
                   )}
-                  {messages.map((msg) => (
-                    <div key={msg.id} className={`flex flex-col ${msg.senderId === user.id ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-3 duration-500 w-full max-w-full`}>
-                      {msg.text && (
-                        <div className={`max-w-[85%] sm:max-w-[80%] px-3.5 sm:px-5 py-2.5 sm:py-3.5 rounded-2xl text-xs sm:text-sm shadow-sm font-medium break-all [word-break:break-word] [overflow-wrap:anywhere] ${msg.senderId === user.id ? `${colors.primary} text-white rounded-tr-none` : `${isDark ? 'bg-slate-800/80 text-slate-200 border-slate-700/30' : 'bg-white text-slate-800 border-gray-200'} border rounded-tl-none`}`}>
-                          {msg.text}
+                  {messages.map((msg) => {
+                    const isMe = msg.senderId === user.id;
+                    const photo = isMe ? currentUserPhoto : (msg.senderPhoto || getSenderPhoto(msg.senderId));
+
+                    return (
+                      <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-3 duration-500 w-full max-w-full my-1.5`}>
+                        <div className={`flex items-end gap-2.5 max-w-[92%] sm:max-w-[85%] ${isMe ? 'flex-row justify-end' : 'flex-row justify-start'}`}>
+                          {/* SENDER AVATAR (For others - LEFT side) */}
+                          {!isMe && (
+                            <div 
+                              className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full shrink-0 overflow-hidden flex items-center justify-center select-none shadow-xs border transition-transform hover:scale-105 ${
+                                isGold 
+                                  ? 'bg-[#1A1712] border-[#A37B14]/40 text-[#E5C378] shadow-sm shadow-[#A37B14]/15 ring-1 ring-[#A37B14]/20' 
+                                  : isDark 
+                                    ? 'bg-slate-800 border-slate-700 text-slate-300 ring-1 ring-white/10' 
+                                    : 'bg-white border-gray-200 text-slate-700 shadow-xs'
+                              }`} 
+                              title={msg.senderName}
+                            >
+                              {photo ? (
+                                <img src={photo} alt={msg.senderName} className="w-full h-full object-cover rounded-full" />
+                              ) : (
+                                <span className="text-[11px] sm:text-xs font-black uppercase">
+                                  {msg.senderName ? msg.senderName.charAt(0).toUpperCase() : 'V'}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Message Content (Bubble or Card) */}
+                          <div className={`flex flex-col min-w-0 ${isMe ? 'items-end' : 'items-start'}`}>
+                            {msg.text && (
+                              <div className={`px-3.5 sm:px-5 py-2.5 sm:py-3.5 rounded-2xl text-xs sm:text-sm shadow-sm font-medium break-all [word-break:break-word] [overflow-wrap:anywhere] ${
+                                isMe 
+                                  ? `${colors.primary} text-white rounded-tr-none` 
+                                  : `${isDark ? 'bg-slate-800/80 text-slate-200 border-slate-700/30' : 'bg-white text-slate-800 border-gray-200'} border rounded-tl-none`
+                              }`}>
+                                {msg.text}
+                              </div>
+                            )}
+                            {msg.card && (
+                              <MediaCardItem
+                                card={msg.card}
+                                canManage={isMe}
+                                onUnlock={() => handleInteractWithCard(msg.card!)}
+                                isHostMode={isHost}
+                                onDelete={() => handleDeleteCard(msg.card!.id)}
+                                onEdit={() => handleEditCard(msg.card!)}
+                                onInsertToRoom={handleInsertToRoom}
+                                onSchedule={handleSchedule}
+                                onShowToast={showToast}
+                                theme={theme}
+                              />
+                            )}
+                          </div>
+
+                          {/* CURRENT USER AVATAR (For me - RIGHT side of bubble, as highlighted in user's image) */}
+                          {isMe && (
+                            <div 
+                              onClick={() => fileInputRef.current?.click()}
+                              className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full shrink-0 overflow-hidden flex items-center justify-center select-none cursor-pointer border transition-transform hover:scale-105 active:scale-95 ${
+                                isGold 
+                                  ? 'bg-[#1A1712] border-[#A37B14]/40 text-[#E5C378] shadow-sm shadow-[#A37B14]/20 ring-1 ring-[#A37B14]/30' 
+                                  : isDark 
+                                    ? 'bg-slate-800 border-slate-700 text-slate-300 ring-1 ring-white/10' 
+                                    : 'bg-white border-gray-200 text-slate-700 shadow-xs'
+                              }`} 
+                              title="Sua foto de perfil (clique para alterar)"
+                            >
+                              {photo ? (
+                                <img src={photo} alt={user.name} className="w-full h-full object-cover rounded-full" />
+                              ) : (
+                                <span className="text-[11px] sm:text-xs font-black uppercase">
+                                  {user.name ? user.name.charAt(0).toUpperCase() : 'V'}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {msg.card && (
-                        <MediaCardItem
-                          card={msg.card}
-                          canManage={msg.senderId === user.id}
-                          onUnlock={() => handleInteractWithCard(msg.card!)}
-                          isHostMode={isHost}
-                          onDelete={() => handleDeleteCard(msg.card!.id)}
-                          onEdit={() => handleEditCard(msg.card!)}
-                          onInsertToRoom={handleInsertToRoom}
-                          onSchedule={handleSchedule}
-                          onShowToast={showToast}
-                          theme={theme}
-                        />
-                      )}
-                      <span className={`text-[9px] ${colors.text} mt-2 uppercase font-black tracking-widest px-1 opacity-60`}>{msg.senderName} • {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                    </div>
-                  ))}
+
+                        <span className={`text-[9px] ${colors.text} mt-1 uppercase font-black tracking-widest px-1 opacity-60 ${isMe ? 'mr-10 sm:mr-11 text-right' : 'ml-10 sm:ml-11 text-left'}`}>
+                          {msg.senderName} • {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    );
+                  })}
                   <div ref={messagesEndRef} />
                 </div>
               ) : activeTab === 'showcase' ? (
@@ -3774,8 +4016,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                   /* LOADING STATE - prevents flicker between offline/online states */
                   <div className="flex-1 flex items-center justify-center min-h-[450px] md:min-h-[550px]">
                     <div className="flex flex-col items-center gap-4">
-                      <Loader2 size={32} className="text-indigo-500 animate-spin" />
-                      <p className="text-xs text-slate-500 font-bold uppercase tracking-widest animate-pulse">Carregando...</p>
+                      <Loader2 size={32} className={`animate-spin ${isGold ? 'text-[#A37B14]' : 'text-indigo-500'}`} />
+                      <p className={`text-xs font-bold uppercase tracking-widest animate-pulse ${isGold ? 'text-[#C5A880]' : 'text-slate-500'}`}>Carregando Cinema VIP...</p>
                     </div>
                   </div>
                 ) : watchPartySource ? (
@@ -3783,28 +4025,67 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                   <div className="flex-1 w-full flex flex-col md:flex-row overflow-hidden rounded-3xl border border-transparent bg-transparent min-h-[450px] md:min-h-[550px] relative pointer-events-none" />
                 ) : (
                   /* OFFLINE CINEMA VIEW */
-                  <div className="flex-1 flex flex-col items-center justify-center p-8 bg-slate-950/40 rounded-3xl border border-slate-800/50 text-center min-h-[450px] md:min-h-[550px] animate-in fade-in">
+                  <div className={`flex-1 flex flex-col items-center justify-center p-8 rounded-3xl text-center min-h-[450px] md:min-h-[550px] animate-in fade-in ${
+                    isGold 
+                      ? 'bg-[#14120E] border border-[#A37B14]/30 shadow-2xl shadow-black/80 ring-1 ring-[#A37B14]/20' 
+                      : 'bg-slate-950/40 border border-slate-800/50'
+                  }`}>
                     {(isAdmin || isHost) ? (
                       <div
                         onClick={() => setIsWatchPartyOpen(true)}
-                        className="p-8 md:p-12 rounded-[2.5rem] bg-indigo-600/5 hover:bg-indigo-600/10 active:bg-indigo-600/20 border border-indigo-500/20 hover:border-indigo-500/40 transition-all cursor-pointer flex flex-col items-center max-w-sm group shadow-xl select-none"
+                        className={`p-8 md:p-12 rounded-[2.5rem] transition-all cursor-pointer flex flex-col items-center max-w-sm group select-none ${
+                          isGold
+                            ? 'bg-[#1A1712] hover:bg-[#231F19] active:bg-[#2A241D] border border-[#A37B14]/35 hover:border-[#A37B14]/70 shadow-2xl shadow-black/90 ring-1 ring-[#A37B14]/20'
+                            : 'bg-indigo-600/5 hover:bg-indigo-600/10 active:bg-indigo-600/20 border border-indigo-500/20 hover:border-indigo-500/40 shadow-xl'
+                        }`}
                         style={{touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'}}
                       >
-                        <div className="w-16 h-16 rounded-full bg-indigo-500/10 flex items-center justify-center mb-6 text-indigo-400 group-hover:scale-110 transition-transform">
+                        {isGold && (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#A37B14]/15 border border-[#A37B14]/30 text-[#E5C378] text-[9px] font-black uppercase tracking-widest mb-4">
+                            <Sparkles size={11} className="text-[#E5C378]" /> Sala VIP de Cinema
+                          </span>
+                        )}
+                        <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform ${
+                          isGold
+                            ? 'bg-[#A37B14]/20 border border-[#A37B14]/40 text-[#E5C378] shadow-inner'
+                            : 'bg-indigo-500/10 text-indigo-400'
+                        }`}>
                           <Tv size={32} />
                         </div>
-                        <h4 className="text-lg font-black text-white uppercase tracking-tighter mb-3">Cinema Offline</h4>
-                        <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wide leading-relaxed">
+                        <h4 className={`text-lg font-black uppercase tracking-tighter mb-3 ${isGold ? 'text-[#FFFCF8]' : 'text-white'}`}>
+                          {isGold ? 'Cinema VIP Offline' : 'Cinema Offline'}
+                        </h4>
+                        <p className={`text-[11px] font-bold uppercase tracking-wide leading-relaxed ${isGold ? 'text-[#C5A880]' : 'text-slate-400'}`}>
                           Clique aqui para fazer upload de um vídeo ou colar um link e iniciar a transmissão para todos os usuários da sala.
                         </p>
+                        {isGold && (
+                          <span className="mt-5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#8C650D] via-[#A37B14] to-[#C5A880] text-black text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-[#A37B14]/25">
+                            <Tv size={14} /> Iniciar Transmissão VIP
+                          </span>
+                        )}
                       </div>
                     ) : (
-                      <div className="p-8 md:p-12 rounded-[2.5rem] bg-slate-900/50 border border-slate-800 flex flex-col items-center max-w-sm shadow-xl">
-                        <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mb-6 text-slate-600 animate-pulse">
+                      <div className={`p-8 md:p-12 rounded-[2.5rem] flex flex-col items-center max-w-sm shadow-xl ${
+                        isGold 
+                          ? 'bg-[#1A1712] border border-[#A37B14]/25 ring-1 ring-[#A37B14]/15' 
+                          : 'bg-slate-900/50 border border-slate-800'
+                      }`}>
+                        {isGold && (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#A37B14]/10 border border-[#A37B14]/20 text-[#A37B14] text-[9px] font-black uppercase tracking-widest mb-4">
+                            Cinema VIP
+                          </span>
+                        )}
+                        <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 animate-pulse ${
+                          isGold 
+                            ? 'bg-[#231F19] border border-[#A37B14]/25 text-[#A37B14]' 
+                            : 'bg-slate-800 text-slate-600'
+                        }`}>
                           <Tv size={32} />
                         </div>
-                        <h4 className="text-lg font-black text-white uppercase tracking-tighter mb-3">Cinema Fechado</h4>
-                        <p className="text-[11px] text-slate-500 font-bold uppercase tracking-wide leading-relaxed">
+                        <h4 className={`text-lg font-black uppercase tracking-tighter mb-3 ${isGold ? 'text-[#FFFCF8]' : 'text-white'}`}>
+                          Cinema Fechado
+                        </h4>
+                        <p className={`text-[11px] font-bold uppercase tracking-wide leading-relaxed ${isGold ? 'text-[#8C8273]' : 'text-slate-500'}`}>
                           Aguardando o Host ou um Administrador iniciar a transmissão de um vídeo para começar a assistir juntos.
                         </p>
                       </div>
@@ -4085,6 +4366,26 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
                       {/* Main Text Input Area */}
                       <div className={`flex-1 min-w-0 ${colors.inputBg} rounded-2xl border ${colors.border} flex items-center px-3 sm:px-4 focus-within:ring-1 ${isGold ? 'focus-within:ring-[#A37B14]/30' : isDark ? 'focus-within:ring-blue-500/30' : 'focus-within:ring-red-500/30'} transition-all shadow-xs`}>
+                        {/* User Profile Avatar when typing in chat */}
+                        <div
+                          onClick={() => fileInputRef.current?.click()}
+                          className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full shrink-0 mr-2 sm:mr-2.5 overflow-hidden flex items-center justify-center cursor-pointer border transition-transform hover:scale-105 active:scale-95 ${
+                            isGold
+                              ? 'bg-[#1A1712] border-[#A37B14]/40 text-[#E5C378] shadow-sm shadow-[#A37B14]/15 ring-1 ring-[#A37B14]/20'
+                              : isDark
+                                ? 'bg-slate-800 border-slate-700 text-slate-300 ring-1 ring-white/10'
+                                : 'bg-gray-100 border-gray-300 text-slate-600'
+                          }`}
+                          title="Sua foto de perfil (clique para alterar)"
+                        >
+                          {currentUserPhoto ? (
+                            <img src={currentUserPhoto} alt={user.name} className="w-full h-full object-cover rounded-full" />
+                          ) : (
+                            <span className="text-[10px] sm:text-xs font-black uppercase">
+                              {user.name ? user.name.charAt(0).toUpperCase() : 'V'}
+                            </span>
+                          )}
+                        </div>
                         <input
                           value={inputText}
                           onChange={(e) => setInputText(e.target.value)}
@@ -4300,9 +4601,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           <div
             className={
               isWatchPartyOpen
-                ? "fixed inset-0 z-[500] bg-black flex flex-col md:flex-row overflow-hidden animate-in fade-in"
+                ? `fixed inset-0 z-[500] ${isGold ? 'bg-[#0C0A08]' : 'bg-black'} flex flex-col md:flex-row overflow-hidden animate-in fade-in`
                 : activeTab === 'cinema'
-                  ? "absolute top-[116px] md:top-[120px] bottom-0 left-0 right-0 z-[40] bg-[#050a14] flex flex-col md:flex-row overflow-hidden"
+                  ? `absolute top-[116px] md:top-[120px] bottom-0 left-0 right-0 z-[40] ${isGold ? 'bg-[#0C0A08]' : 'bg-[#050a14]'} flex flex-col md:flex-row overflow-hidden`
                   : "hidden"
             }
           >
@@ -4313,22 +4614,32 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                 <div className="relative">
                   <button
                     onClick={() => setIsCinemaMenuOpen(!isCinemaMenuOpen)}
-                    className="p-3 bg-black/50 text-white rounded-full hover:bg-black/80 transition-all backdrop-blur-md border border-white/10 flex items-center justify-center shadow-lg"
+                    className={`p-3 rounded-full transition-all backdrop-blur-md flex items-center justify-center shadow-lg ${
+                      isGold
+                        ? 'bg-[#1A1712]/85 text-[#E5C378] border border-[#A37B14]/30 hover:bg-[#231F19]'
+                        : 'bg-black/50 text-white border border-white/10 hover:bg-black/80'
+                    }`}
                   >
                     <MoreVertical size={20} />
                   </button>
                   
                   {isCinemaMenuOpen && (
-                    <div className="absolute left-0 mt-2 w-56 rounded-2xl bg-slate-900/95 backdrop-blur-xl border border-slate-800 text-white shadow-2xl p-2 flex flex-col gap-1 z-[520] animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className={`absolute left-0 mt-2 w-56 rounded-2xl backdrop-blur-xl shadow-2xl p-2 flex flex-col gap-1 z-[520] animate-in fade-in slide-in-from-top-2 duration-200 ${
+                      isGold
+                        ? 'bg-[#14120E]/95 border border-[#A37B14]/35 text-[#FFFCF8] ring-1 ring-[#A37B14]/20'
+                        : 'bg-slate-900/95 border border-slate-800 text-white'
+                    }`}>
                       {canControlVideo && (
                         <button
                           onClick={() => {
                             setIsCinemaMenuOpen(false);
                             handleNewVideoSelection();
                           }}
-                          className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800/80 transition-all text-left text-xs font-bold uppercase tracking-wider"
+                          className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left text-xs font-bold uppercase tracking-wider ${
+                            isGold ? 'hover:bg-[#A37B14]/15 text-[#E5C378]' : 'hover:bg-slate-800/80'
+                          }`}
                         >
-                          <Plus size={16} className="text-indigo-400" />
+                          <Plus size={16} className={isGold ? 'text-[#E5C378]' : 'text-indigo-400'} />
                           Novo Vídeo
                         </button>
                       )}
@@ -4348,9 +4659,11 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                             }))
                             .catch(() => prompt('Copie o link da sala:', fullMessage));
                         }}
-                        className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800/80 transition-all text-left text-xs font-bold uppercase tracking-wider"
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left text-xs font-bold uppercase tracking-wider ${
+                          isGold ? 'hover:bg-[#A37B14]/15 text-[#E5C378]' : 'hover:bg-slate-800/80'
+                        }`}
                       >
-                        <Copy size={16} className="text-sky-400" />
+                        <Copy size={16} className={isGold ? 'text-[#C5A880]' : 'text-sky-400'} />
                         Copiar Link da Sala
                       </button>
 
@@ -4362,9 +4675,11 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                           setIsChatMinimized(false); // ensure sidebar is fully expanded on mobile
                           loadRecentVideos();         // force refresh video list
                         }}
-                        className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800/80 transition-all text-left text-xs font-bold uppercase tracking-wider"
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left text-xs font-bold uppercase tracking-wider ${
+                          isGold ? 'hover:bg-[#A37B14]/15 text-[#E5C378]' : 'hover:bg-slate-800/80'
+                        }`}
                       >
-                        <FolderOpen size={16} className="text-emerald-400" />
+                        <FolderOpen size={16} className={isGold ? 'text-[#E5C378]' : 'text-emerald-400'} />
                         Ver Histórico
                       </button>
 
@@ -4374,16 +4689,18 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                           setIsWatchPartyOpen(!isWatchPartyOpen);
                           setActiveTab('cinema');
                         }}
-                        className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800/80 transition-all text-left text-xs font-bold uppercase tracking-wider"
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left text-xs font-bold uppercase tracking-wider ${
+                          isGold ? 'hover:bg-[#A37B14]/15 text-[#E5C378]' : 'hover:bg-slate-800/80'
+                        }`}
                       >
                         {isWatchPartyOpen ? (
                           <>
-                            <Minimize2 size={16} className="text-sky-400" />
+                            <Minimize2 size={16} className={isGold ? 'text-[#C5A880]' : 'text-sky-400'} />
                             Sair do Modo Cheio
                           </>
                         ) : (
                           <>
-                            <Maximize2 size={16} className="text-sky-400" />
+                            <Maximize2 size={16} className={isGold ? 'text-[#C5A880]' : 'text-sky-400'} />
                             Tela Cheia
                           </>
                         )}
@@ -4395,7 +4712,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                             setIsCinemaMenuOpen(false);
                             stopWatchParty();
                           }}
-                          className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-950/40 hover:text-red-400 transition-all text-left text-xs font-bold uppercase tracking-wider text-red-500 border-t border-slate-800/50 mt-1"
+                          className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left text-xs font-bold uppercase tracking-wider text-red-500 mt-1 ${
+                            isGold ? 'hover:bg-red-950/40 hover:text-red-400 border-t border-[#A37B14]/20' : 'hover:bg-red-950/40 hover:text-red-400 border-t border-slate-800/50'
+                          }`}
                         >
                           <Power size={16} />
                           Encerrar
@@ -4410,7 +4729,11 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                   <button
                     onClick={() => { setIsCinemaMenuOpen(false); handleNewVideoSelection(); }}
                     title="Subir Vídeo / Link"
-                    className="p-3 bg-indigo-600/80 text-white rounded-full hover:bg-indigo-500 active:scale-95 transition-all backdrop-blur-md border border-indigo-400/30 flex items-center justify-center shadow-lg"
+                    className={`p-3 rounded-full active:scale-95 transition-all backdrop-blur-md flex items-center justify-center shadow-lg ${
+                      isGold
+                        ? 'bg-gradient-to-r from-[#8C650D] via-[#A37B14] to-[#C5A880] text-black hover:brightness-110 border border-[#D4AF37]/50 shadow-[#A37B14]/25'
+                        : 'bg-indigo-600/80 text-white hover:bg-indigo-500 border border-indigo-400/30'
+                    }`}
                   >
                     <Tv size={18} />
                   </button>
@@ -4420,7 +4743,11 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               {/* Chat Sidebar Toggle Button */}
               <button
                 onClick={() => setIsCinemaSidebarCollapsed(!isCinemaSidebarCollapsed)}
-                className="absolute top-6 right-6 z-[510] px-3 py-2 bg-slate-800/80 hover:bg-slate-700 text-white rounded-xl transition-all shadow-md font-bold uppercase text-[10px] tracking-wider flex items-center gap-1.5 backdrop-blur-sm"
+                className={`absolute top-6 right-6 z-[510] px-3 py-2 rounded-xl transition-all shadow-md font-bold uppercase text-[10px] tracking-wider flex items-center gap-1.5 backdrop-blur-sm ${
+                  isGold
+                    ? 'bg-[#1A1712]/90 hover:bg-[#231F19] text-[#E5C378] border border-[#A37B14]/30'
+                    : 'bg-slate-800/80 hover:bg-slate-700 text-white'
+                }`}
               >
                 {isCinemaSidebarCollapsed ? (
                   <>
@@ -4437,9 +4764,20 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               {(isCinemaSidebarCollapsed || isChatMinimized) && floatingMessages.length > 0 && (
                 <div className="absolute bottom-6 left-6 z-[520] max-w-[280px] md:max-w-sm flex flex-col gap-2 pointer-events-none animate-in fade-in">
                   {floatingMessages.map((msg) => (
-                    <div key={msg.id} className="bg-slate-900/80 backdrop-blur-md border border-slate-700/30 px-4 py-2.5 rounded-2xl shadow-xl flex flex-col gap-0.5 animate-in slide-in-from-bottom-3 duration-300">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400">{msg.senderName}</span>
-                      <span className="text-xs font-semibold text-slate-100 break-all">{msg.text}</span>
+                    <div 
+                      key={msg.id} 
+                      className={`backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-xl flex flex-col gap-0.5 animate-in slide-in-from-bottom-3 duration-300 ${
+                        isGold
+                          ? 'bg-[#14120E]/95 border border-[#A37B14]/35 ring-1 ring-[#A37B14]/20'
+                          : 'bg-slate-900/80 border border-slate-700/30'
+                      }`}
+                    >
+                      <span className={`text-[9px] font-black uppercase tracking-widest ${isGold ? 'text-[#E5C378]' : 'text-indigo-400'}`}>
+                        {msg.senderName}
+                      </span>
+                      <span className={`text-xs font-semibold break-all ${isGold ? 'text-[#FFFCF8]' : 'text-slate-100'}`}>
+                        {msg.text}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -4447,11 +4785,15 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
               {/* LOCK OVERLAY IF NOT OWNER AND NOT PURCHASED */}
               {watchPartyCardId && !myCards.some(c => c.id === watchPartyCardId) && !purchasedCardIds.has(watchPartyCardId) ? (
-                <div className="absolute inset-0 z-[520] bg-slate-900/95 backdrop-blur-xl flex flex-col items-center justify-center p-8 text-center animate-in fade-in">
-                  <div className="p-8 rounded-[3rem] bg-slate-800 border border-slate-700 shadow-2xl mb-6">
-                    <Lock size={48} className="text-indigo-400 mx-auto mb-4" />
-                    <h4 className="text-xl font-black text-white uppercase tracking-tighter mb-2">Conteúdo Exclusivo</h4>
-                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Este vídeo faz parte de um Card e requer liberação.</p>
+                <div className={`absolute inset-0 z-[520] backdrop-blur-xl flex flex-col items-center justify-center p-8 text-center animate-in fade-in ${
+                  isGold ? 'bg-[#0C0A08]/95' : 'bg-slate-900/95'
+                }`}>
+                  <div className={`p-8 rounded-[3rem] shadow-2xl mb-6 ${
+                    isGold ? 'bg-[#14120E] border border-[#A37B14]/30' : 'bg-slate-800 border border-slate-700'
+                  }`}>
+                    <Lock size={48} className={`mx-auto mb-4 ${isGold ? 'text-[#E5C378]' : 'text-indigo-400'}`} />
+                    <h4 className={`text-xl font-black uppercase tracking-tighter mb-2 ${isGold ? 'text-[#FFFCF8]' : 'text-white'}`}>Conteúdo Exclusivo</h4>
+                    <p className={`text-xs font-bold uppercase tracking-widest ${isGold ? 'text-[#C5A880]' : 'text-slate-400'}`}>Este vídeo faz parte de um Card e requer liberação.</p>
                   </div>
                   <button
                     onClick={() => {
@@ -4459,7 +4801,11 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                       if (card) handleInteractWithCard(card);
                       else showToast("Desbloqueie o card original para assistir.", "info");
                     }}
-                    className="px-8 py-4 bg-emerald-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-emerald-500 transition-all shadow-xl flex items-center gap-2"
+                    className={`px-8 py-4 font-black rounded-2xl uppercase tracking-widest text-xs transition-all shadow-xl flex items-center gap-2 ${
+                      isGold
+                        ? 'bg-gradient-to-r from-[#8C650D] via-[#A37B14] to-[#C5A880] text-black hover:brightness-110 shadow-[#A37B14]/25 border border-[#D4AF37]/50'
+                        : 'bg-emerald-600 text-white hover:bg-emerald-500'
+                    }`}
                   >
                     <Zap size={16} /> Liberar Acesso
                   </button>
@@ -4485,16 +4831,16 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                       <div className="relative w-full h-full flex items-center justify-center bg-black">
                         {!remoteStream && (
                           <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-slate-950/80 backdrop-blur-sm z-[10] space-y-4">
-                            <Loader2 size={36} className="text-indigo-500 animate-spin" />
-                            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest animate-pulse">Conectando à transmissão P2P...</p>
-                            <div className="w-48 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                            <Loader2 size={36} className={`animate-spin ${isGold ? 'text-[#A37B14]' : 'text-indigo-500'}`} />
+                            <p className={`text-xs font-bold uppercase tracking-widest animate-pulse ${isGold ? 'text-[#C5A880]' : 'text-slate-400'}`}>Conectando à transmissão P2P...</p>
+                            <div className={`w-48 h-1.5 rounded-full overflow-hidden ${isGold ? 'bg-[#231F19]' : 'bg-slate-800'}`}>
                               <div
-                                className="bg-indigo-500 h-full rounded-full transition-all duration-500"
+                                className={`h-full rounded-full transition-all duration-500 ${isGold ? 'bg-gradient-to-r from-[#8C650D] to-[#A37B14]' : 'bg-indigo-500'}`}
                                 style={{ width: `${Math.max(p2pLoadingProgress, 5)}%` }}
                               />
                             </div>
                             {p2pLoadingProgress > 0 && (
-                              <p className="text-[10px] font-black text-indigo-400 tracking-widest">{p2pLoadingProgress}%</p>
+                              <p className={`text-[10px] font-black tracking-widest ${isGold ? 'text-[#E5C378]' : 'text-indigo-400'}`}>{p2pLoadingProgress}%</p>
                             )}
                           </div>
                         )}
@@ -4555,24 +4901,28 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
             </div>
 
             {/* FLOATING CHAT SIDEBAR FOR WATCH PARTY */}
-            <div className={`${isCinemaSidebarCollapsed ? 'w-0 h-0 border-l-0 overflow-hidden' : isChatMinimized ? 'w-full md:w-96 md:h-full border-l border-slate-800' : 'w-full md:w-96 h-1/2 md:h-full border-l border-slate-800'} bg-slate-900 flex flex-col shadow-2xl relative flex-shrink-0 transition-all duration-300`}>
+            <div className={`$${isCinemaSidebarCollapsed ? 'w-0 h-0 border-l-0 overflow-hidden' : isChatMinimized ? 'w-full md:w-96 md:h-full border-l ' + (isGold ? 'border-[#A37B14]/25' : 'border-slate-800') : 'w-full md:w-96 h-1/2 md:h-full border-l ' + (isGold ? 'border-[#A37B14]/25' : 'border-slate-800')} ${isGold ? 'bg-[#14120E] text-[#FFFCF8]' : 'bg-slate-900 text-white'} flex flex-col shadow-2xl relative flex-shrink-0 transition-all duration-300`}>
               {/* When minimized: show ONLY the chevron row, hide tab labels and input */}
               {isChatMinimized ? (
-                <div className="flex items-center justify-center border-b border-slate-800 bg-slate-800/20 py-2">
+                <div className={`flex items-center justify-center py-2 ${isGold ? 'border-b border-[#A37B14]/20 bg-[#1A1712]/60' : 'border-b border-slate-800 bg-slate-800/20'}`}>
                   <button
                     onClick={() => setIsChatMinimized(false)}
                     title="Expandir chat"
-                    className="px-6 py-2 text-slate-400 hover:text-slate-200 transition-all flex items-center gap-2"
+                    className={`px-6 py-2 transition-all flex items-center gap-2 ${isGold ? 'text-[#E5C378] hover:text-[#FFFCF8]' : 'text-slate-400 hover:text-slate-200'}`}
                   >
                     <ChevronDown size={16} className="rotate-180" />
                     <span className="text-[10px] font-black uppercase tracking-widest">Expandir Chat</span>
                   </button>
                 </div>
               ) : isAdmin ? (
-                <div className="flex border-b border-slate-800 bg-slate-800/20 items-center">
+                <div className={`flex items-center ${isGold ? 'border-b border-[#A37B14]/20 bg-[#1A1712]/60' : 'border-b border-slate-800 bg-slate-800/20'}`}>
                   <button
                     onClick={() => setSidebarTab('chat')}
-                    className={`flex-1 py-4 text-xs font-black uppercase tracking-widest transition-all ${sidebarTab === 'chat' ? 'text-white border-b-2 border-indigo-500 bg-slate-800/50' : 'text-slate-500 hover:text-slate-300'}`}
+                    className={`flex-1 py-4 text-xs font-black uppercase tracking-widest transition-all ${
+                      sidebarTab === 'chat' 
+                        ? (isGold ? 'text-[#E5C378] border-b-2 border-[#A37B14] bg-[#A37B14]/15' : 'text-white border-b-2 border-indigo-500 bg-slate-800/50') 
+                        : (isGold ? 'text-[#8C8273] hover:text-[#C5A880]' : 'text-slate-500 hover:text-slate-300')
+                    }`}
                   >
                     Chat
                   </button>
@@ -4580,29 +4930,33 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                   <button
                     onClick={() => setIsChatMinimized(!isChatMinimized)}
                     title={isChatMinimized ? 'Expandir chat' : 'Minimizar chat'}
-                    className="px-2 py-4 text-slate-500 hover:text-slate-300 transition-all flex items-center justify-center"
+                    className={`px-2 py-4 transition-all flex items-center justify-center ${isGold ? 'text-[#A37B14] hover:text-[#E5C378]' : 'text-slate-500 hover:text-slate-300'}`}
                   >
                     <ChevronDown size={14} className={`transition-transform duration-300 ${isChatMinimized ? 'rotate-180' : ''}`} />
                   </button>
                   <button
                     onClick={() => setSidebarTab('history')}
-                    className={`flex-1 py-4 text-xs font-black uppercase tracking-widest transition-all ${sidebarTab === 'history' ? 'text-white border-b-2 border-indigo-500 bg-slate-800/50' : 'text-slate-500 hover:text-slate-300'}`}
+                    className={`flex-1 py-4 text-xs font-black uppercase tracking-widest transition-all ${
+                      sidebarTab === 'history' 
+                        ? (isGold ? 'text-[#E5C378] border-b-2 border-[#A37B14] bg-[#A37B14]/15' : 'text-white border-b-2 border-indigo-500 bg-slate-800/50') 
+                        : (isGold ? 'text-[#8C8273] hover:text-[#C5A880]' : 'text-slate-500 hover:text-slate-300')
+                    }`}
                   >
                     Histórico
                   </button>
                 </div>
               ) : (
-                <div className="p-4 border-b border-slate-800 bg-slate-800/50 flex justify-between items-center">
+                <div className={`p-4 flex justify-between items-center ${isGold ? 'border-b border-[#A37B14]/20 bg-[#1A1712]/70' : 'border-b border-slate-800 bg-slate-800/50'}`}>
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                    <span className="text-xs font-black uppercase text-white tracking-widest">Assistindo Juntos</span>
+                    <div className={`w-2 h-2 rounded-full animate-pulse ${isGold ? 'bg-[#A37B14] shadow-sm shadow-[#A37B14]' : 'bg-emerald-500'}`} />
+                    <span className={`text-xs font-black uppercase tracking-widest ${isGold ? 'text-[#E5C378]' : 'text-white'}`}>Assistindo Juntos</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase">{messages.length} Mensagens</span>
+                    <span className={`text-[10px] font-bold uppercase ${isGold ? 'text-[#8C8273]' : 'text-slate-500'}`}>{messages.length} Mensagens</span>
                     <button
                       onClick={() => setIsChatMinimized(!isChatMinimized)}
                       title={isChatMinimized ? 'Expandir chat' : 'Minimizar chat'}
-                      className="text-slate-500 hover:text-slate-300 transition-all"
+                      className={`transition-all ${isGold ? 'text-[#A37B14] hover:text-[#E5C378]' : 'text-slate-500 hover:text-slate-300'}`}
                     >
                       <ChevronDown size={14} className={`transition-transform duration-300 ${isChatMinimized ? 'rotate-180' : ''}`} />
                     </button>
@@ -4618,31 +4972,75 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                       <div key={msg.id} className={`flex flex-col ${msg.senderId === user.id ? 'items-end' : 'items-start'} animate-in slide-in-from-bottom-2 fade-in fill-mode-both`} style={{ animationDelay: `${i * 0.05}s` }}>
                         <span
                           onClick={() => isHost && msg.senderId !== user.id && handleToggleAdmin(msg.senderId)}
-                          className={`text-[10px] font-black uppercase mb-1 flex items-center gap-1 ${isHost && msg.senderId !== user.id ? 'cursor-pointer hover:text-indigo-400' : ''} ${msg.senderId === user.id ? 'text-blue-400' : 'text-slate-500'}`}
+                          className={`text-[10px] font-black uppercase mb-1 flex items-center gap-1 ${
+                            isHost && msg.senderId !== user.id ? (isGold ? 'cursor-pointer hover:text-[#E5C378]' : 'cursor-pointer hover:text-indigo-400') : ''
+                          } ${
+                            msg.senderId === user.id ? (isGold ? 'text-[#E5C378]' : 'text-blue-400') : (isGold ? 'text-[#A37B14]' : 'text-slate-500')
+                          }`}
                         >
                           {msg.senderName}
-                          {roomAdmins.has(msg.senderId) && <span className="text-[7px] bg-indigo-600 text-white px-1 rounded-sm">ADM</span>}
-                          {msg.senderId === roomId && <span className="text-[7px] bg-amber-500 text-white px-1 rounded-sm">HOST</span>}
+                          {roomAdmins.has(msg.senderId) && (
+                            <span className={`text-[7px] px-1 rounded-sm ${isGold ? 'bg-[#231F19] text-[#E5C378] border border-[#A37B14]/30' : 'bg-indigo-600 text-white'}`}>
+                              ADM
+                            </span>
+                          )}
+                          {msg.senderId === roomId && (
+                            <span className={`text-[7px] px-1 rounded-sm ${isGold ? 'bg-[#A37B14] text-black font-black' : 'bg-amber-500 text-white'}`}>
+                              HOST
+                            </span>
+                          )}
                           {isHost && msg.senderId !== user.id && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 toggleVideoController(msg.senderId);
                               }}
-                              className={`ml-1.5 p-0.5 rounded hover:bg-slate-700/50 transition-all ${allowedVideoControllers.has(msg.senderId) ? 'text-emerald-400' : 'text-slate-600'}`}
+                              className={`ml-1.5 p-0.5 rounded transition-all ${
+                                allowedVideoControllers.has(msg.senderId) 
+                                  ? (isGold ? 'text-[#E5C378]' : 'text-emerald-400') 
+                                  : (isGold ? 'text-[#6E675C] hover:bg-[#231F19]' : 'text-slate-600 hover:bg-slate-700/50')
+                              }`}
                               title={allowedVideoControllers.has(msg.senderId) ? "Remover controle do player" : "Permitir controle do player"}
                             >
                               <Sliders size={10} />
                             </button>
                           )}
                           {!isHost && allowedVideoControllers.has(msg.senderId) && (
-                            <span className="text-[8px] text-emerald-400 font-bold uppercase ml-1 flex items-center gap-0.5">
+                            <span className={`text-[8px] font-bold uppercase ml-1 flex items-center gap-0.5 ${isGold ? 'text-[#E5C378]' : 'text-emerald-400'}`}>
                               <Sliders size={8} /> CTRL
                             </span>
                           )}
                         </span>
-                        <div className={`px-4 py-2 rounded-2xl text-xs font-medium max-w-[90%] break-all ${msg.senderId === user.id ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700/50'}`}>
-                          {msg.text}
+                        <div className={`flex items-end gap-1.5 w-full ${msg.senderId === user.id ? 'justify-end' : 'justify-start'}`}>
+                          {msg.senderId !== user.id && (
+                            <div className={`w-6 h-6 rounded-full shrink-0 overflow-hidden flex items-center justify-center border text-[9px] font-black ${
+                              isGold ? 'bg-[#0F0D0A] border-[#A37B14]/30 text-[#E5C378]' : 'bg-slate-800 border-slate-700 text-slate-300'
+                            }`}>
+                              {getSenderPhoto(msg.senderId) ? (
+                                <img src={getSenderPhoto(msg.senderId)!} alt="" className="w-full h-full object-cover rounded-full" />
+                              ) : (
+                                (msg.senderName || 'V').charAt(0).toUpperCase()
+                              )}
+                            </div>
+                          )}
+                          <div className={`px-4 py-2 rounded-2xl text-xs font-medium max-w-[85%] break-all ${
+                            msg.senderId === user.id 
+                              ? (isGold ? 'bg-gradient-to-r from-[#8C650D] to-[#A37B14] text-black font-semibold rounded-tr-none shadow-md border border-[#D4AF37]/30' : 'bg-blue-600 text-white rounded-tr-none') 
+                              : (isGold ? 'bg-[#1E1B15] text-[#FFFCF8] rounded-tl-none border border-[#A37B14]/20 shadow-xs' : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700/50')
+                          }`}>
+                            {msg.text}
+                          </div>
+                          {msg.senderId === user.id && (
+                            <div className={`w-6 h-6 rounded-full shrink-0 overflow-hidden flex items-center justify-center border text-[9px] font-black ${
+                              isGold ? 'bg-[#0F0D0A] border-[#A37B14]/30 text-[#E5C378]' : 'bg-slate-800 border-slate-700 text-slate-300'
+                            }`}>
+                              {currentUserPhoto ? (
+                                <img src={currentUserPhoto} alt="" className="w-full h-full object-cover rounded-full" />
+                              ) : (
+                                (user.name || 'V').charAt(0).toUpperCase()
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -4650,23 +5048,46 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                   </div>
                   )}
 
-                  <div className="p-4 bg-slate-800/30 border-t border-slate-800">
-                    <div className="flex items-center gap-2 bg-slate-900 rounded-xl px-4 py-1 border border-slate-700 focus-within:border-blue-500/50 transition-all">
+                  <div className={`p-4 border-t ${isGold ? 'bg-[#1A1712]/80 border-[#A37B14]/20' : 'bg-slate-800/30 border-slate-800'}`}>
+                    <div className={`flex items-center gap-2 rounded-xl px-3 py-1 border transition-all ${
+                      isGold 
+                        ? 'bg-[#0F0D0A] border-[#A37B14]/30 focus-within:border-[#A37B14] focus-within:ring-1 focus-within:ring-[#A37B14]/30' 
+                        : 'bg-slate-900 border-slate-700 focus-within:border-blue-500/50'
+                    }`}>
+                      <div className={`w-6 h-6 rounded-full shrink-0 overflow-hidden flex items-center justify-center border text-[9px] font-black ${
+                        isGold ? 'bg-[#1A1712] border-[#A37B14]/30 text-[#E5C378]' : 'bg-slate-800 border-slate-700 text-slate-300'
+                      }`}>
+                        {currentUserPhoto ? (
+                          <img src={currentUserPhoto} alt="" className="w-full h-full object-cover rounded-full" />
+                        ) : (
+                          (user.name || 'V').charAt(0).toUpperCase()
+                        )}
+                      </div>
                       <input
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                         placeholder="Comentar..."
-                        className="flex-1 bg-transparent border-none text-[16px] py-3 text-white outline-none"
+                        className={`flex-1 bg-transparent border-none text-[16px] py-3 outline-none ${
+                          isGold ? 'text-[#FFFCF8] placeholder-[#6E675C]' : 'text-white placeholder-slate-400'
+                        }`}
                       />
-                      <button onClick={() => handleSendMessage()} disabled={!inputText.trim()} className="text-blue-500 disabled:opacity-30"><Send size={18} /></button>
+                      <button 
+                        onClick={() => handleSendMessage()} 
+                        disabled={!inputText.trim()} 
+                        className={`transition-colors disabled:opacity-30 ${isGold ? 'text-[#E5C378] hover:text-amber-300' : 'text-blue-500'}`}
+                      >
+                        <Send size={18} />
+                      </button>
                     </div>
                   </div>
                 </>
               ) : (
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-hide animate-in fade-in">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Vídeos Recentes (Salvos Local)</span>
+                    <span className={`text-[10px] font-black uppercase tracking-wider ${isGold ? 'text-[#A37B14]' : 'text-slate-400'}`}>
+                      Vídeos Recentes (Salvos Local)
+                    </span>
                     <button 
                       onClick={() => {
                         if (confirm("Limpar todo o histórico local?")) {
@@ -4680,29 +5101,42 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                     </button>
                   </div>
                   {recentVideos.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                    <div className={`flex flex-col items-center justify-center py-12 font-bold uppercase tracking-wider text-[10px] ${isGold ? 'text-[#8C8273]' : 'text-slate-500'}`}>
                       Nenhum vídeo recente encontrado.
                     </div>
                   ) : (
                     recentVideos.map((video: any) => (
-                      <div key={video.id} className="flex items-center justify-between p-3 bg-slate-800/40 border border-slate-700/30 rounded-2xl group transition-all hover:bg-slate-800/80 hover:border-indigo-500/30 backdrop-blur-md relative overflow-hidden">
-                        <div className="w-16 aspect-video rounded-lg overflow-hidden bg-slate-900 border border-slate-700/50 flex-shrink-0 relative">
+                      <div 
+                        key={video.id} 
+                        className={`flex items-center justify-between p-3 rounded-2xl group transition-all backdrop-blur-md relative overflow-hidden ${
+                          isGold 
+                            ? 'bg-[#1A1712] border border-[#A37B14]/25 hover:border-[#A37B14]/60 hover:bg-[#231F19]' 
+                            : 'bg-slate-800/40 border border-slate-700/30 hover:bg-slate-800/80 hover:border-indigo-500/30'
+                        }`}
+                      >
+                        <div className={`w-16 aspect-video rounded-lg overflow-hidden border flex-shrink-0 relative ${
+                          isGold ? 'bg-[#0F0D0A] border-[#A37B14]/25' : 'bg-slate-900 border-slate-700/50'
+                        }`}>
                           {video.thumbnail ? (
                             <img src={video.thumbnail} className="w-full h-full object-cover" alt="" />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-slate-600 bg-slate-900">
+                            <div className={`w-full h-full flex items-center justify-center ${isGold ? 'text-[#A37B14] bg-[#0F0D0A]' : 'text-slate-600 bg-slate-900'}`}>
                               <Video size={16} />
                             </div>
                           )}
                         </div>
                         <div className="flex-1 min-w-0 px-3 flex flex-col justify-center">
-                          <p className="text-xs font-black text-white truncate uppercase tracking-tighter" title={video.name}>{video.name}</p>
-                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{(video.size / (1024 * 1024)).toFixed(1)} MB</p>
+                          <p className={`text-xs font-black truncate uppercase tracking-tighter ${isGold ? 'text-[#FFFCF8]' : 'text-white'}`} title={video.name}>{video.name}</p>
+                          <p className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${isGold ? 'text-[#C5A880]' : 'text-slate-400'}`}>{(video.size / (1024 * 1024)).toFixed(1)} MB</p>
                         </div>
                         <div className="flex items-center gap-1.5 z-10">
                           <button
                             onClick={() => playRecentVideo(video)}
-                            className="p-2 bg-emerald-600/10 text-emerald-400 hover:bg-emerald-600 hover:text-white rounded-xl transition-all border border-emerald-500/10 shadow-lg active:scale-95"
+                            className={`p-2 rounded-xl transition-all shadow-lg active:scale-95 border ${
+                              isGold
+                                ? 'bg-[#A37B14]/15 text-[#E5C378] hover:bg-[#A37B14] hover:text-black border-[#A37B14]/30'
+                                : 'bg-emerald-600/10 text-emerald-400 hover:bg-emerald-600 hover:text-white border-emerald-500/10'
+                            }`}
                             title="Transmitir Vídeo"
                           >
                             <Tv size={14} />
@@ -4726,12 +5160,36 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
         {/* WATCH PARTY SOURCE SELECTION MODAL */}
         {isWatchPartyOpen && !watchPartySource && (
-          <div className="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md animate-in fade-in">
+          <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 sm:p-6 bg-black/90 backdrop-blur-md animate-in fade-in">
             {canControlVideo ? (
-              <div className="bg-slate-900 border border-slate-800 p-8 rounded-[3rem] w-full max-w-md shadow-2xl relative animate-in zoom-in-95 duration-200">
-                <button onClick={() => setIsWatchPartyOpen(false)} className="absolute top-6 right-6 p-2 bg-slate-800 rounded-full text-white hover:bg-slate-700 transition-all"><X size={20} /></button>
-                <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-8 text-center flex items-center justify-center gap-3">
-                  <Tv className="text-indigo-500" /> Assistir Juntos
+              <div className={`p-6 sm:p-8 rounded-[2.5rem] sm:rounded-[3rem] w-full max-w-md shadow-2xl relative animate-in zoom-in-95 duration-200 ${
+                isGold 
+                  ? 'bg-[#14120E] border border-[#A37B14]/40 text-[#FFFCF8] shadow-black/90 ring-1 ring-[#A37B14]/30' 
+                  : 'bg-slate-900 border border-slate-800 text-white'
+              }`}>
+                <button 
+                  onClick={() => setIsWatchPartyOpen(false)} 
+                  className={`absolute top-6 right-6 p-2 rounded-full transition-all ${
+                    isGold 
+                      ? 'bg-[#231F19] text-[#E5C378] border border-[#A37B14]/30 hover:bg-[#2F2921] hover:text-white' 
+                      : 'bg-slate-800 text-white hover:bg-slate-700'
+                  }`}
+                >
+                  <X size={20} />
+                </button>
+                
+                {isGold && (
+                  <div className="flex justify-center mb-2">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#A37B14]/15 border border-[#A37B14]/30 text-[#E5C378] text-[9px] font-black uppercase tracking-widest">
+                      <Sparkles size={11} className="text-[#E5C378]" /> Cinema VIP Lounge
+                    </span>
+                  </div>
+                )}
+
+                <h3 className={`text-2xl font-black uppercase tracking-tighter mb-6 sm:mb-8 text-center flex items-center justify-center gap-3 ${
+                  isGold ? 'text-[#FFFCF8]' : 'text-white'
+                }`}>
+                  <Tv className={isGold ? 'text-[#A37B14]' : 'text-indigo-500'} /> Assistir Juntos
                 </h3>
 
                 <div className="space-y-6">
@@ -4739,18 +5197,27 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                     <button
                       onClick={() => watchVideoUploadRef.current?.click()}
                       disabled={uploadProgress !== null}
-                      className="w-full py-6 rounded-2xl bg-indigo-600/10 border-2 border-dashed border-indigo-500/30 flex flex-col items-center gap-2 text-indigo-400 hover:bg-indigo-600/20 transition-all group disabled:opacity-50"
+                      className={`w-full py-6 rounded-2xl border-2 border-dashed flex flex-col items-center gap-2 transition-all group disabled:opacity-50 ${
+                        isGold 
+                          ? 'bg-[#A37B14]/10 border-[#A37B14]/40 text-[#E5C378] hover:bg-[#A37B14]/20 hover:border-[#A37B14]/70' 
+                          : 'bg-indigo-600/10 border-indigo-500/30 text-indigo-400 hover:bg-indigo-600/20'
+                      }`}
                     >
                       {uploadProgress !== null ? (
                         <div className="flex flex-col items-center gap-3 w-full px-8">
-                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div className="bg-indigo-500 h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                          <div className={`w-full h-1.5 rounded-full overflow-hidden ${isGold ? 'bg-[#231F19]' : 'bg-slate-800'}`}>
+                            <div 
+                              className={`h-full transition-all duration-300 ${isGold ? 'bg-gradient-to-r from-[#8C650D] via-[#A37B14] to-[#C5A880]' : 'bg-indigo-500'}`} 
+                              style={{ width: `${uploadProgress}%` }} 
+                            />
                           </div>
-                          <span className="text-[10px] font-black uppercase tracking-widest">{uploadProgress}% Carregando...</span>
+                          <span className={`text-[10px] font-black uppercase tracking-widest ${isGold ? 'text-[#E5C378]' : 'text-indigo-400'}`}>
+                            {uploadProgress}% Carregando...
+                          </span>
                         </div>
                       ) : (
                         <>
-                          <Upload size={32} className="group-hover:scale-110 transition-transform" />
+                          <Upload size={32} className={`group-hover:scale-110 transition-transform ${isGold ? 'text-[#E5C378]' : ''}`} />
                           <span className="text-xs font-black uppercase tracking-widest">Subir Vídeo Local</span>
                         </>
                       )}
@@ -4760,7 +5227,11 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         <button 
                           onClick={() => broadcastWatchParty(undefined, undefined, undefined, undefined, true)} 
                           disabled={uploadingWatchParty}
-                          className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-indigo-500 transition-all shadow-lg animate-in zoom-in-95 flex items-center justify-center gap-2 disabled:opacity-50"
+                          className={`w-full py-4 font-black rounded-2xl uppercase tracking-widest text-xs transition-all shadow-lg animate-in zoom-in-95 flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 ${
+                            isGold
+                              ? 'bg-gradient-to-r from-[#8C650D] via-[#A37B14] to-[#C5A880] text-black hover:brightness-110 shadow-[#A37B14]/25 border border-[#D4AF37]/50'
+                              : 'bg-indigo-600 text-white hover:bg-indigo-500'
+                          }`}
                         >
                           <Zap size={16} /> Transmitir P2P (Instantâneo)
                         </button>
@@ -4768,7 +5239,11 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         <button 
                           onClick={() => broadcastWatchParty()} 
                           disabled={uploadingWatchParty}
-                          className="w-full py-4 bg-emerald-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-emerald-500 transition-all shadow-lg animate-in zoom-in-95 flex items-center justify-center gap-2 disabled:opacity-50"
+                          className={`w-full py-4 font-black rounded-2xl uppercase tracking-widest text-xs transition-all shadow-lg animate-in zoom-in-95 flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 ${
+                            isGold
+                              ? 'bg-[#231F19] hover:bg-[#2F2921] text-[#E5C378] border border-[#A37B14]/40 shadow-md'
+                              : 'bg-emerald-600 text-white hover:bg-emerald-500'
+                          }`}
                         >
                           {uploadingWatchParty ? (
                             <>
@@ -4785,50 +5260,81 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                   </div>
 
                   <div className="relative py-2 flex items-center">
-                    <div className="flex-1 border-t border-slate-800"></div>
-                    <span className="px-4 text-[10px] font-black text-slate-600 uppercase">OU</span>
-                    <div className="flex-1 border-t border-slate-800"></div>
+                    <div className={`flex-1 border-t ${isGold ? 'border-[#A37B14]/20' : 'border-slate-800'}`}></div>
+                    <span className={`px-4 text-[10px] font-black uppercase ${isGold ? 'text-[#A37B14]' : 'text-slate-600'}`}>OU</span>
+                    <div className={`flex-1 border-t ${isGold ? 'border-[#A37B14]/20' : 'border-slate-800'}`}></div>
                   </div>
 
                   <div className="space-y-4">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2 px-1">Inserir Link (YouTube, Vimeo, etc.)</label>
+                    <label className={`text-[10px] font-black uppercase tracking-widest block mb-2 px-1 ${
+                      isGold ? 'text-[#A37B14]' : 'text-slate-500'
+                    }`}>
+                      Inserir Link (YouTube, Vimeo, etc.)
+                    </label>
                     <div className="flex gap-2">
                       <input
                         value={watchPartyInput}
                         onChange={(e) => setWatchPartyInput(e.target.value)}
                         placeholder="https://www.youtube.com/watch?v=..."
-                        className="flex-1 bg-slate-800 border border-slate-700 rounded-2xl p-4 text-white text-xs outline-none focus:border-indigo-500 transition-all font-medium"
+                        className={`flex-1 rounded-2xl p-4 text-xs outline-none transition-all font-medium ${
+                          isGold 
+                            ? 'bg-[#0F0D0A] border border-[#A37B14]/30 text-[#FFFCF8] placeholder-[#6E675C] focus:border-[#A37B14] focus:ring-1 focus:ring-[#A37B14]/30' 
+                            : 'bg-slate-800 border border-slate-700 text-white focus:border-indigo-500'
+                        }`}
                       />
                       <button
                         onClick={startWatchPartyWithUrl}
-                        className="p-4 bg-slate-800 text-white rounded-2xl hover:bg-slate-700 transition-all border border-slate-700"
+                        className={`p-4 rounded-2xl transition-all border font-bold active:scale-95 ${
+                          isGold
+                            ? 'bg-[#231F19] text-[#E5C378] hover:bg-[#2F2921] border-[#A37B14]/30'
+                            : 'bg-slate-800 text-white hover:bg-slate-700 border-slate-700'
+                        }`}
                       >
                         Selecionar
                       </button>
                     </div>
                     {watchPartySelection?.type === 'url' && (
-                      <button onClick={() => broadcastWatchParty()} className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-indigo-500 transition-all shadow-lg animate-in zoom-in-95 flex items-center justify-center gap-2">
+                      <button 
+                        onClick={() => broadcastWatchParty()} 
+                        className={`w-full py-4 font-black rounded-2xl uppercase tracking-widest text-xs transition-all shadow-lg animate-in zoom-in-95 flex items-center justify-center gap-2 active:scale-95 ${
+                          isGold
+                            ? 'bg-gradient-to-r from-[#8C650D] via-[#A37B14] to-[#C5A880] text-black hover:brightness-110 shadow-[#A37B14]/25 border border-[#D4AF37]/50'
+                            : 'bg-indigo-600 text-white hover:bg-indigo-500'
+                        }`}
+                      >
                         <ArrowUpRight size={16} /> Entrar com Link
                       </button>
                     )}
-                    <p className="text-[9px] text-slate-500 font-bold uppercase tracking-tight px-1 italic">
+                    <p className={`text-[9px] font-bold uppercase tracking-tight px-1 italic ${isGold ? 'text-[#8C8273]' : 'text-slate-500'}`}>
                       * Nota: Alguns sites bloqueiam o acesso via navegador compartilhado por segurança (X-Frame). Use links diretos de vídeo sempre que possível.
                     </p>
                   </div>
 
                   {myCards.some(c => c.type === CardType.VIDEO) && (
-                    <div className="space-y-4 pt-6 border-t border-slate-800">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block px-1">Minha Galeria de Vídeos</label>
+                    <div className={`space-y-4 pt-6 border-t ${isGold ? 'border-[#A37B14]/25' : 'border-slate-800'}`}>
+                      <label className={`text-[10px] font-black uppercase tracking-widest block px-1 ${
+                        isGold ? 'text-[#A37B14]' : 'text-slate-500'
+                      }`}>
+                        Minha Galeria de Vídeos
+                      </label>
                       <div className="grid grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-2 scrollbar-hide">
                         {myCards.filter(c => c.type === CardType.VIDEO).map(card => (
-                          <div key={card.id} className={`relative aspect-video rounded-xl overflow-hidden group border transition-all ${watchPartySelection?.cardId === card.id ? 'border-indigo-500 ring-2 ring-indigo-500/50' : 'border-slate-800 hover:border-slate-600'}`}>
+                          <div key={card.id} className={`relative aspect-video rounded-xl overflow-hidden group border transition-all ${
+                            watchPartySelection?.cardId === card.id 
+                              ? (isGold ? 'border-[#A37B14] ring-2 ring-[#A37B14]/50' : 'border-indigo-500 ring-2 ring-indigo-500/50') 
+                              : (isGold ? 'border-[#A37B14]/25 hover:border-[#A37B14]/50' : 'border-slate-800 hover:border-slate-600')
+                          }`}>
                             <button
                               onClick={() => setWatchPartySelection({ source: card.mediaUrl!, type: 'video', cardId: card.id })}
                               className="w-full h-full text-left"
                             >
                               <img src={card.thumbnail || card.mediaUrl} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
                               <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white">
-                                {watchPartySelection?.cardId === card.id ? <CheckCircle size={24} /> : <Video size={20} className="drop-shadow-lg" />}
+                                {watchPartySelection?.cardId === card.id ? (
+                                  <CheckCircle size={24} className={isGold ? 'text-[#E5C378]' : 'text-white'} />
+                                ) : (
+                                  <Video size={20} className="drop-shadow-lg" />
+                                )}
                               </div>
                             </button>
                             <button 
@@ -4855,7 +5361,14 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                         ))}
                       </div>
                       {watchPartySelection?.cardId && (
-                        <button onClick={() => broadcastWatchParty()} className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-indigo-500 transition-all shadow-lg flex items-center justify-center gap-2">
+                        <button 
+                          onClick={() => broadcastWatchParty()} 
+                          className={`w-full py-4 font-black rounded-2xl uppercase tracking-widest text-xs transition-all shadow-lg flex items-center justify-center gap-2 active:scale-95 ${
+                            isGold
+                              ? 'bg-gradient-to-r from-[#8C650D] via-[#A37B14] to-[#C5A880] text-black hover:brightness-110 shadow-[#A37B14]/25 border border-[#D4AF37]/50'
+                              : 'bg-indigo-600 text-white hover:bg-indigo-500'
+                          }`}
+                        >
                           <Tv size={16} /> Transmitir Card Selecionado
                         </button>
                       )}
@@ -4864,13 +5377,39 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                 </div>
               </div>
             ) : (
-              <div className="bg-slate-900 border border-slate-800 p-8 rounded-[3rem] w-full max-w-md shadow-2xl relative flex flex-col items-center justify-center text-center animate-in zoom-in-95 duration-200">
-                <button onClick={() => setIsWatchPartyOpen(false)} className="absolute top-6 right-6 p-2 bg-slate-800 rounded-full text-white hover:bg-slate-700 transition-all"><X size={20} /></button>
-                <div className="w-16 h-16 bg-indigo-500/10 rounded-full flex items-center justify-center mb-6 text-indigo-400">
+              <div className={`p-8 rounded-[3rem] w-full max-w-md shadow-2xl relative flex flex-col items-center justify-center text-center animate-in zoom-in-95 duration-200 ${
+                isGold 
+                  ? 'bg-[#14120E] border border-[#A37B14]/40 text-[#FFFCF8] shadow-black/90 ring-1 ring-[#A37B14]/30' 
+                  : 'bg-slate-900 border border-slate-800 text-white'
+              }`}>
+                <button 
+                  onClick={() => setIsWatchPartyOpen(false)} 
+                  className={`absolute top-6 right-6 p-2 rounded-full transition-all ${
+                    isGold 
+                      ? 'bg-[#231F19] text-[#E5C378] border border-[#A37B14]/30 hover:bg-[#2F2921] hover:text-white' 
+                      : 'bg-slate-800 text-white hover:bg-slate-700'
+                  }`}
+                >
+                  <X size={20} />
+                </button>
+                {isGold && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#A37B14]/15 border border-[#A37B14]/30 text-[#E5C378] text-[9px] font-black uppercase tracking-widest mb-4">
+                    <Sparkles size={11} className="text-[#E5C378]" /> Sala VIP de Cinema
+                  </span>
+                )}
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 ${
+                  isGold 
+                    ? 'bg-[#A37B14]/15 border border-[#A37B14]/30 text-[#E5C378]' 
+                    : 'bg-indigo-500/10 text-indigo-400'
+                }`}>
                   <Tv size={36} className="animate-pulse" />
                 </div>
-                <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-2">Cinema Offline</h3>
-                <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Aguardando o anfitrião iniciar um vídeo...</p>
+                <h3 className={`text-xl font-black uppercase tracking-tighter mb-2 ${isGold ? 'text-[#FFFCF8]' : 'text-white'}`}>
+                  Cinema Offline
+                </h3>
+                <p className={`text-xs font-bold uppercase tracking-wider ${isGold ? 'text-[#C5A880]' : 'text-slate-400'}`}>
+                  Aguardando o anfitrião iniciar um vídeo...
+                </p>
               </div>
             )}
           </div>
@@ -4903,9 +5442,12 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
             initialDefaults={targetSessionConfig?.defaults || quickDefaults}
             paidChatConfig={targetSessionConfig?.paidChat || paidChatConfig}
             quickPhrasesConfig={targetSessionConfig?.phrases || quickPhrasesConfig}
+            showcaseChatConfig={showcaseChatConfig}
             initialTab={quickSettingsTab}
             isRoomCreator={targetSessionConfig?.sessionId ? (targetSessionConfig.sessionId === roomId ? isHost : true) : isHost}
             roomTitle={targetSessionConfig?.sessionName || (roomDetails?.name || 'Esta Sala')}
+            currentRoomId={roomId}
+            creatorId={user.id}
             onSave={handleSaveQuickSettings}
           />
         )}

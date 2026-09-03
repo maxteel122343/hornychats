@@ -69,6 +69,7 @@ export interface Message {
   id: string;
   senderId: string;
   senderName: string;
+  senderPhoto?: string;
   text?: string;
   card?: MediaCard;
   timestamp: number;
@@ -123,4 +124,12 @@ export interface PaidChatConfig {
 export interface QuickPhrasesConfig {
   creatorPhrases: string[];
   visitorPhrases: string[];
+}
+
+export type ShowcaseChatDestinationMode = 'default_room' | 'new_room';
+
+export interface ShowcaseChatConfig {
+  mode: ShowcaseChatDestinationMode;
+  defaultRoomId?: string;
+  defaultRoomName?: string;
 }

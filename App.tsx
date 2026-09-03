@@ -353,6 +353,7 @@ const App: React.FC = () => {
             link={toast.link}
             duration={toast.duration}
             shareText={toast.shareText}
+            theme={theme}
             onClose={() => setToast(prev => ({ ...prev, isVisible: false }))}
           />
         </div>

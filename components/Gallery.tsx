@@ -316,15 +316,16 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
     }
   };
 
-  const handleUnlockCard = (card: MediaCard) => {
+  const handleUnlockCard = (card: MediaCard): boolean => {
     const isOwner = card.creator_id === user.id;
     if (isOwner || unlockedCardIds.has(card.id) || card.creditCost === 0) {
       setActivePreviewCard(card);
-      return;
+      return true;
     }
 
     // OPEN PAYMENT MODAL FOR EXCLUSIVE CONTENT
     setSelectedPurchaseCard(card);
+    return false;
   };
 
   const handleConfirmPurchaseInGallery = async (card: MediaCard, useFreeCredits: boolean): Promise<boolean> => {
@@ -983,7 +984,7 @@ const Gallery: React.FC<GalleryProps> = ({ user, onShowToast, updateCredits, the
                 key={card.id}
                 card={card}
                 canManage={card.creator_id === user.id}
-                onUnlock={async () => handleUnlockCard(card)}
+                onUnlock={() => handleUnlockCard(card)}
                 isHostMode={false}
                 theme={theme}
                 onShowToast={onShowToast}
