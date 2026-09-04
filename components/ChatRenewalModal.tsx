@@ -18,6 +18,7 @@ interface ChatRenewalModalProps {
   creatorName?: string;
   theme?: AppTheme;
   isExpired?: boolean;
+  isFreeRenewal?: boolean;
 }
 
 export const ChatRenewalModal: React.FC<ChatRenewalModalProps> = ({
@@ -35,12 +36,14 @@ export const ChatRenewalModal: React.FC<ChatRenewalModalProps> = ({
   roomName = 'Sala Exclusiva',
   creatorName,
   theme = 'dark',
-  isExpired = false
+  isExpired = false,
+  isFreeRenewal = false
 }) => {
   if (!isOpen) return null;
 
   const isDark = theme === 'dark';
-  const hasEnoughCredits = userCredits >= costCredits;
+  const effectiveCost = isFreeRenewal ? 0 : costCredits;
+  const hasEnoughCredits = isFreeRenewal || userCredits >= effectiveCost;
 
   const formatSeconds = (sec: number) => {
     const s = Math.max(0, Math.floor(sec));
@@ -134,7 +137,7 @@ export const ChatRenewalModal: React.FC<ChatRenewalModalProps> = ({
               </span>
               <div className="flex items-baseline gap-1 mt-0.5">
                 <span className={`text-xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  {costCredits} Créditos
+                  {isFreeRenewal ? 'Gratuito' : `${costCredits} Créditos`}
                 </span>
                 <span className="text-xs font-bold text-slate-400">
                   / a cada {intervalMinutes} min
@@ -147,68 +150,72 @@ export const ChatRenewalModal: React.FC<ChatRenewalModalProps> = ({
                 Seu Saldo
               </span>
               <span className={`text-sm font-black mt-0.5 inline-block ${
-                hasEnoughCredits 
+                isFreeRenewal 
                   ? 'text-emerald-500' 
-                  : 'text-red-500'
+                  : hasEnoughCredits 
+                    ? 'text-emerald-500' 
+                    : 'text-red-500'
               }`}>
                 {userCredits} Créditos
               </span>
             </div>
           </div>
 
-          {/* Auto-Debit Toggle (Débito Automático) */}
-          <div className={`p-4 rounded-2xl border transition-all ${
-            autoDebit 
-              ? (isDark ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-emerald-50 border-emerald-200') 
-              : (isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-gray-50 border-gray-200')
-          }`}>
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
-                  autoDebit 
-                    ? 'bg-emerald-500 text-slate-950 font-black shadow-md shadow-emerald-500/20' 
-                    : (isDark ? 'bg-slate-800 text-slate-400' : 'bg-gray-200 text-slate-600')
-                }`}>
-                  <Zap size={18} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                      Débito Automático
-                    </span>
-                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded ${
-                      autoDebit 
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
-                        : (isDark ? 'bg-slate-800 text-slate-400' : 'bg-gray-200 text-slate-600')
-                    }`}>
-                      {autoDebit ? 'ATIVADO' : 'DESLIGADO'}
-                    </span>
+          {/* Auto-Debit Toggle (Débito Automático) - only if paid */}
+          {!isFreeRenewal && (
+            <div className={`p-4 rounded-2xl border transition-all ${
+              autoDebit 
+                ? (isDark ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-emerald-50 border-emerald-200') 
+                : (isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-gray-50 border-gray-200')
+            }`}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+                    autoDebit 
+                      ? 'bg-emerald-500 text-slate-950 font-black shadow-md shadow-emerald-500/20' 
+                      : (isDark ? 'bg-slate-800 text-slate-400' : 'bg-gray-200 text-slate-600')
+                  }`}>
+                    <Zap size={18} />
                   </div>
-                  <p className={`text-[10px] mt-0.5 font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Renova sozinho a cada ciclo de tempo sem interromper sua conversa.
-                  </p>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                        Débito Automático
+                      </span>
+                      <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded ${
+                        autoDebit 
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                          : (isDark ? 'bg-slate-800 text-slate-400' : 'bg-gray-200 text-slate-600')
+                      }`}>
+                        {autoDebit ? 'ATIVADO' : 'DESLIGADO'}
+                      </span>
+                    </div>
+                    <p className={`text-[10px] mt-0.5 font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Renova sozinho a cada ciclo de tempo sem interromper sua conversa.
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              {/* Switch */}
-              <button
-                type="button"
-                role="switch"
-                aria-checked={autoDebit}
-                onClick={() => onToggleAutoDebit(!autoDebit)}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  autoDebit ? 'bg-emerald-500' : (isDark ? 'bg-slate-700' : 'bg-gray-300')
-                }`}
-              >
-                <span
-                  aria-hidden="true"
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                    autoDebit ? 'translate-x-5' : 'translate-x-0'
+                {/* Switch */}
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={autoDebit}
+                  onClick={() => onToggleAutoDebit(!autoDebit)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    autoDebit ? 'bg-emerald-500' : (isDark ? 'bg-slate-700' : 'bg-gray-300')
                   }`}
-                />
-              </button>
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      autoDebit ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Action Buttons */}
           <div className="space-y-2 pt-1">
@@ -219,7 +226,7 @@ export const ChatRenewalModal: React.FC<ChatRenewalModalProps> = ({
                 className="w-full py-4 bg-gradient-to-r from-red-600 via-rose-600 to-red-500 text-white font-black rounded-2xl uppercase tracking-[0.15em] text-xs shadow-xl hover:opacity-95 transform active:scale-98 transition-all flex items-center justify-center gap-2"
               >
                 <CheckCircle2 size={16} />
-                <span>Renovar Chat Agora (-{costCredits} Créditos)</span>
+                <span>{isFreeRenewal ? 'Reiniciar Ciclo do Chat (Gratuito)' : `Renovar Chat Agora (-${costCredits} Créditos)`}</span>
               </button>
             ) : (
               <div className="space-y-2">

@@ -2,13 +2,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Send, Plus, Home, Wallet, Share2, MessageSquare, LayoutGrid, QrCode, X, User as UserIcon, LogIn, Camera, Settings, Sun, Moon, Menu, ChevronLeft, ChevronRight, ChevronDown, Copy, CheckCircle, Loader2, RefreshCw, DollarSign, ArrowUpRight, Mic, Video, Upload, StopCircle, Trash2, Aperture, Lock, Zap, History, CreditCard, Mail, ShoppingCart, LogOut, FolderOpen, Edit, Tv, Image as ImageIcon, Cloud, MoreVertical, Minimize2, Maximize2, Power, Sliders, ArrowLeft, Users, Clock, Sparkles, DoorOpen } from 'lucide-react';
-import { User, Message, MediaCard, ChatSession, CardType, PaymentTransaction, CardDefaults, PaidChatConfig, QuickPhrasesConfig, ShowcaseChatConfig, AppTheme } from '../types';
+import { User, Message, MediaCard, ChatSession, CardType, PaymentTransaction, CardDefaults, PaidChatConfig, QuickPhrasesConfig, ShowcaseChatConfig, AppTheme, UserTimerState } from '../types';
 import { supabase } from '../lib/supabase';
 import CardModal from './CardModal';
 import MediaCardItem from './MediaCardItem';
 import Gallery from './Gallery';
 import { QuickSettingsModal, DEFAULT_CREATOR_PHRASES, DEFAULT_VISITOR_PHRASES } from './QuickSettingsModal';
 import { ChatRenewalModal } from './ChatRenewalModal';
+import { RoomTimerMonitorModal } from './RoomTimerMonitorModal';
 import { WalletModal } from './WalletModal';
 import { ToastType, ToastOptions } from './Toast';
 import { getFollowers, getFollowing } from '../lib/followers';
@@ -249,11 +250,30 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     if (typeof window !== 'undefined' && roomId) {
       const saved = localStorage.getItem(`paid_chat_config_${roomId}`);
       if (saved) {
-        try { return JSON.parse(saved); } catch (e) {}
+        try { 
+          const parsed = JSON.parse(saved);
+          return {
+            enabled: parsed.enabled ?? (parsed.timeLimitEnabled ?? false),
+            timeLimitEnabled: parsed.timeLimitEnabled ?? (parsed.enabled ?? false),
+            paidRenewalEnabled: parsed.paidRenewalEnabled ?? true,
+            timerMode: parsed.timerMode || 'individual',
+            autoCloseOnExpire: parsed.autoCloseOnExpire ?? false,
+            intervalMinutes: parsed.intervalMinutes || 5,
+            costCredits: parsed.costCredits ?? 10,
+            warningSeconds: parsed.warningSeconds || 60,
+            autoDebitDefault: parsed.autoDebitDefault ?? false,
+            showTimerToParticipants: parsed.showTimerToParticipants ?? false,
+            roomCycleStartTime: parsed.roomCycleStartTime
+          };
+        } catch (e) {}
       }
     }
     return {
       enabled: false,
+      timeLimitEnabled: false,
+      paidRenewalEnabled: true,
+      timerMode: 'individual',
+      autoCloseOnExpire: false,
       intervalMinutes: 5,
       costCredits: 10,
       warningSeconds: 60,
@@ -361,10 +381,17 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     return cycle - (elapsed % cycle);
   };
 
-  // Chat Renewal States (Cronômetro regressivo em vermelho e Débito Automático)
+  // Chat Renewal & Room Timer States
   const [isRenewalModalOpen, setIsRenewalModalOpen] = useState(false);
   const [renewalSecondsRemaining, setRenewalSecondsRemaining] = useState(60);
   const [isChatPausedDueToRenewal, setIsChatPausedDueToRenewal] = useState(false);
+  const [isRoomAutoClosedModalOpen, setIsRoomAutoClosedModalOpen] = useState(false);
+  const [renewalCount, setRenewalCount] = useState(0);
+
+  // Monitor de Usuários para o Criador da Sala
+  const [userTimers, setUserTimers] = useState<Record<string, UserTimerState>>({});
+  const [isTimerMonitorOpen, setIsTimerMonitorOpen] = useState(false);
+
   const [sessionStartTime, setSessionStartTime] = useState<number>(() => {
     if (typeof window !== 'undefined' && roomId) {
       const saved = localStorage.getItem(`session_start_${roomId}_${user.id}`);
@@ -376,21 +403,22 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     return Date.now();
   });
 
-  // Manter sessionStartTime sincronizado ao trocar de sala
+  // Manter sessionStartTime sincronizado ao entrar na sala (reseta se ciclo já tiver expirado há muito tempo)
   useEffect(() => {
     if (!roomId) return;
+    const cycleMs = Math.max(30, (paidChatConfig.intervalMinutes || 5) * 60) * 1000;
     const saved = localStorage.getItem(`session_start_${roomId}_${user.id}`);
+    const now = Date.now();
     if (saved) {
       const num = parseInt(saved, 10);
-      if (!isNaN(num) && num > 0) {
+      if (!isNaN(num) && num > 0 && (now - num) < cycleMs) {
         setSessionStartTime(num);
         return;
       }
     }
-    const now = Date.now();
     setSessionStartTime(now);
     localStorage.setItem(`session_start_${roomId}_${user.id}`, now.toString());
-  }, [roomId, user.id]);
+  }, [roomId, user.id, paidChatConfig.intervalMinutes]);
 
   const [autoDebit, setAutoDebit] = useState<boolean>(() => {
     if (typeof window !== 'undefined' && roomId) {
@@ -412,25 +440,53 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   };
 
   const handleRenewChat = async () => {
-    if (user.credits < paidChatConfig.costCredits) {
+    const isFree = !paidChatConfig.paidRenewalEnabled;
+    const cost = isFree ? 0 : paidChatConfig.costCredits;
+
+    if (!isFree && user.credits < cost) {
       openWallet('recharge');
       showToast('Saldo insuficiente. Recarregue seus créditos para renovar.', 'warning');
       return;
     }
 
-    const cost = paidChatConfig.costCredits;
-    updateCredits(user.credits - cost);
+    if (!isFree && cost > 0) {
+      updateCredits(user.credits - cost);
+    }
+
     const now = Date.now();
     setSessionStartTime(now);
+    setRenewalCount(prev => prev + 1);
+    const cycleDuration = Math.max(30, (paidChatConfig.intervalMinutes || 5) * 60);
+    setRenewalSecondsRemaining(cycleDuration);
+
     if (roomId) {
       localStorage.setItem(`session_start_${roomId}_${user.id}`, now.toString());
     }
     setIsRenewalModalOpen(false);
     setIsChatPausedDueToRenewal(false);
-    showToast(`Chat renovado com sucesso! (-${cost} créditos)`, 'success');
+    showToast(isFree ? 'Ciclo do chat reiniciado com sucesso!' : `Chat renovado com sucesso! (-${cost} créditos)`, 'success');
+
+    // Notificar criador via canal de tempo
+    const activeChannel = roomChannel || roomChannelRef.current;
+    if (activeChannel) {
+      activeChannel.send({
+        type: 'broadcast',
+        event: 'user-timer-heartbeat',
+        payload: {
+          userId: user.id,
+          userName: user.name,
+          userPhoto: currentUserPhoto,
+          enteredAt: now,
+          secondsRemaining: cycleDuration,
+          renewalCount: renewalCount + 1,
+          status: 'renewed',
+          lastActive: Date.now()
+        }
+      });
+    }
 
     // Transfer or log transaction in Supabase
-    if (user.isLoggedIn && roomDetails?.creator_id && roomDetails.creator_id !== user.id) {
+    if (!isFree && cost > 0 && user.isLoggedIn && roomDetails?.creator_id && roomDetails.creator_id !== user.id) {
       try {
         await supabase.from('credit_transactions').insert([{
           sender_id: user.id,
@@ -443,6 +499,58 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
         console.warn('Could not log credit transaction:', e);
       }
     }
+  };
+
+  // Funções do monitor de tempo do criador
+  const handleGrantTimeToUser = (targetUserId: string) => {
+    const addSeconds = Math.max(60, (paidChatConfig.intervalMinutes || 5) * 60);
+    setUserTimers(prev => {
+      const u = prev[targetUserId];
+      if (!u) return prev;
+      return {
+        ...prev,
+        [targetUserId]: {
+          ...u,
+          secondsRemaining: u.secondsRemaining + addSeconds,
+          status: 'active'
+        }
+      };
+    });
+
+    const activeChannel = roomChannel || roomChannelRef.current;
+    if (activeChannel) {
+      activeChannel.send({
+        type: 'broadcast',
+        event: 'timer-grant-time',
+        payload: { targetUserId, additionalSeconds: addSeconds }
+      });
+    }
+    showToast('Tempo extra concedido para o usuário com sucesso!', 'success');
+  };
+
+  const handleCloseUserRoom = (targetUserId: string) => {
+    setUserTimers(prev => {
+      const u = prev[targetUserId];
+      if (!u) return prev;
+      return {
+        ...prev,
+        [targetUserId]: {
+          ...u,
+          secondsRemaining: 0,
+          status: 'expired'
+        }
+      };
+    });
+
+    const activeChannel = roomChannel || roomChannelRef.current;
+    if (activeChannel) {
+      activeChannel.send({
+        type: 'broadcast',
+        event: 'timer-close-user',
+        payload: { targetUserId }
+      });
+    }
+    showToast('Sessão do usuário encerrada.', 'info');
   };
 
   const handleSaveQuickSettings = async (
@@ -717,77 +825,131 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
   }, [quickStream, quickRecordingType, isReviewing, isQuickRecording]);
 
   const isHost = !!(
+    (roomDetails && roomDetails.creator_id && roomDetails.creator_id === user.id) ||
     roomId === user.id ||
-    roomId?.startsWith('priv-') ||
-    roomId?.startsWith('guest_') ||
-    (roomDetails && roomDetails.creator_id === user.id)
+    (typeof window !== 'undefined' && roomId && localStorage.getItem(`room_creator_${roomId}`) === user.id) ||
+    (roomDetails && Array.isArray(roomDetails.admins) && roomDetails.admins.includes(user.id) && user.isLoggedIn)
   );
   const isWatchPartyHost = watchPartyHostId ? watchPartyHostId === user.id : !!(localVideoUrl || isHost);
   const isAdmin = isHost || (user.isLoggedIn && roomAdmins.has(user.id)) || roomId?.startsWith('guest_');
   const canControlVideo = true; // Everyone can insert and control video
 
-  // Paid Chat Rotation Timer Effect (Cobrança Rotativa a cada X minutos)
+  // Paid Chat Rotation Timer Effect (Cobrança Rotativa e Tempo Limite)
   useEffect(() => {
-    // If not enabled or no roomId, reset states
-    if (!paidChatConfig.enabled || !roomId) {
+    const isTimerActive = !!(paidChatConfig.timeLimitEnabled || paidChatConfig.enabled);
+    if (!isTimerActive || !roomId) {
       setIsRenewalModalOpen(false);
       setIsChatPausedDueToRenewal(false);
+      setIsRoomAutoClosedModalOpen(false);
       return;
     }
 
-    // Host does not pay, so ensure modal and pause are closed
+    // Host does not pay, so ensure renewal modal is closed for host
     if (isHost) {
       setIsRenewalModalOpen(false);
       setIsChatPausedDueToRenewal(false);
+      setIsRoomAutoClosedModalOpen(false);
     }
 
     const interval = setInterval(() => {
       const cycleDurationSeconds = Math.max(30, (paidChatConfig.intervalMinutes || 5) * 60);
       const warningDuration = Math.min(paidChatConfig.warningSeconds || 60, cycleDurationSeconds);
-      const elapsedSeconds = Math.max(0, Math.floor((Date.now() - sessionStartTime) / 1000));
-      const secondsLeftInCycle = cycleDurationSeconds - (elapsedSeconds % cycleDurationSeconds);
+      let secondsLeftInCycle = 0;
+
+      if (paidChatConfig.timerMode === 'room_global') {
+        // Modo Sala Global: sincronizado com início da sala pelo criador
+        const roomStart = paidChatConfig.roomCycleStartTime || ((roomDetails as any)?.created_at ? new Date((roomDetails as any).created_at).getTime() : sessionStartTime);
+        const elapsedGlobal = Math.max(0, Math.floor((Date.now() - roomStart) / 1000));
+        secondsLeftInCycle = Math.max(0, cycleDurationSeconds - (elapsedGlobal % cycleDurationSeconds));
+      } else {
+        // Modo Individual: cada usuário tem seu próprio tempo contado a partir de quando entrou
+        const elapsed = Math.max(0, Math.floor((Date.now() - sessionStartTime) / 1000));
+        secondsLeftInCycle = Math.max(0, cycleDurationSeconds - elapsed);
+      }
 
       setRenewalSecondsRemaining(secondsLeftInCycle);
 
-      // If user is room creator/host, host does not receive renewal prompts, warnings or chat pause
+      // Se for o criador / host:
       if (isHost) {
+        // Faz a contagem regressiva em tempo real nos timers dos usuários no monitor
+        setUserTimers(prev => {
+          if (Object.keys(prev).length === 0) return prev;
+          let changed = false;
+          const next: Record<string, UserTimerState> = {};
+          for (const [uid, u] of Object.entries(prev)) {
+            const nextSec = Math.max(0, u.secondsRemaining - 1);
+            let nextStatus = u.status;
+            if (nextSec === 0) nextStatus = 'expired';
+            else if (nextSec <= warningDuration) nextStatus = 'warning';
+            if (nextSec !== u.secondsRemaining || nextStatus !== u.status) {
+              changed = true;
+            }
+            next[uid] = { ...u, secondsRemaining: nextSec, status: nextStatus };
+          }
+          return changed ? next : prev;
+        });
         return;
       }
 
-      // Warning window reached (e.g. within 60s / 300s before expiring)
+      // Participante: janela de aviso antes de expirar
       if (secondsLeftInCycle <= warningDuration && secondsLeftInCycle > 1) {
-        if (autoDebit) {
-          // If auto debit is enabled and user has enough credits, automatically renew without interruption
-          if (user.credits >= paidChatConfig.costCredits) {
-            updateCredits(user.credits - paidChatConfig.costCredits);
-            const now = Date.now();
-            setSessionStartTime(now);
-            localStorage.setItem(`session_start_${roomId}_${user.id}`, now.toString());
-            setIsRenewalModalOpen(false);
-            setIsChatPausedDueToRenewal(false);
-            showToast(`Chat renovado automaticamente (-${paidChatConfig.costCredits} créditos)`, 'success');
-            return;
+        if (paidChatConfig.autoCloseOnExpire) {
+          // No fechamento automático, não abre modal de renovação paga
+          return;
+        }
+
+        if (paidChatConfig.paidRenewalEnabled) {
+          if (autoDebit) {
+            if (user.credits >= paidChatConfig.costCredits) {
+              updateCredits(user.credits - paidChatConfig.costCredits);
+              const now = Date.now();
+              setSessionStartTime(now);
+              setRenewalCount(p => p + 1);
+              localStorage.setItem(`session_start_${roomId}_${user.id}`, now.toString());
+              setIsRenewalModalOpen(false);
+              setIsChatPausedDueToRenewal(false);
+              showToast(`Chat renovado automaticamente (-${paidChatConfig.costCredits} créditos)`, 'success');
+              return;
+            } else {
+              setIsRenewalModalOpen(true);
+            }
           } else {
-            // Auto-debit failed due to insufficient credits: alert user with red countdown
             setIsRenewalModalOpen(true);
           }
         } else {
-          // Manual renewal: show modal with red countdown timer
+          // Renovação gratuita (apenas reset de ciclo)
           setIsRenewalModalOpen(true);
         }
       }
 
-      // Time ran out (Cycle ended and not renewed)
-      if (secondsLeftInCycle <= 1 || elapsedSeconds >= cycleDurationSeconds) {
-        if (autoDebit && user.credits >= paidChatConfig.costCredits) {
-          updateCredits(user.credits - paidChatConfig.costCredits);
-          const now = Date.now();
-          setSessionStartTime(now);
-          localStorage.setItem(`session_start_${roomId}_${user.id}`, now.toString());
+      // Participante: tempo esgotou
+      if (secondsLeftInCycle <= 0) {
+        if (paidChatConfig.autoCloseOnExpire) {
+          // Fechamento automático: fecha sala imediatamente sem opção de renovação
+          setIsChatPausedDueToRenewal(true);
           setIsRenewalModalOpen(false);
-          setIsChatPausedDueToRenewal(false);
-          showToast(`Chat renovado automaticamente (-${paidChatConfig.costCredits} créditos)`, 'success');
+          setIsRoomAutoClosedModalOpen(true);
+          setRenewalSecondsRemaining(0);
+          return;
+        }
+
+        if (paidChatConfig.paidRenewalEnabled) {
+          if (autoDebit && user.credits >= paidChatConfig.costCredits) {
+            updateCredits(user.credits - paidChatConfig.costCredits);
+            const now = Date.now();
+            setSessionStartTime(now);
+            setRenewalCount(p => p + 1);
+            localStorage.setItem(`session_start_${roomId}_${user.id}`, now.toString());
+            setIsRenewalModalOpen(false);
+            setIsChatPausedDueToRenewal(false);
+            showToast(`Chat renovado automaticamente (-${paidChatConfig.costCredits} créditos)`, 'success');
+          } else {
+            setIsChatPausedDueToRenewal(true);
+            setIsRenewalModalOpen(true);
+            setRenewalSecondsRemaining(0);
+          }
         } else {
+          // Modo gratuito sem auto-close
           setIsChatPausedDueToRenewal(true);
           setIsRenewalModalOpen(true);
           setRenewalSecondsRemaining(0);
@@ -797,6 +959,42 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
     return () => clearInterval(interval);
   }, [paidChatConfig, isHost, roomId, sessionStartTime, autoDebit, user.credits]);
+
+  // Heartbeat do participante para o criador monitorar o tempo de cada usuário
+  useEffect(() => {
+    if (isHost || !(paidChatConfig.timeLimitEnabled || paidChatConfig.enabled) || !roomId) return;
+    const activeChannel = roomChannel || roomChannelRef.current;
+    if (!activeChannel) return;
+
+    const interval = setInterval(() => {
+      let currentStatus: UserTimerState['status'] = 'active';
+      const warningDuration = Math.min(paidChatConfig.warningSeconds || 60, (paidChatConfig.intervalMinutes || 5) * 60);
+      if (renewalSecondsRemaining <= 0) {
+        currentStatus = 'expired';
+      } else if (renewalSecondsRemaining <= warningDuration) {
+        currentStatus = 'warning';
+      } else if (renewalCount > 0) {
+        currentStatus = 'renewed';
+      }
+
+      activeChannel.send({
+        type: 'broadcast',
+        event: 'user-timer-heartbeat',
+        payload: {
+          userId: user.id,
+          userName: user.name,
+          userPhoto: currentUserPhoto,
+          enteredAt: sessionStartTime,
+          secondsRemaining: renewalSecondsRemaining,
+          renewalCount: renewalCount,
+          status: currentStatus,
+          lastActive: Date.now()
+        }
+      });
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [isHost, paidChatConfig, roomId, renewalSecondsRemaining, renewalCount, sessionStartTime, user, currentUserPhoto, roomChannel]);
 
   const toggleVideoController = (userId: string) => {
     if (!isHost) return;
@@ -1493,6 +1691,58 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     fetchMessages();
 
     const channel = supabase.channel(`room:${roomId}`)
+      .on('broadcast', { event: 'chat-message-direct' }, (payload) => {
+        const m = payload?.payload;
+        if (!m || !m.id || m.sender_id === user.id) return;
+        setMessages(prev => {
+          if (prev.some(msg => msg.id === m.id || (msg.senderId === m.sender_id && msg.text === m.text && Math.abs(msg.timestamp - new Date(m.created_at).getTime()) < 5000))) {
+            return prev;
+          }
+          return [...prev, {
+            id: m.id,
+            senderId: m.sender_id,
+            senderName: m.sender_name,
+            text: m.text,
+            timestamp: new Date(m.created_at).getTime()
+          }];
+        });
+      })
+      .on('broadcast', { event: 'user-timer-heartbeat' }, (payload) => {
+        const u = payload?.payload;
+        if (!u || !u.userId || u.userId === user.id) return;
+        setUserTimers(prev => ({
+          ...prev,
+          [u.userId]: {
+            userId: u.userId,
+            userName: u.userName || 'Visitante',
+            userPhoto: u.userPhoto || userAvatars[u.userId],
+            enteredAt: u.enteredAt || Date.now(),
+            secondsRemaining: u.secondsRemaining !== undefined ? u.secondsRemaining : 0,
+            renewalCount: u.renewalCount || 0,
+            status: u.status || 'active',
+            lastActive: Date.now()
+          }
+        }));
+      })
+      .on('broadcast', { event: 'timer-grant-time' }, (payload) => {
+        if (payload?.payload?.targetUserId === user.id) {
+          const addSec = payload?.payload?.additionalSeconds || 300;
+          setRenewalSecondsRemaining(prev => prev + addSec);
+          setIsChatPausedDueToRenewal(false);
+          setIsRenewalModalOpen(false);
+          setIsRoomAutoClosedModalOpen(false);
+          showToast(`O criador concedeu tempo extra para você no chat!`, 'success');
+        }
+      })
+      .on('broadcast', { event: 'timer-close-user' }, (payload) => {
+        if (payload?.payload?.targetUserId === user.id) {
+          setIsChatPausedDueToRenewal(true);
+          setIsRenewalModalOpen(false);
+          setIsRoomAutoClosedModalOpen(true);
+          setRenewalSecondsRemaining(0);
+          showToast('O criador encerrou sua sessão nesta sala.', 'warning');
+        }
+      })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` },
         (payload) => {
           const m = payload.new;
@@ -1507,7 +1757,30 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
               } catch {}
             })();
           }
-          setMessages(prev => [...prev, { id: m.id, senderId: m.sender_id, senderName: m.sender_name, text: m.text, card: m.card_data, timestamp: new Date(m.created_at).getTime() }]);
+          setMessages(prev => {
+            if (prev.some(msg => msg.id === m.id)) return prev;
+            const optIdx = prev.findIndex(msg => msg.senderId === m.sender_id && msg.text === m.text && Math.abs(msg.timestamp - new Date(m.created_at).getTime()) < 15000);
+            if (optIdx !== -1) {
+              const copy = [...prev];
+              copy[optIdx] = {
+                id: m.id,
+                senderId: m.sender_id,
+                senderName: m.sender_name,
+                text: m.text,
+                card: m.card_data,
+                timestamp: new Date(m.created_at).getTime()
+              };
+              return copy;
+            }
+            return [...prev, {
+              id: m.id,
+              senderId: m.sender_id,
+              senderName: m.sender_name,
+              text: m.text,
+              card: m.card_data,
+              timestamp: new Date(m.created_at).getTime()
+            }];
+          });
         })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` },
         (payload) => { setMessages(prev => prev.filter(m => m.id !== payload.old.id)); })
@@ -2871,35 +3144,56 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       setInputText('');
     }
 
+    const optimisticId = 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+    const now = Date.now();
+    const optimisticMsg: Message = {
+      id: optimisticId,
+      senderId: user.id,
+      senderName: user.name,
+      text: text,
+      timestamp: now
+    };
+
+    // 1. Imediatamente adiciona no estado local para que o remetente (criador ou usuário) veja sua mensagem na tela instantaneamente
+    setMessages(prev => [...prev, optimisticMsg]);
+
+    // 2. Transmite via broadcast para entrega ultra-rápida entre criador e usuários
+    const activeChannel = roomChannel || roomChannelRef.current;
+    if (activeChannel) {
+      activeChannel.send({
+        type: 'broadcast',
+        event: 'chat-message-direct',
+        payload: {
+          id: optimisticId,
+          sender_id: user.id,
+          sender_name: user.name,
+          text: text,
+          created_at: new Date(now).toISOString()
+        }
+      });
+    }
+
+    // 3. Persiste no Supabase
     try {
-      const { error } = await supabase.from('messages').insert([{ 
+      const { data: insertedData, error } = await supabase.from('messages').insert([{ 
         room_id: roomId, 
         sender_id: user.id, 
         sender_name: user.name, 
         text: text 
-      }]);
+      }]).select().single();
+
       if (error) {
-        console.warn('Supabase insert message error (fallback to local):', error);
-        // Fallback optimistic message
-        const optimisticMsg: Message = {
-          id: 'msg_' + Math.random().toString(36).substring(2, 10),
-          senderId: user.id,
-          senderName: user.name,
-          text: text,
-          timestamp: Date.now()
-        };
-        setMessages(prev => [...prev, optimisticMsg]);
+        console.warn('Supabase insert message error (mantendo mensagem otimista):', error);
+      } else if (insertedData) {
+        // Atualiza o ID temporário pelo ID real do banco
+        setMessages(prev => prev.map(m => m.id === optimisticId ? {
+          ...m,
+          id: insertedData.id,
+          timestamp: new Date(insertedData.created_at).getTime()
+        } : m));
       }
     } catch (e) {
-      console.warn('Network error sending message, adding locally:', e);
-      const optimisticMsg: Message = {
-        id: 'msg_' + Math.random().toString(36).substring(2, 10),
-        senderId: user.id,
-        senderName: user.name,
-        text: text,
-        timestamp: Date.now()
-      };
-      setMessages(prev => [...prev, optimisticMsg]);
+      console.warn('Network error sending message (mantendo mensagem otimista):', e);
     }
   };
 
@@ -3663,20 +3957,32 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           {/* Header Right: Theme + Wallet/Credits + Video Call + Lixeira (Limpar) + Earnings + Share + Close */}
           <div className="flex items-center gap-1 sm:gap-2 shrink-0 relative">
             {/* Cronômetro da Sala na Borda Superior (Ao lado do alternar tema p gold - Destaque da Imagem 2) */}
-            {paidChatConfig.enabled && (isHost || paidChatConfig.showTimerToParticipants) && (
-              <div 
-                className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-mono font-black border tracking-tight shadow-xs select-none transition-all ${
+            {(paidChatConfig.timeLimitEnabled || paidChatConfig.enabled) && (isHost || paidChatConfig.showTimerToParticipants) && (
+              <button 
+                type="button"
+                onClick={() => {
+                  if (isHost) {
+                    setIsTimerMonitorOpen(true);
+                  } else if (!paidChatConfig.autoCloseOnExpire) {
+                    setIsRenewalModalOpen(true);
+                  }
+                }}
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-mono font-black border tracking-tight shadow-xs transition-all cursor-pointer active:scale-95 ${
                   isGold 
-                    ? 'bg-white border-[#1A1712]/15 text-[#A37B14]' 
+                    ? 'bg-white border-[#1A1712]/15 text-[#A37B14] hover:bg-[#F9F7F2]' 
                     : isDark
                       ? (renewalSecondsRemaining <= (paidChatConfig.warningSeconds || 60)
                           ? 'bg-red-950/60 text-red-400 border-red-500/60 ring-1 ring-red-500/30'
-                          : 'bg-slate-900/90 text-amber-400 border-slate-700/80')
+                          : 'bg-slate-900/90 text-amber-400 border-slate-700/80 hover:bg-slate-800')
                       : (renewalSecondsRemaining <= (paidChatConfig.warningSeconds || 60)
                           ? 'bg-red-50 text-red-600 border-red-300 ring-1 ring-red-200'
-                          : 'bg-amber-50 text-amber-800 border-amber-200')
+                          : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100')
                 }`}
-                title={`Tempo Restante da Sala (${paidChatConfig.intervalMinutes} min): ${formatTimer(renewalSecondsRemaining)}`}
+                title={
+                  isHost 
+                    ? `Clique para abrir o Monitor de Tempo de Cada Usuário (${paidChatConfig.intervalMinutes} min por usuário)` 
+                    : `Tempo Restante da Sala (${paidChatConfig.intervalMinutes} min): ${formatTimer(renewalSecondsRemaining)}`
+                }
               >
                 <Clock 
                   size={14} 
@@ -3689,7 +3995,14 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                 <span className={renewalSecondsRemaining <= (paidChatConfig.warningSeconds || 60) ? 'text-red-500 font-bold' : ''}>
                   {formatTimer(renewalSecondsRemaining)}
                 </span>
-              </div>
+                {isHost && (
+                  <span className={`ml-0.5 px-1.5 py-0.2 rounded-md text-[9px] font-sans font-bold uppercase tracking-wider ${
+                    isGold ? 'bg-[#A37B14]/15 text-[#A37B14]' : isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-200/60 text-amber-900'
+                  }`}>
+                    {Object.keys(userTimers).length > 0 ? `${Object.keys(userTimers).length} no chat` : 'Monitor'}
+                  </span>
+                )}
+              </button>
             )}
 
             <button 
@@ -5557,8 +5870,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           />
         )}
 
-        {/* Modal de Renovação de Chat (Cobrança Rotativa com Cronômetro em Vermelho e Débito Automático) */}
-        {isRenewalModalOpen && !isHost && paidChatConfig.enabled && (
+        {/* Modal de Renovação de Chat (Cobrança Rotativa ou Ciclo de Tempo Gratuito) */}
+        {isRenewalModalOpen && !isHost && (paidChatConfig.timeLimitEnabled || paidChatConfig.enabled) && !paidChatConfig.autoCloseOnExpire && (
           <ChatRenewalModal
             isOpen={isRenewalModalOpen}
             onClose={() => {
@@ -5581,7 +5894,58 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
             creatorName={roomDetails?.creator_id ? 'Criador' : undefined}
             theme={theme}
             isExpired={isChatPausedDueToRenewal}
+            isFreeRenewal={!paidChatConfig.paidRenewalEnabled}
           />
+        )}
+
+        {/* Modal do Monitor de Tempo dos Usuários (Exclusivo para o Criador da Sala) */}
+        {isTimerMonitorOpen && isHost && (
+          <RoomTimerMonitorModal
+            isOpen={isTimerMonitorOpen}
+            onClose={() => setIsTimerMonitorOpen(false)}
+            theme={theme}
+            roomName={roomDetails?.name || 'Esta Sala'}
+            config={paidChatConfig}
+            userTimers={userTimers}
+            onGrantTime={handleGrantTimeToUser}
+            onCloseUserRoom={handleCloseUserRoom}
+          />
+        )}
+
+        {/* Modal de Encerramento Automático da Sala (Quando autoCloseOnExpire está ativado) */}
+        {isRoomAutoClosedModalOpen && (
+          <div className="fixed inset-0 z-[750] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-200">
+            <div className={`w-full max-w-md p-6 sm:p-8 rounded-[2.5rem] shadow-2xl border text-center relative flex flex-col items-center gap-5 animate-in zoom-in-95 duration-200 ${
+              isGold ? 'bg-[#1A1712] border-[#A37B14]/40 text-[#E5C378]' : isDark ? 'bg-[#0f172a] border-red-500/40 text-white' : 'bg-white border-red-300 text-slate-900'
+            }`}>
+              <div className="w-16 h-16 rounded-3xl bg-red-500/15 border border-red-500/30 text-red-500 flex items-center justify-center animate-bounce">
+                <Clock size={32} className="stroke-[2.5]" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-red-500 block mb-1">
+                  TEMPO LIMITE ESGOTADO
+                </span>
+                <h3 className="text-xl font-black tracking-tight">
+                  Sala Fechada Automaticamente
+                </h3>
+                <p className={`text-xs mt-2 font-medium leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                  O tempo limite configurado para esta sala foi concluído. A sala foi programada com encerramento automático sem renovação.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRoomAutoClosedModalOpen(false);
+                  navigate('/');
+                }}
+                className="w-full py-4 bg-gradient-to-r from-red-600 to-rose-600 hover:opacity-95 text-white font-black rounded-2xl uppercase tracking-[0.15em] text-xs shadow-xl active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <DoorOpen size={18} />
+                <span>Sair e Voltar ao Início</span>
+              </button>
+            </div>
+          </div>
         )}
 
         {/* MODAL DE CONFIRMAÇÃO DE LIMPEZA DO CHAT */}

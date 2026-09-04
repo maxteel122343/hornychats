@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   X, Save, Settings, Layers, Palette, Eye, Sliders, Timer, Zap, Tag, DollarSign, 
   FolderOpen, ArrowLeft, Clock, MessageSquare, Plus, Trash2, Sparkles, AlertCircle, RotateCcw,
-  DoorOpen, Users, CheckCircle2, Shield
+  DoorOpen, Users, CheckCircle2, Shield, Coins
 } from 'lucide-react';
 import { CardDefaults, PaidChatConfig, QuickPhrasesConfig, ShowcaseChatConfig, AppTheme } from '../types';
 import { saveCreatorChatRouting } from '../lib/chatRouting';
@@ -69,14 +69,29 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({
   const [data, setData] = useState<CardDefaults>(initialDefaults);
   const [activeTab, setActiveTab] = useState<'general' | 'advanced' | 'paid_chat' | 'phrases' | 'showcase_chat'>(initialTab);
 
-  // Paid Chat State (Cobrança Rotativa de Chat)
-  const [paidChat, setPaidChat] = useState<PaidChatConfig>(initialPaidChat || {
-    enabled: false,
-    intervalMinutes: 5,
-    costCredits: 10,
-    warningSeconds: 60,
-    autoDebitDefault: false,
-    showTimerToParticipants: false
+  // Paid Chat State (Cobrança Rotativa de Chat & Tempo Limitado)
+  const [paidChat, setPaidChat] = useState<PaidChatConfig>(() => {
+    const init = initialPaidChat || {
+      enabled: false,
+      timeLimitEnabled: false,
+      paidRenewalEnabled: false,
+      intervalMinutes: 5,
+      costCredits: 10,
+      warningSeconds: 60,
+      autoDebitDefault: false,
+      showTimerToParticipants: false,
+      autoCloseOnExpire: false,
+      timerMode: 'individual' as const
+    };
+    const isEnabled = Boolean(init.enabled || init.timeLimitEnabled);
+    return {
+      ...init,
+      enabled: isEnabled,
+      timeLimitEnabled: init.timeLimitEnabled !== undefined ? init.timeLimitEnabled : isEnabled,
+      paidRenewalEnabled: init.paidRenewalEnabled !== undefined ? init.paidRenewalEnabled : isEnabled,
+      autoCloseOnExpire: Boolean(init.autoCloseOnExpire),
+      timerMode: init.timerMode || 'individual'
+    };
   });
 
   // Quick Phrases State (Balões de Frases)
@@ -296,21 +311,21 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({
         {/* Scrollable Form Content */}
         <div className="flex-1 overflow-y-auto pr-1 space-y-5 scrollbar-thin">
           
-          {/* TAB 1: TEMPO DE CHAT PAGO (COBRANÇA ROTATIVA) */}
+          {/* TAB 1: TEMPO DE CHAT & COBRANÇA ROTATIVA */}
           {activeTab === 'paid_chat' && (
-            <div className="space-y-5">
+            <div className="space-y-4">
               
-              {/* Main Activation Banner */}
+              {/* TOGGLE 1: MODELO DE TEMPO LIMITADO DO CHAT (CRONÔMETRO) */}
               <div className={`p-4 sm:p-5 rounded-3xl border transition-all ${
-                paidChat.enabled 
-                  ? (isDark ? 'bg-red-950/30 border-red-500/50' : 'bg-red-50 border-red-300')
+                paidChat.timeLimitEnabled 
+                  ? (isDark ? 'bg-amber-950/30 border-amber-500/50' : 'bg-amber-50 border-amber-300')
                   : (isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-gray-50 border-gray-200')
               }`}>
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all ${
-                      paidChat.enabled
-                        ? 'bg-red-500 text-white shadow-lg shadow-red-500/30 animate-pulse'
+                      paidChat.timeLimitEnabled
+                        ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/30 animate-pulse'
                         : (isDark ? 'bg-slate-800 text-slate-400' : 'bg-gray-200 text-slate-500')
                     }`}>
                       <Clock size={24} />
@@ -318,18 +333,18 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({
                     <div>
                       <div className="flex items-center gap-2">
                         <span className={`text-sm font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          Cobrança Rotativa de Chat
+                          Ativar Tempo Limitado do Chat
                         </span>
                         <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
-                          paidChat.enabled 
-                            ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
+                          paidChat.timeLimitEnabled 
+                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
                             : (isDark ? 'bg-slate-800 text-slate-400' : 'bg-gray-200 text-slate-600')
                         }`}>
-                          {paidChat.enabled ? 'ATIVADO' : 'DESLIGADO'}
+                          {paidChat.timeLimitEnabled ? 'CRONÔMETRO ATIVO' : 'ILIMITADO'}
                         </span>
                       </div>
                       <p className={`text-[11px] mt-0.5 font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                        Exige renovação paga a cada intervalo de tempo para os participantes continuarem no chat.
+                        Ativa o relógio e contagem regressiva para a sala. Funciona mesmo sem cobrança de créditos.
                       </p>
                     </div>
                   </div>
@@ -338,31 +353,34 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({
                   <button
                     type="button"
                     role="switch"
-                    aria-checked={paidChat.enabled}
-                    onClick={() => handlePaidChatChange('enabled', !paidChat.enabled)}
+                    aria-checked={Boolean(paidChat.timeLimitEnabled)}
+                    onClick={() => {
+                      const next = !paidChat.timeLimitEnabled;
+                      handlePaidChatChange('timeLimitEnabled', next);
+                      handlePaidChatChange('enabled', next);
+                    }}
                     className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      paidChat.enabled ? 'bg-red-500' : (isDark ? 'bg-slate-700' : 'bg-gray-300')
+                      paidChat.timeLimitEnabled ? 'bg-amber-500' : (isDark ? 'bg-slate-700' : 'bg-gray-300')
                     }`}
                   >
                     <span
                       aria-hidden="true"
                       className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                        paidChat.enabled ? 'translate-x-5' : 'translate-x-0'
+                        paidChat.timeLimitEnabled ? 'translate-x-5' : 'translate-x-0'
                       }`}
                     />
                   </button>
                 </div>
               </div>
 
-              {/* Time Interval & Cost Configuration */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                
+              {/* Time Interval & Warning Configuration */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Intervalo de Tempo */}
                 <div className={`p-4 rounded-2xl border space-y-3 ${
                   isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-gray-50 border-gray-200'
                 }`}>
                   <label className={`text-[10px] font-black uppercase tracking-widest block ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                    INTERVALO DE TEMPO DO CHAT
+                    DURAÇÃO DO CICLO DE TEMPO
                   </label>
                   <div className="flex items-center gap-2">
                     <input
@@ -371,10 +389,10 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({
                       max="120"
                       value={paidChat.intervalMinutes}
                       onChange={(e) => handlePaidChatChange('intervalMinutes', Math.max(1, parseInt(e.target.value) || 1))}
-                      className={`w-24 border rounded-xl p-3 text-center text-lg font-black outline-none transition-all ${
+                      className={`w-24 border rounded-xl p-2.5 text-center text-lg font-black outline-none transition-all ${
                         isDark 
-                          ? 'bg-slate-900 border-slate-700 text-white focus:border-red-500' 
-                          : 'bg-white border-gray-200 text-slate-900 focus:border-red-500'
+                          ? 'bg-slate-900 border-slate-700 text-white focus:border-amber-500' 
+                          : 'bg-white border-gray-200 text-slate-900 focus:border-amber-500'
                       }`}
                     />
                     <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
@@ -382,7 +400,6 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({
                     </span>
                   </div>
 
-                  {/* Quick Preset Buttons */}
                   <div className="flex flex-wrap gap-1.5 pt-1">
                     {[1, 2, 5, 10, 15, 30].map(mins => (
                       <button
@@ -391,7 +408,7 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({
                         onClick={() => handlePaidChatChange('intervalMinutes', mins)}
                         className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all ${
                           paidChat.intervalMinutes === mins
-                            ? 'bg-red-500 text-white border-red-500 shadow-sm'
+                            ? 'bg-amber-500 text-black border-amber-500 shadow-sm font-black'
                             : (isDark ? 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white' : 'bg-white text-slate-600 border-gray-200 hover:bg-gray-100')
                         }`}
                       >
@@ -401,64 +418,13 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({
                   </div>
                 </div>
 
-                {/* Valor Cobrado por Ciclo */}
+                {/* Aviso Regressivo em Vermelho */}
                 <div className={`p-4 rounded-2xl border space-y-3 ${
                   isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-gray-50 border-gray-200'
                 }`}>
-                  <label className={`text-[10px] font-black uppercase tracking-widest block text-red-500`}>
-                    VALOR COBRADO NA RENOVAÇÃO
+                  <label className={`text-[10px] font-black uppercase tracking-widest block text-red-400`}>
+                    AVISO REGRESSIVO ANTES DO FIM
                   </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min="1"
-                      max="10000"
-                      value={paidChat.costCredits}
-                      onChange={(e) => handlePaidChatChange('costCredits', Math.max(1, parseInt(e.target.value) || 1))}
-                      className={`w-28 border rounded-xl p-3 text-center text-lg font-black outline-none transition-all ${
-                        isDark 
-                          ? 'bg-slate-900 border-slate-700 text-white focus:border-red-500' 
-                          : 'bg-white border-gray-200 text-slate-900 focus:border-red-500'
-                      }`}
-                    />
-                    <span className="text-xs font-bold text-emerald-500 uppercase tracking-wider">
-                      Créditos por renovação
-                    </span>
-                  </div>
-
-                  {/* Quick Preset Buttons */}
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {[5, 10, 20, 50, 100].map(cr => (
-                      <button
-                        key={cr}
-                        type="button"
-                        onClick={() => handlePaidChatChange('costCredits', cr)}
-                        className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all ${
-                          paidChat.costCredits === cr
-                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                            : (isDark ? 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white' : 'bg-white text-slate-600 border-gray-200 hover:bg-gray-100')
-                        }`}
-                      >
-                        {cr} cr
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Tempo do Cronômetro Regressivo */}
-              <div className={`p-4 rounded-2xl border space-y-2 ${
-                isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-gray-50 border-gray-200'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className={`text-[10px] font-black uppercase tracking-widest block text-red-400`}>
-                      AVISO DE CRONÔMETRO REGRESSIVO EM VERMELHO
-                    </label>
-                    <p className={`text-[10px] mt-0.5 font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                      Tempo de contagem regressiva em destaque vermelho exibido para o usuário antes do chat fechar (de 1 até 5 minutos).
-                    </p>
-                  </div>
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
@@ -466,7 +432,7 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({
                       max="600"
                       value={paidChat.warningSeconds || 60}
                       onChange={(e) => handlePaidChatChange('warningSeconds', Math.max(10, parseInt(e.target.value) || 60))}
-                      className={`w-20 border rounded-xl p-2 text-center text-sm font-black outline-none font-mono ${
+                      className={`w-24 border rounded-xl p-2.5 text-center text-lg font-black outline-none font-mono ${
                         isDark 
                           ? 'bg-slate-900 border-slate-700 text-red-400 focus:border-red-500' 
                           : 'bg-white border-gray-200 text-red-600 focus:border-red-500'
@@ -476,27 +442,230 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({
                       segundos ({Math.round((paidChat.warningSeconds || 60) / 60 * 10) / 10} min)
                     </span>
                   </div>
-                </div>
 
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {[60, 120, 180, 240, 300].map(sec => (
-                    <button
-                      key={sec}
-                      type="button"
-                      onClick={() => handlePaidChatChange('warningSeconds', sec)}
-                      className={`text-[10px] font-bold px-3 py-1.5 rounded-xl border transition-all ${
-                        (paidChat.warningSeconds || 60) === sec
-                          ? 'bg-red-600 text-white border-red-500 shadow-md scale-105'
-                          : (isDark ? 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white' : 'bg-white text-slate-600 border-gray-200 hover:bg-gray-100')
-                      }`}
-                    >
-                      {sec / 60} min ({sec}s)
-                    </button>
-                  ))}
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {[30, 60, 120, 180].map(sec => (
+                      <button
+                        key={sec}
+                        type="button"
+                        onClick={() => handlePaidChatChange('warningSeconds', sec)}
+                        className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all ${
+                          (paidChat.warningSeconds || 60) === sec
+                            ? 'bg-red-600 text-white border-red-500 shadow-sm font-black'
+                            : (isDark ? 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white' : 'bg-white text-slate-600 border-gray-200 hover:bg-gray-100')
+                        }`}
+                      >
+                        {sec}s ({sec / 60} min)
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
-              {/* Toggle: Exibir Cronômetro para o Usuário no Topo */}
+              {/* TOGGLE 2: COBRANÇA ROTATIVA EM CRÉDITOS (SEPARADO DO TEMPO) */}
+              <div className={`p-4 rounded-2xl border transition-all ${
+                paidChat.paidRenewalEnabled 
+                  ? (isDark ? 'bg-red-950/30 border-red-500/40' : 'bg-red-50 border-red-200')
+                  : (isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-gray-50 border-gray-200')
+              }`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                      paidChat.paidRenewalEnabled 
+                        ? 'bg-red-500 text-white shadow-md' 
+                        : (isDark ? 'bg-slate-800 text-slate-500' : 'bg-gray-200 text-slate-500')
+                    }`}>
+                      <Coins size={18} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                          Cobrança Rotativa em Créditos
+                        </span>
+                        <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
+                          paidChat.paidRenewalEnabled 
+                            ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
+                            : (isDark ? 'bg-slate-800 text-slate-500' : 'bg-gray-200 text-slate-600')
+                        }`}>
+                          {paidChat.paidRenewalEnabled ? 'COBRANÇA ATIVA' : 'GRATUITO (SEM CRÉDITOS)'}
+                        </span>
+                      </div>
+                      <p className={`text-[11px] mt-0.5 font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Quando ativado, exige pagamento de créditos para renovar o chat. Se desativado, o tempo corre sem cobrar créditos do usuário.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={Boolean(paidChat.paidRenewalEnabled)}
+                    onClick={() => handlePaidChatChange('paidRenewalEnabled', !paidChat.paidRenewalEnabled)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      paidChat.paidRenewalEnabled ? 'bg-red-500' : (isDark ? 'bg-slate-700' : 'bg-gray-300')
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        paidChat.paidRenewalEnabled ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Sub-config: Valor em créditos (apenas quando cobrança está ativada) */}
+                {paidChat.paidRenewalEnabled && (
+                  <div className="mt-3 pt-3 border-t border-red-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2 animate-in fade-in duration-200">
+                    <span className="text-xs font-bold text-red-400 uppercase tracking-wider">
+                      Valor cobrado por renovação:
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        max="10000"
+                        value={paidChat.costCredits}
+                        onChange={(e) => handlePaidChatChange('costCredits', Math.max(1, parseInt(e.target.value) || 1))}
+                        className={`w-20 border rounded-xl p-2 text-center text-sm font-black outline-none ${
+                          isDark ? 'bg-slate-900 border-slate-700 text-white focus:border-red-500' : 'bg-white border-gray-200 text-slate-900 focus:border-red-500'
+                        }`}
+                      />
+                      <span className="text-xs font-bold text-emerald-500">créditos</span>
+                      <div className="flex gap-1 ml-2">
+                        {[5, 10, 20, 50].map(cr => (
+                          <button
+                            key={cr}
+                            type="button"
+                            onClick={() => handlePaidChatChange('costCredits', cr)}
+                            className={`text-[9px] font-bold px-2 py-1 rounded-lg border ${
+                              paidChat.costCredits === cr ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400 border-slate-700'
+                            }`}
+                          >
+                            {cr}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* TOGGLE 3: MODO DO CRONÔMETRO (INDIVIDUAL vs SINCRONIZADO COM A SALA) */}
+              <div className={`p-4 rounded-2xl border transition-all ${
+                isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-gray-50 border-gray-200'
+              }`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                      paidChat.timerMode === 'room_global' 
+                        ? 'bg-purple-500/20 text-purple-400' 
+                        : 'bg-blue-500/20 text-blue-400'
+                    }`}>
+                      <Users size={18} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                          Modo do Cronômetro
+                        </span>
+                        <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
+                          paidChat.timerMode === 'room_global'
+                            ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                            : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                        }`}>
+                          {paidChat.timerMode === 'room_global' ? 'GLOBAL DA SALA' : 'INDIVIDUAL POR USUÁRIO'}
+                        </span>
+                      </div>
+                      <p className={`text-[11px] mt-0.5 font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {paidChat.timerMode === 'room_global'
+                          ? 'Sincronizado com o criador: a sala fecha no tempo do criador. Quem entrar faltando 2 minutos terá apenas 2 minutos.'
+                          : 'Individual: cada usuário conta 5 minutos separadamente a partir do exato momento em que entrou na sala.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 bg-black/20 p-1 rounded-xl border border-white/5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handlePaidChatChange('timerMode', 'individual')}
+                      className={`text-[10px] font-black uppercase px-2.5 py-1.5 rounded-lg transition-all ${
+                        paidChat.timerMode !== 'room_global'
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Individual
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handlePaidChatChange('timerMode', 'room_global')}
+                      className={`text-[10px] font-black uppercase px-2.5 py-1.5 rounded-lg transition-all ${
+                        paidChat.timerMode === 'room_global'
+                          ? 'bg-purple-600 text-white shadow-sm'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Global
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* TOGGLE 4: FECHAMENTO AUTOMÁTICO DA SALA (SEM RENOVAÇÃO) */}
+              <div className={`p-4 rounded-2xl border transition-all ${
+                paidChat.autoCloseOnExpire 
+                  ? (isDark ? 'bg-red-950/30 border-red-500/40' : 'bg-red-50 border-red-200')
+                  : (isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-gray-50 border-gray-200')
+              }`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                      paidChat.autoCloseOnExpire 
+                        ? 'bg-red-600 text-white' 
+                        : (isDark ? 'bg-slate-800 text-slate-500' : 'bg-gray-200 text-slate-500')
+                    }`}>
+                      <X size={18} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                          Fechamento Automático da Sala ao Expirar
+                        </span>
+                        <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
+                          paidChat.autoCloseOnExpire 
+                            ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
+                            : (isDark ? 'bg-slate-800 text-slate-500' : 'bg-gray-200 text-slate-600')
+                        }`}>
+                          {paidChat.autoCloseOnExpire ? 'FECHA SOZINHA (SEM RENOVAÇÃO)' : 'PERMITE RENOVAR'}
+                        </span>
+                      </div>
+                      <p className={`text-[11px] mt-0.5 font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Quando ativado, a sala fecha sozinha e encerra o chat ao fim do tempo, sem exibir modal para o usuário renovar.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={Boolean(paidChat.autoCloseOnExpire)}
+                    onClick={() => handlePaidChatChange('autoCloseOnExpire', !paidChat.autoCloseOnExpire)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      paidChat.autoCloseOnExpire ? 'bg-red-600' : (isDark ? 'bg-slate-700' : 'bg-gray-300')
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        paidChat.autoCloseOnExpire ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* TOGGLE 5: EXIBIR CRONÔMETRO PARA O USUÁRIO NO TOPO */}
               <div className={`p-4 rounded-2xl border transition-all ${
                 isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-gray-50 border-gray-200'
               }`}>
@@ -511,11 +680,9 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <label className={`text-[10px] font-black uppercase tracking-widest block ${
-                          isDark ? 'text-slate-300' : 'text-slate-700'
-                        }`}>
-                          EXIBIR CRONÔMETRO PARA O USUÁRIO NO TOPO
-                        </label>
+                        <span className={`text-xs font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                          Exibir Cronômetro para o Usuário no Topo
+                        </span>
                         <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
                           paidChat.showTimerToParticipants 
                             ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
@@ -556,10 +723,23 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({
                 <AlertCircle size={18} className="shrink-0 mt-0.5 text-blue-400" />
                 <div className="text-[11px] leading-relaxed">
                   <span className="font-bold block uppercase tracking-wider text-[10px] text-blue-400 mb-0.5">
-                    Como funciona a Renovação de Chat:
+                    Resumo das Regras de Tempo da Sala:
                   </span>
-                  A cada <strong>{paidChat.intervalMinutes} minutos</strong>, surge para o usuário participante um modal com <strong>cronômetro regressivo vermelho de {paidChat.warningSeconds || 60}s</strong>.
-                  O usuário pode pagar <strong>{paidChat.costCredits} créditos</strong> para renovar ou ativar o <strong>Débito Automático</strong> para renovar de forma contínua sem travar a conversa. Se não pagar, a sessão é pausada.
+                  {paidChat.timeLimitEnabled ? (
+                    <>
+                      O cronômetro roda em ciclos de <strong>{paidChat.intervalMinutes} minutos</strong> no modo <strong>{paidChat.timerMode === 'room_global' ? 'Global Sincronizado' : 'Individual por Usuário'}</strong>.
+                      {paidChat.autoCloseOnExpire ? (
+                        <span> Ao término, <strong>a sala fecha automaticamente</strong> sem opção de renovação.</span>
+                      ) : paidChat.paidRenewalEnabled ? (
+                        <span> O usuário receberá aviso em vermelho de {paidChat.warningSeconds || 60}s e poderá pagar <strong>{paidChat.costCredits} créditos</strong> para renovar.</span>
+                      ) : (
+                        <span> O chat reinicia o tempo gratuitamente para o usuário.</span>
+                      )}
+                      <span> Como criador, ao clicar no cronômetro da sala você pode <strong>monitorar todos os usuários em tempo real</strong>.</span>
+                    </>
+                  ) : (
+                    <span>O chat está sem limite de tempo (tempo ilimitado).</span>
+                  )}
                 </div>
               </div>
 
