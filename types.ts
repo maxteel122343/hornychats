@@ -119,6 +119,7 @@ export interface PaidChatConfig {
   costCredits: number;
   warningSeconds: number;
   autoDebitDefault?: boolean;
+  showTimerToParticipants?: boolean;
 }
 
 export interface QuickPhrasesConfig {

@@ -257,7 +257,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       intervalMinutes: 5,
       costCredits: 10,
       warningSeconds: 60,
-      autoDebitDefault: false
+      autoDebitDefault: false,
+      showTimerToParticipants: false
     };
   });
 
@@ -292,7 +293,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       intervalMinutes: 5,
       costCredits: 10,
       warningSeconds: 60,
-      autoDebitDefault: false
+      autoDebitDefault: false,
+      showTimerToParticipants: false
     };
     if (sessionId === roomId) {
       pChat = { ...paidChatConfig };
@@ -335,6 +337,30 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     setIsQuickSettingsOpen(true);
   };
 
+  // Helper para formatar segundos em MM:SS
+  const formatTimer = (totalSeconds: number) => {
+    const safe = Math.max(0, Math.floor(totalSeconds));
+    const m = Math.floor(safe / 60);
+    const s = safe % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  // Helper para calcular tempo restante de uma sessão específica
+  const calculateSessionTimer = (sessionId: string, cfg: PaidChatConfig | null) => {
+    if (!cfg || !cfg.enabled) return 0;
+    const cycle = Math.max(30, (cfg.intervalMinutes || 5) * 60);
+    let start = Date.now();
+    try {
+      const saved = localStorage.getItem(`session_start_${sessionId}_${user.id}`);
+      if (saved) {
+        const num = parseInt(saved, 10);
+        if (!isNaN(num) && num > 0) start = num;
+      }
+    } catch (e) {}
+    const elapsed = Math.max(0, Math.floor((Date.now() - start) / 1000));
+    return cycle - (elapsed % cycle);
+  };
+
   // Chat Renewal States (Cronômetro regressivo em vermelho e Débito Automático)
   const [isRenewalModalOpen, setIsRenewalModalOpen] = useState(false);
   const [renewalSecondsRemaining, setRenewalSecondsRemaining] = useState(60);
@@ -349,6 +375,22 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
     }
     return Date.now();
   });
+
+  // Manter sessionStartTime sincronizado ao trocar de sala
+  useEffect(() => {
+    if (!roomId) return;
+    const saved = localStorage.getItem(`session_start_${roomId}_${user.id}`);
+    if (saved) {
+      const num = parseInt(saved, 10);
+      if (!isNaN(num) && num > 0) {
+        setSessionStartTime(num);
+        return;
+      }
+    }
+    const now = Date.now();
+    setSessionStartTime(now);
+    localStorage.setItem(`session_start_${roomId}_${user.id}`, now.toString());
+  }, [roomId, user.id]);
 
   const [autoDebit, setAutoDebit] = useState<boolean>(() => {
     if (typeof window !== 'undefined' && roomId) {
@@ -686,11 +728,17 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
   // Paid Chat Rotation Timer Effect (Cobrança Rotativa a cada X minutos)
   useEffect(() => {
-    // If not enabled or if the user is the room creator/host, host does not pay
-    if (!paidChatConfig.enabled || isHost || !roomId) {
+    // If not enabled or no roomId, reset states
+    if (!paidChatConfig.enabled || !roomId) {
       setIsRenewalModalOpen(false);
       setIsChatPausedDueToRenewal(false);
       return;
+    }
+
+    // Host does not pay, so ensure modal and pause are closed
+    if (isHost) {
+      setIsRenewalModalOpen(false);
+      setIsChatPausedDueToRenewal(false);
     }
 
     const interval = setInterval(() => {
@@ -700,6 +748,11 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
       const secondsLeftInCycle = cycleDurationSeconds - (elapsedSeconds % cycleDurationSeconds);
 
       setRenewalSecondsRemaining(secondsLeftInCycle);
+
+      // If user is room creator/host, host does not receive renewal prompts, warnings or chat pause
+      if (isHost) {
+        return;
+      }
 
       // Warning window reached (e.g. within 60s / 300s before expiring)
       if (secondsLeftInCycle <= warningDuration && secondsLeftInCycle > 1) {
@@ -3371,6 +3424,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
           const currentRoomDetails = isActive ? roomDetails : null; // We only have details for current room easily
           const displayImage = currentRoomDetails?.image_url || null;
           const isOtherUserRoom = session.id !== user.id && !session.id.startsWith('priv-') && !session.id.startsWith('room-');
+          const isCreatorOfSession = !isOtherUserRoom || (isActive && isHost);
 
           // Check if this specific session has paid chat enabled
           let sessionPaidConfig: PaidChatConfig | null = null;
@@ -3459,6 +3513,27 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
                           <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shrink-0" title="Cobrança ativa" />
                         )}
                       </button>
+
+                      {/* Cronômetro da Sala - Apenas para Criador (Destaque da Imagem 1) */}
+                      {isCreatorOfSession && isSessionPaidActive && (
+                        <div 
+                          className={`flex items-center gap-1 px-1.5 py-0.5 sm:py-1 rounded-xl border text-[9px] font-mono font-black tracking-tight shrink-0 select-none shadow-xs transition-all ${
+                            isGold 
+                              ? 'bg-[#A37B14]/15 text-[#A37B14] border-[#A37B14]/35' 
+                              : isDark 
+                                ? 'bg-red-950/40 text-red-400 border-red-500/40 ring-1 ring-red-500/20' 
+                                : 'bg-red-50 text-red-600 border-red-300 ring-1 ring-red-200'
+                          }`}
+                          title={`Cronômetro da Sala (${sessionPaidConfig?.intervalMinutes || 5} min)`}
+                        >
+                          <Clock size={10} className="shrink-0 text-red-500 animate-pulse" />
+                          <span>
+                            {isActive
+                              ? formatTimer(renewalSecondsRemaining)
+                              : formatTimer(calculateSessionTimer(session.id, sessionPaidConfig))}
+                          </span>
+                        </div>
+                      )}
 
                       <button
                         onClick={(e) => handleCloseSession(e, session.id)}
@@ -3587,6 +3662,36 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ user, updateCredits, updateFreeCred
 
           {/* Header Right: Theme + Wallet/Credits + Video Call + Lixeira (Limpar) + Earnings + Share + Close */}
           <div className="flex items-center gap-1 sm:gap-2 shrink-0 relative">
+            {/* Cronômetro da Sala na Borda Superior (Ao lado do alternar tema p gold - Destaque da Imagem 2) */}
+            {paidChatConfig.enabled && (isHost || paidChatConfig.showTimerToParticipants) && (
+              <div 
+                className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-mono font-black border tracking-tight shadow-xs select-none transition-all ${
+                  isGold 
+                    ? 'bg-white border-[#1A1712]/15 text-[#A37B14]' 
+                    : isDark
+                      ? (renewalSecondsRemaining <= (paidChatConfig.warningSeconds || 60)
+                          ? 'bg-red-950/60 text-red-400 border-red-500/60 ring-1 ring-red-500/30'
+                          : 'bg-slate-900/90 text-amber-400 border-slate-700/80')
+                      : (renewalSecondsRemaining <= (paidChatConfig.warningSeconds || 60)
+                          ? 'bg-red-50 text-red-600 border-red-300 ring-1 ring-red-200'
+                          : 'bg-amber-50 text-amber-800 border-amber-200')
+                }`}
+                title={`Tempo Restante da Sala (${paidChatConfig.intervalMinutes} min): ${formatTimer(renewalSecondsRemaining)}`}
+              >
+                <Clock 
+                  size={14} 
+                  className={`shrink-0 ${
+                    renewalSecondsRemaining <= (paidChatConfig.warningSeconds || 60)
+                      ? 'text-red-500 animate-pulse' 
+                      : isGold ? 'text-[#A37B14]' : 'text-amber-500'
+                  }`} 
+                />
+                <span className={renewalSecondsRemaining <= (paidChatConfig.warningSeconds || 60) ? 'text-red-500 font-bold' : ''}>
+                  {formatTimer(renewalSecondsRemaining)}
+                </span>
+              </div>
+            )}
+
             <button 
               type="button"
               onClick={toggleTheme} 

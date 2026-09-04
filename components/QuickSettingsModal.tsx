@@ -75,7 +75,8 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({
     intervalMinutes: 5,
     costCredits: 10,
     warningSeconds: 60,
-    autoDebitDefault: false
+    autoDebitDefault: false,
+    showTimerToParticipants: false
   });
 
   // Quick Phrases State (Balões de Frases)
@@ -492,6 +493,59 @@ export const QuickSettingsModal: React.FC<QuickSettingsModalProps> = ({
                       {sec / 60} min ({sec}s)
                     </button>
                   ))}
+                </div>
+              </div>
+
+              {/* Toggle: Exibir Cronômetro para o Usuário no Topo */}
+              <div className={`p-4 rounded-2xl border transition-all ${
+                isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-gray-50 border-gray-200'
+              }`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
+                      paidChat.showTimerToParticipants 
+                        ? (isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700')
+                        : (isDark ? 'bg-slate-800 text-slate-500' : 'bg-gray-200 text-slate-500')
+                    }`}>
+                      <Timer size={18} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <label className={`text-[10px] font-black uppercase tracking-widest block ${
+                          isDark ? 'text-slate-300' : 'text-slate-700'
+                        }`}>
+                          EXIBIR CRONÔMETRO PARA O USUÁRIO NO TOPO
+                        </label>
+                        <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
+                          paidChat.showTimerToParticipants 
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                            : (isDark ? 'bg-slate-800 text-slate-500' : 'bg-gray-200 text-slate-600')
+                        }`}>
+                          {paidChat.showTimerToParticipants ? 'ATIVADO' : 'DESLIGADO'}
+                        </span>
+                      </div>
+                      <p className={`text-[11px] mt-0.5 font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Quando ativado, o cronômetro da sala aparece para os participantes na borda superior da sala (ao lado do alternar tema).
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={Boolean(paidChat.showTimerToParticipants)}
+                    onClick={() => handlePaidChatChange('showTimerToParticipants', !paidChat.showTimerToParticipants)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      paidChat.showTimerToParticipants ? 'bg-emerald-500' : (isDark ? 'bg-slate-700' : 'bg-gray-300')
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        paidChat.showTimerToParticipants ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
                 </div>
               </div>
 
