@@ -134,11 +134,12 @@ export interface UserTimerState {
   userName: string;
   userPhoto?: string;
   secondsRemaining: number;
-  cycleMinutes: number;
+  cycleMinutes?: number;
   renewalCount: number; // Quantas vezes o relógio já reiniciou
   status: 'active' | 'warning' | 'expired' | 'renewed' | 'left';
   enteredAt: number;
-  lastHeartbeat: number;
+  lastHeartbeat?: number;
+  lastActive?: number;
 }
 
 export interface QuickPhrasesConfig {

@@ -34,13 +34,14 @@ export const RoomTimerMonitorModal: React.FC<RoomTimerMonitorModalProps> = ({
   const isDark = theme === 'dark' || isGold;
 
   const timerList = Object.values(userTimers);
+  const isTimerActive = Boolean(config.timeLimitEnabled || config.enabled);
 
   // Stats calculation
   const totalUsers = timerList.length;
-  const activeCount = timerList.filter(u => u.status === 'active').length;
-  const warningCount = timerList.filter(u => u.status === 'warning').length;
+  const activeCount = timerList.filter(u => u.status === 'active' || u.status === 'renewed').length;
+  const warningCount = isTimerActive ? timerList.filter(u => u.status === 'warning').length : 0;
   const renewedCount = timerList.filter(u => u.status === 'renewed' || u.renewalCount > 0).length;
-  const expiredCount = timerList.filter(u => u.status === 'expired').length;
+  const expiredCount = isTimerActive ? timerList.filter(u => u.status === 'expired').length : 0;
   const leftCount = timerList.filter(u => u.status === 'left').length;
 
   const formatTimer = (totalSeconds: number) => {
@@ -58,7 +59,14 @@ export const RoomTimerMonitorModal: React.FC<RoomTimerMonitorModalProps> = ({
         </span>
       );
     }
-    if (user.status === 'expired') {
+    if (!isTimerActive) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-950/70 text-emerald-400 border border-emerald-500/40">
+          <CheckCircle2 size={10} /> Conectado • Tempo Livre
+        </span>
+      );
+    }
+    if (user.status === 'expired' || user.secondsRemaining <= 0) {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-red-950/70 text-red-400 border border-red-500/50 animate-pulse">
           <ShieldAlert size={10} /> Sala Fechada
@@ -109,15 +117,24 @@ export const RoomTimerMonitorModal: React.FC<RoomTimerMonitorModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base sm:text-lg font-black tracking-tight">Monitor de Tempo dos Usuários</h3>
+                <h3 className="text-base sm:text-lg font-black tracking-tight">
+                  {isTimerActive ? 'Monitor de Tempo dos Usuários' : 'Monitor de Presença dos Usuários'}
+                </h3>
                 <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${
-                  isGold ? 'bg-[#A37B14]/15 border-[#A37B14]/30 text-[#A37B14]' : 'bg-blue-500/10 border-blue-500/20 text-blue-400'
+                  isGold 
+                    ? 'bg-[#A37B14]/15 border-[#A37B14]/30 text-[#A37B14]' 
+                    : isTimerActive 
+                      ? 'bg-blue-500/10 border-blue-500/20 text-blue-400'
+                      : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
                 }`}>
-                  {config.timerMode === 'room_global' ? 'Global da Sala' : 'Individual'}
+                  {isTimerActive ? (config.timerMode === 'room_global' ? 'Global da Sala' : 'Individual') : 'Acesso Livre'}
                 </span>
               </div>
               <p className={`text-xs mt-0.5 truncate font-medium ${isGold ? 'text-[#A37B14]' : isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                {roomName} • Ciclo de {config.intervalMinutes || 5} min • {config.paidRenewalEnabled ? `${config.costCredits} créditos/renovação` : 'Sem cobrança'}
+                {isTimerActive 
+                  ? `${roomName} • Ciclo de ${config.intervalMinutes || 5} min • ${config.paidRenewalEnabled ? `${config.costCredits} créditos/renovação` : 'Sem cobrança'}`
+                  : `${roomName} • Relógio Desativado • Monitorando participantes em tempo real`
+                }
               </p>
             </div>
           </div>
@@ -182,7 +199,7 @@ export const RoomTimerMonitorModal: React.FC<RoomTimerMonitorModalProps> = ({
               <Users size={36} className="mb-2 opacity-50" />
               <p className="text-xs font-bold uppercase tracking-widest">Nenhum visitante conectado no momento</p>
               <p className="text-[11px] mt-1 max-w-xs font-medium opacity-70">
-                Quando os usuários entrarem na sala com o tempo ativado, seus cronômetros individuais e histórico aparecerão aqui em tempo real.
+                Assim que qualquer visitante entrar nesta sala (com ou sem cronômetro ativado), ele aparecerá aqui instantaneamente em tempo real.
               </p>
               {onRefresh && (
                 <button
@@ -245,13 +262,15 @@ export const RoomTimerMonitorModal: React.FC<RoomTimerMonitorModalProps> = ({
                   <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/5">
                     {/* Timer */}
                     <div className={`px-3 py-1.5 rounded-xl border text-center font-mono font-black text-xs sm:text-sm tracking-tight ${
-                      isExpired
-                        ? 'bg-red-600 text-white border-red-500 shadow-sm'
-                        : isWarning
-                          ? 'bg-amber-500 text-black border-amber-400 animate-pulse'
-                          : (isGold ? 'bg-[#A37B14]/20 text-[#A37B14] border-[#A37B14]/40' : isDark ? 'bg-slate-800 text-white border-slate-700' : 'bg-white text-slate-800 border-gray-300')
+                      !isTimerActive
+                        ? (isGold ? 'bg-[#A37B14]/20 text-[#A37B14] border-[#A37B14]/40' : isDark ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
+                        : isExpired
+                          ? 'bg-red-600 text-white border-red-500 shadow-sm'
+                          : isWarning
+                            ? 'bg-amber-500 text-black border-amber-400 animate-pulse'
+                            : (isGold ? 'bg-[#A37B14]/20 text-[#A37B14] border-[#A37B14]/40' : isDark ? 'bg-slate-800 text-white border-slate-700' : 'bg-white text-slate-800 border-gray-300')
                     }`}>
-                      {userTimer.status === 'left' ? 'OFFLINE' : formatTimer(userTimer.secondsRemaining)}
+                      {userTimer.status === 'left' ? 'OFFLINE' : (!isTimerActive ? 'LIVRE' : formatTimer(userTimer.secondsRemaining))}
                     </div>
 
                     {/* Quick Actions for Creator */}
