@@ -51,22 +51,41 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User>(() => {
+    const today = new Date().toISOString().split('T')[0];
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('guest_user');
       if (saved) {
         try {
-          return JSON.parse(saved);
+          const parsed = JSON.parse(saved);
+          const lastClaimDate = parsed.last_free_claim_at ? parsed.last_free_claim_at.split('T')[0] : null;
+          const paid = parsed.paid_credits !== undefined ? parsed.paid_credits : Math.max(0, (parsed.credits || 0) - (parsed.free_credits || 0));
+
+          // Renovação diária de 20 créditos gratuitos para o visitante
+          if (!lastClaimDate || lastClaimDate !== today) {
+            const renewedUser = {
+              ...parsed,
+              free_credits: 20,
+              paid_credits: paid,
+              credits: paid + 20,
+              last_free_claim_at: new Date().toISOString()
+            };
+            localStorage.setItem('guest_user', JSON.stringify(renewedUser));
+            return renewedUser;
+          }
+          return parsed;
         } catch (e) {}
       }
     }
-    const newGuest = {
+    const newGuest: User = {
       id: 'guest_' + Math.random().toString(36).substr(2, 5),
       name: 'Visitante',
-      credits: 50,
-      free_credits: 50,
+      credits: 20,
+      free_credits: 20,
+      paid_credits: 0,
       earnings: 0,
       isHost: false,
-      isLoggedIn: false
+      isLoggedIn: false,
+      last_free_claim_at: new Date().toISOString()
     };
     if (typeof window !== 'undefined') {
       localStorage.setItem('guest_user', JSON.stringify(newGuest));
@@ -250,25 +269,60 @@ const App: React.FC = () => {
           localStorage.setItem('linkcard_user_photo', loadedPhoto);
         }
 
+        const rawPaid = profile.paid_credits !== undefined 
+          ? profile.paid_credits 
+          : Math.max(0, (profile.credits ?? 0) - (profile.free_credits ?? 0));
+        const rawFree = profile.free_credits !== undefined ? profile.free_credits : 20;
+        const todayStr = new Date().toISOString().split('T')[0];
+        const lastClaimDate = profile.last_free_claim_at ? profile.last_free_claim_at.split('T')[0] : null;
+
+        let currentFree = rawFree;
+        let currentPaid = rawPaid;
+        let currentClaimAt = profile.last_free_claim_at || new Date().toISOString();
+        let needsDbSync = false;
+
+        // Renovação diária de 20 créditos gratuitos para o criador/usuário autenticado
+        if (!lastClaimDate || lastClaimDate !== todayStr) {
+          currentFree = 20; // Renova os 20 créditos gratuitos diários
+          currentClaimAt = new Date().toISOString();
+          needsDbSync = true;
+        }
+
+        const currentTotal = currentPaid + currentFree;
+
+        if (needsDbSync) {
+          supabase.from('profiles').update({
+            free_credits: currentFree,
+            paid_credits: currentPaid,
+            credits: currentTotal,
+            last_free_claim_at: currentClaimAt
+          }).eq('id', profile.id).then(({ error }) => {
+            if (error) console.warn("Erro ao atualizar renovação diária no perfil:", error);
+          });
+        }
+
         setUser({
           id: profile.id,
           name: profile.username || sbUser.email?.split('@')[0],
-          credits: profile.credits ?? 50,
+          credits: currentTotal,
           earnings: profile.earnings ?? 0,
-          free_credits: profile.free_credits ?? 0,
-          last_free_claim_at: profile.last_free_claim_at,
+          free_credits: currentFree,
+          paid_credits: currentPaid,
+          last_free_claim_at: currentClaimAt,
           isLoggedIn: true,
           profilePhoto: loadedPhoto,
           isHost: true // Authenticated users can be hosts
         });
       } else {
-        // Create profile if not exists
+        // Create profile if not exists with 20 daily free credits
         const newProfile = {
           id: sbUser.id,
           username: sbUser.email?.split('@')[0],
-          credits: 50,
+          credits: 20,
           earnings: 0,
-          free_credits: 50
+          free_credits: 20,
+          paid_credits: 0,
+          last_free_claim_at: new Date().toISOString()
         };
         await supabase.from('profiles').insert([newProfile]);
         setUser({ ...newProfile, isLoggedIn: true, name: newProfile.username, isHost: true });
@@ -286,38 +340,94 @@ const App: React.FC = () => {
   };
 
   const updateCredits = async (amount: number) => {
-    const newCredits = user.credits + amount;
-    setUser(prev => ({ ...prev, credits: newCredits }));
+    setUser(prev => {
+      let paid = prev.paid_credits !== undefined ? prev.paid_credits : Math.max(0, prev.credits - (prev.free_credits || 0));
+      let free = prev.free_credits !== undefined ? prev.free_credits : 0;
 
-    if (user.isLoggedIn) {
-      await supabase
-        .from('profiles')
-        .update({ credits: newCredits })
-        .eq('id', user.id);
-    }
+      if (amount > 0) {
+        // Recarga ou depósito (ex: Pix) -> adiciona aos créditos pagos permanentes
+        paid += amount;
+      } else if (amount < 0) {
+        // Cobrança / gasto (ex: renovação de chat, compra de card)
+        // Consome primeiro os créditos gratuitos diários; se faltar, debita dos créditos pagos
+        const cost = Math.abs(amount);
+        if (free >= cost) {
+          free -= cost;
+        } else {
+          const remainder = cost - free;
+          free = 0;
+          paid = Math.max(0, paid - remainder);
+        }
+      }
+
+      const total = paid + free;
+      const updatedUser: User = {
+        ...prev,
+        credits: total,
+        free_credits: free,
+        paid_credits: paid
+      };
+
+      if (typeof window !== 'undefined' && !prev.isLoggedIn) {
+        localStorage.setItem('guest_user', JSON.stringify(updatedUser));
+      }
+
+      if (prev.isLoggedIn) {
+        supabase
+          .from('profiles')
+          .update({ 
+            credits: total,
+            free_credits: free,
+            paid_credits: paid
+          })
+          .eq('id', prev.id)
+          .then(({ error }) => {
+            if (error) console.warn("Erro ao atualizar créditos no DB:", error);
+          });
+      }
+
+      return updatedUser;
+    });
   };
 
   const updateFreeCredits = async (amount: number, updateTimestamp: boolean = false) => {
-    const newFreeCredits = (user.free_credits || 0) + amount;
-    const newTotalCredits = user.credits + amount;
-    const now = new Date().toISOString();
+    setUser(prev => {
+      const newFree = Math.max(0, (prev.free_credits || 0) + amount);
+      const paid = prev.paid_credits !== undefined ? prev.paid_credits : Math.max(0, prev.credits - (prev.free_credits || 0));
+      const total = paid + newFree;
+      const now = new Date().toISOString();
 
-    setUser(prev => ({
-      ...prev,
-      free_credits: newFreeCredits,
-      credits: newTotalCredits,
-      last_free_claim_at: updateTimestamp ? now : prev.last_free_claim_at
-    }));
+      const updatedUser: User = {
+        ...prev,
+        free_credits: newFree,
+        paid_credits: paid,
+        credits: total,
+        last_free_claim_at: updateTimestamp ? now : prev.last_free_claim_at
+      };
 
-    if (user.isLoggedIn) {
-      const updateData: any = { free_credits: newFreeCredits, credits: newTotalCredits };
-      if (updateTimestamp) updateData.last_free_claim_at = now;
+      if (typeof window !== 'undefined' && !prev.isLoggedIn) {
+        localStorage.setItem('guest_user', JSON.stringify(updatedUser));
+      }
 
-      await supabase
-        .from('profiles')
-        .update(updateData)
-        .eq('id', user.id);
-    }
+      if (prev.isLoggedIn) {
+        const updateData: any = { 
+          free_credits: newFree, 
+          paid_credits: paid, 
+          credits: total 
+        };
+        if (updateTimestamp) updateData.last_free_claim_at = now;
+
+        supabase
+          .from('profiles')
+          .update(updateData)
+          .eq('id', prev.id)
+          .then(({ error }) => {
+            if (error) console.warn("Erro ao atualizar free_credits no DB:", error);
+          });
+      }
+
+      return updatedUser;
+    });
   };
 
   return (

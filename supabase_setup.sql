@@ -88,7 +88,8 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS picpay_email TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS paypal_email TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS stripe_email TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS earnings INT DEFAULT 0;
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS free_credits INT DEFAULT 50;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS free_credits INT DEFAULT 20;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS paid_credits INT DEFAULT 0;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS last_free_claim_at TEXT;
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;

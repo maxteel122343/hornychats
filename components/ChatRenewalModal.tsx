@@ -4,6 +4,7 @@ import { AppTheme } from '../types';
 
 interface ChatRenewalModalProps {
   isOpen: boolean;
+  isHost?: boolean;
   onClose: () => void;
   onRenew: () => void;
   onOpenWallet: () => void;
@@ -23,6 +24,7 @@ interface ChatRenewalModalProps {
 
 export const ChatRenewalModal: React.FC<ChatRenewalModalProps> = ({
   isOpen,
+  isHost = false,
   onClose,
   onRenew,
   onOpenWallet,
@@ -39,7 +41,8 @@ export const ChatRenewalModal: React.FC<ChatRenewalModalProps> = ({
   isExpired = false,
   isFreeRenewal = false
 }) => {
-  if (!isOpen) return null;
+  // O modal de renovação NUNCA deve ser exibido para o criador da sala
+  if (!isOpen || isHost) return null;
 
   const isDark = theme === 'dark';
   const effectiveCost = isFreeRenewal ? 0 : costCredits;

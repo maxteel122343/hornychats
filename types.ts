@@ -90,6 +90,7 @@ export interface User {
   paypalEmail?: string;
   stripeEmail?: string;
   free_credits?: number;
+  paid_credits?: number;
   last_free_claim_at?: string;
 }
 
